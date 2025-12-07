@@ -1,6 +1,12 @@
 {
   "name": "hiivmind-skills-documentation-navigation",
-  "owner": "hiivmind",
+  "owner": {
+    "name": "hiivmind"
+  },
+  "metadata": {
+    "description": "Meta-plugin for generating documentation skill plugins to index and navigate any open source project documentation",
+    "version": "1.0.0"
+  },
   "plugins": [
     {
       "name": "documentation-skills",
