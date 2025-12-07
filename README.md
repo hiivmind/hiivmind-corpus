@@ -2,6 +2,16 @@
 
 Claude Code skills for indexing and navigating open source project documentation.
 
+## Installation
+
+```bash
+# Add the marketplace
+/plugin marketplace add hiivmind/hiivmind-skills-documentation-navigation
+
+# Install the plugin
+/plugin install hiivmind-skills-documentation-navigation@documentation-skills
+```
+
 ## Overview
 
 This plugin provides skills to:

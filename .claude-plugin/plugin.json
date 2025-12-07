@@ -1,11 +1,11 @@
 {
-  "name": "documentation-indexing-and-navigation-skills",
+  "name": "documentation-skills",
   "description": "Meta-plugin for generating documentation skill plugins to index and navigate any open source project documentation",
   "version": "1.0.0",
   "author": {
     "name": "Nathaniel Ramm"
   },
-  "repository": "https://github.com/hiivmind/documentation_skills",
+  "repository": "https://github.com/hiivmind/hiivmind-skills-documentation-navigation",
   "keywords": [
     "documentation",
     "meta-plugin",
