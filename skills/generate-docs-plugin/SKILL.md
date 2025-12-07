@@ -10,27 +10,71 @@ Generate a documentation skill plugin structure for any open source project.
 ## Process
 
 ```
-1. DISCOVER  →  2. RESEARCH  →  3. GENERATE
-   (clone)       (analyze)      (files)
+1. INPUT      →  2. SCAFFOLD    →  3. CLONE       →  4. RESEARCH  →  5. GENERATE  →  6. CLEANUP
+   (gather)       (create dir)      (into scaffold)   (analyze)      (files)         (remove clone)
 ```
 
 **Note:** After generating, run `docs-init` to build the index collaboratively.
 
-## Phase 1: Discover
+## Phase 1: Input Gathering
 
-Clone the target documentation repository temporarily.
+Before doing anything, collect required information:
+
+| Input | Source | Example |
+|-------|--------|---------|
+| **Repo URL** | User provides | `https://github.com/pola-rs/polars` |
+| **Plugin name** | Derive from repo or ask user | `polars-docs` |
+| **Docs path** | Usually `docs/`, verify from URL or ask | `docs/` |
+
+### Deriving Plugin Name
+
+Extract from repo URL:
+- `https://github.com/pola-rs/polars` → `polars-docs`
+- `https://github.com/prisma/docs` → `prisma-docs`
+- `https://github.com/ClickHouse/ClickHouse` → `clickhouse-docs`
+
+**If ambiguous, ask the user.**
+
+### Plugin Destination
+
+All doc plugins are created in:
+```
+~/.claude/plugins/marketplaces/hiivmind-skills-documentation-navigation/
+```
+
+## Phase 2: Scaffold
+
+Create the plugin directory structure **before cloning**:
 
 ```bash
+# Set variables (replace with actual values)
+PLUGIN_NAME="polars-docs"
+PLUGIN_ROOT="$HOME/.claude/plugins/marketplaces/hiivmind-skills-documentation-navigation/${PLUGIN_NAME}"
+
+# Create the plugin directory
+mkdir -p "${PLUGIN_ROOT}"
+cd "${PLUGIN_ROOT}"
+```
+
+Now you have a destination for everything that follows.
+
+## Phase 3: Clone
+
+Clone the source repo **inside the plugin directory**:
+
+```bash
+cd "${PLUGIN_ROOT}"
 git clone --depth 1 {repo_url} .temp-source
 ```
 
-Identify:
-- Documentation location (`docs/`, `documentation/`, root)
-- File count and types (`.md`, `.mdx`, `.rst`)
+This ensures:
+- Clone is relative to the plugin being created
+- Easy cleanup later
+- No confusion about working directory
 
-## Phase 2: Research
+## Phase 4: Research
 
-Analyze the existing structure. **Do not assume** - investigate.
+Analyze the cloned documentation. **Do not assume** - investigate.
 
 ### Questions to Answer
 
@@ -44,6 +88,8 @@ Analyze the existing structure. **Do not assume** - investigate.
 
 ### Research Commands
 
+All commands run from `${PLUGIN_ROOT}`:
+
 ```bash
 # Framework detection
 ls .temp-source/
@@ -51,43 +97,49 @@ ls .temp-source/
 # Find nav structure
 find .temp-source -name "sidebars*" -o -name "mkdocs.yml" -o -name "conf.py"
 
+# Count doc files
+find .temp-source/{docs_path} -name "*.md" -o -name "*.mdx" | wc -l
+
 # Sample frontmatter
-head -30 .temp-source/docs/some-file.md
+head -30 .temp-source/{docs_path}/some-file.md
 
 # Check for external sources
-grep -r "git clone" .temp-source/scripts/ .temp-source/package.json
+grep -r "git clone" .temp-source/scripts/ .temp-source/package.json 2>/dev/null
 ```
 
-## Phase 3: Generate
+## Phase 5: Generate
 
-Create the plugin structure:
+Create the plugin files in `${PLUGIN_ROOT}`:
+
+### Directory Structure
 
 ```
-{project}-docs/
+{plugin-name}/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── skills/
 │   └── navigate/
-│       └── SKILL.md      # Per-project (for discoverability)
+│       └── SKILL.md
 ├── data/
 │   ├── config.yaml
 │   └── index.md          # Placeholder - built by docs-init
+├── .temp-source/         # Temporary - removed in Phase 6
 ├── .gitignore
 └── README.md
 ```
 
 ### Files to Create
 
-**plugin.json**
+**`.claude-plugin/plugin.json`**
 ```json
 {
-  "name": "{project}-docs",
+  "name": "{plugin-name}",
   "description": "Always-current {Project} documentation",
   "version": "1.0.0"
 }
 ```
 
-**config.yaml**
+**`data/config.yaml`**
 ```yaml
 source:
   repo_url: "{repo_url}"
@@ -106,37 +158,71 @@ settings:
     - "**/_*.md"
 ```
 
-**index.md** (placeholder)
+**`data/index.md`** (placeholder)
 ```markdown
 # {Project} Documentation Index
 
 > Run `docs-init` to build this index.
 ```
 
-**navigate/SKILL.md** - Per-project, with specific description for discoverability.
+**`skills/navigate/SKILL.md`**
+- Per-project skill with specific description for discoverability
+- Include project name in the skill description
 
-### Cleanup
+**`.gitignore`**
+```
+.temp-source/
+```
 
-Remove temporary clone after generating:
+**`README.md`**
+- Brief description of the plugin
+- Link to source documentation
+- Instructions for updating index
+
+## Phase 6: Cleanup
+
+Remove the temporary clone:
+
+```bash
+cd "${PLUGIN_ROOT}"
+rm -rf .temp-source
+```
+
+## Example Walkthrough
+
+**User**: "Create a docs plugin for Polars: https://github.com/pola-rs/polars/tree/main/docs"
+
+### Phase 1 - Input
+- Repo URL: `https://github.com/pola-rs/polars`
+- Plugin name: `polars-docs`
+- Docs path: `docs/` (from URL)
+
+### Phase 2 - Scaffold
+```bash
+mkdir -p ~/.claude/plugins/marketplaces/hiivmind-skills-documentation-navigation/polars-docs
+cd ~/.claude/plugins/marketplaces/hiivmind-skills-documentation-navigation/polars-docs
+```
+
+### Phase 3 - Clone
+```bash
+git clone --depth 1 https://github.com/pola-rs/polars .temp-source
+```
+
+### Phase 4 - Research
+- Framework: MkDocs (found `mkdocs.yml`)
+- Nav: Defined in `mkdocs.yml`
+- 150 markdown files
+- Docs root: `docs/`
+
+### Phase 5 - Generate
+Create all plugin files with discovered values.
+
+### Phase 6 - Cleanup
 ```bash
 rm -rf .temp-source
 ```
 
-## Example
-
-**User**: "Create a docs plugin for Prisma"
-
-**Phase 1**: Clone `https://github.com/prisma/docs` to `.temp-source`
-
-**Phase 2**:
-- Framework: Docusaurus
-- Nav: `sidebars.js`
-- 450 MDX files
-- Docs root: `docs/`
-
-**Phase 3**: Generate `prisma-docs/` structure
-
-**Next step**: Run `docs-init` from within `prisma-docs/` to build the index.
+**Next step**: Run `docs-init` from within `polars-docs/` to build the index.
 
 ## Reference
 
