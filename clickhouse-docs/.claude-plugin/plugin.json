@@ -1,0 +1,10 @@
+{
+  "name": "clickhouse-docs",
+  "description": "Always-current ClickHouse documentation with indexed navigation",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nathaniel Ramm"
+  },
+  "repository": "https://github.com/hiivmind/documentation_skills",
+  "keywords": ["clickhouse", "documentation", "database", "analytics", "olap"]
+}

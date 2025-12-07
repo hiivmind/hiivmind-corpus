@@ -1,0 +1,19 @@
+# {{project_display_name}} Documentation Plugin Configuration
+
+source:
+  repo_url: "{{repo_url}}"
+  branch: "{{branch}}"
+  docs_root: "{{docs_root}}"
+
+index:
+  last_commit_sha: null
+  last_indexed_at: null
+  format: "markdown"
+
+settings:
+  include_patterns:
+    - "**/*.md"
+    - "**/*.mdx"
+  exclude_patterns:
+    - "**/_*.md"
+    - "**/_snippets/**"

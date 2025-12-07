@@ -1,0 +1,10 @@
+{
+  "name": "{{project_name}}-docs",
+  "description": "{{description}}",
+  "version": "1.0.0",
+  "author": {
+    "name": "{{author_name}}"
+  },
+  "repository": "https://github.com/hiivmind/documentation_skills",
+  "keywords": [{{keywords_json}}]
+}

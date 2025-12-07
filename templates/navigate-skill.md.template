@@ -1,0 +1,56 @@
+---
+name: {{project_name}}-navigate
+description: Find relevant {{project_display_name}} documentation. Use when working with {{project_display_name}} code, APIs, or configuration.
+---
+
+# {{project_display_name}} Documentation Navigator
+
+Find and retrieve relevant documentation from the {{project_display_name}} docs.
+
+## Process
+
+1. **Read the index**: `data/index.md`
+2. **Find relevant file path** from index entries
+3. **Get content** (see Source Access below)
+4. **Answer** with citation to file path
+
+## Source Access
+
+### If `.source/` exists (local clone)
+Read directly from `.source/{path}`
+
+### If `.source/` doesn't exist
+
+**Option A: Fetch on demand**
+```
+https://raw.githubusercontent.com/{{repo_owner}}/{{repo_name}}/{{branch}}/{path}
+```
+Use WebFetch to retrieve content. No clone needed.
+
+**Option B: Clone locally**
+```bash
+git clone --depth 1 {{repo_url}} .source
+```
+
+After cloning, compare commits:
+```bash
+cd .source && git rev-parse HEAD
+```
+
+Compare this to `last_commit_sha` in `data/config.yaml`:
+- If clone is **newer** → warn user: "The docs have been updated since the index was built. Consider running maintenance to update the index."
+- Continue answering regardless
+
+## File Locations
+
+- **Index**: `data/index.md`
+- **Config**: `data/config.yaml` (has `last_commit_sha`)
+- **Local source**: `.source/{{docs_root}}` (if cloned)
+- **Remote source**: `https://raw.githubusercontent.com/{{repo_owner}}/{{repo_name}}/{{branch}}/{{docs_root}}`
+
+## Output
+
+- Cite the file path for reference
+- Include code examples from the docs
+- Suggest related docs from the same index section
+- If source is newer than index, note this to user
