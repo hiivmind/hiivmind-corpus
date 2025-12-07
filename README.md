@@ -173,6 +173,35 @@ The index covers:
 
 The navigate skill is immediately usable. Run `docs-maintain` periodically to check for upstream changes.
 
+## Repository Organization
+
+This repository contains the **meta-plugin** (skills for generating and maintaining doc plugins) plus **one reference implementation** (clickhouse-docs). Generated documentation plugins should live in their own repositories.
+
+### Why separate repos?
+
+**Indexes are personal.** The collaborative index you build reflects *your* priorities and use cases. Someone focused on ClickHouse analytics has different needs than someone building ETL pipelines. A centralized collection of "everyone's indexes" has limited value.
+
+**Independent lifecycles.** Your doc plugin updates when *you* need it updated, not when someone else changes theirs.
+
+**Lightweight installation.** Users install only the doc plugins they actually use.
+
+### Recommended approach
+
+| Repository | Contents |
+|------------|----------|
+| This repo | Meta-plugin skills + templates + reference implementation |
+| `your-org/prisma-docs` | Your Prisma documentation plugin |
+| `your-org/react-docs` | Your React documentation plugin |
+
+### The clickhouse-docs example
+
+The `clickhouse-docs/` directory serves as:
+- A working reference implementation
+- A test case for meta-plugin changes
+- An example of index structure and organization
+
+Feel free to use it directly, or use it as a template for your own plugins.
+
 ## Future Enhancements
 
 See [docs/future-enhancements.md](docs/future-enhancements.md) for planned improvements including:
