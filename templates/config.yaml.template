@@ -1,4 +1,4 @@
-# {{project_display_name}} Documentation Plugin Configuration
+# {{project_display_name}} Corpus Configuration
 
 source:
   repo_url: "{{repo_url}}"

@@ -1,16 +1,16 @@
 {
-  "name": "documentation-skills",
-  "description": "Meta-plugin for generating documentation skill plugins to index and navigate any open source project documentation",
+  "name": "hiivmind-corpus",
+  "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
   "version": "1.0.0",
   "author": {
     "name": "Nathaniel Ramm"
   },
-  "repository": "https://github.com/hiivmind/hiivmind-skills-documentation-navigation",
+  "repository": "https://github.com/hiivmind/hiivmind-corpus",
   "keywords": [
     "documentation",
+    "corpus",
     "meta-plugin",
     "skills",
-    "exploration",
     "navigation",
     "indexing"
   ]

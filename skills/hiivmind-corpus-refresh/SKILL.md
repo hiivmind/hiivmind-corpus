@@ -1,15 +1,15 @@
 ---
-name: docs-refresh
-description: Refresh documentation index by comparing with upstream changes. Diffs against last indexed commit and aligns index structure/content.
+name: hiivmind-corpus-refresh
+description: Refresh corpus index by comparing with upstream changes. Diffs against last indexed commit and aligns index structure/content.
 ---
 
-# Documentation Index Refresh
+# Corpus Index Refresh
 
 Compare index against upstream commits and refresh based on diff.
 
 ## Prerequisites
 
-Run from within a docs plugin directory (e.g., `clickhouse-docs/`).
+Run from within a corpus skill directory (e.g., `hiivmind-corpus-polars/`).
 
 Requires initialized plugin with `data/config.yaml`:
 ```yaml
@@ -23,7 +23,7 @@ index:
   last_indexed_at: "2025-01-01T00:00:00Z"
 ```
 
-**Note:** For first-time setup, use `docs-initial-analysis` instead.
+**Note:** For first-time setup, use `hiivmind-corpus-build` instead.
 
 ## Commands
 
@@ -157,8 +157,7 @@ git commit -m "Update docs index to {short_sha}"
 
 ## Reference
 
-- Initialize plugin: `skills/docs-plugin-init/SKILL.md`
-- Initial analysis: `skills/docs-initial-analysis/SKILL.md`
-- Enhance topics: `skills/docs-enhance/SKILL.md`
-- Example implementation: `clickhouse-docs/`
+- Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
+- Build index: `skills/hiivmind-corpus-build/SKILL.md`
+- Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
 - Future enhancements: `docs/future-enhancements.md`

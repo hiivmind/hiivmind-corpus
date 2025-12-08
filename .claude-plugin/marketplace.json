@@ -1,19 +1,19 @@
 {
-  "name": "hiivmind-skills-documentation-navigation",
+  "name": "hiivmind-corpus",
   "owner": {
     "name": "hiivmind"
   },
   "metadata": {
-    "description": "Meta-plugin for generating documentation skill plugins to index and navigate any open source project documentation",
+    "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
     "version": "1.0.0"
   },
   "plugins": [
     {
-      "name": "documentation-skills",
+      "name": "hiivmind-corpus",
       "source": "./",
-      "description": "Meta-plugin for generating, initializing, and maintaining documentation navigation plugins",
+      "description": "Create, build, and maintain documentation corpus skills for any project",
       "version": "1.0.0",
-      "keywords": ["documentation", "meta-plugin", "skills", "navigation", "indexing"]
+      "keywords": ["documentation", "corpus", "meta-plugin", "skills", "navigation", "indexing"]
     }
   ]
 }

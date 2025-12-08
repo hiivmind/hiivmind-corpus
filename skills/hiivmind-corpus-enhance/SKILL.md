@@ -1,19 +1,19 @@
 ---
-name: docs-enhance
-description: Enhance an existing documentation index by adding depth to specific topics. Use when you need more detail on particular areas.
+name: hiivmind-corpus-enhance
+description: Enhance an existing corpus index by adding depth to specific topics. Use when you need more detail on particular areas.
 ---
 
-# Documentation Index Enhancement
+# Corpus Index Enhancement
 
-Expand and deepen specific sections of an existing documentation index.
+Expand and deepen specific sections of an existing corpus index.
 
 ## Prerequisites
 
-Run from within a docs plugin directory (e.g., `clickhouse-docs/`).
+Run from within a corpus skill directory (e.g., `hiivmind-corpus-polars/`).
 
-Requires an initialized index at `data/index.md` (run `docs-initial-analysis` first).
+Requires an initialized index at `data/index.md` (run `hiivmind-corpus-build` first).
 
-**Note:** This skill enhances index *depth*, not *freshness*. Use `docs-refresh` to sync with upstream changes.
+**Note:** This skill enhances index *depth*, not *freshness*. Use `hiivmind-corpus-refresh` to sync with upstream changes.
 
 ## When to Use
 
@@ -195,7 +195,6 @@ User: "Perfect, but add the PREWHERE section too"
 
 ## Reference
 
-- Initialize plugin: `skills/docs-plugin-init/SKILL.md`
-- Initial analysis: `skills/docs-initial-analysis/SKILL.md`
-- Refresh from upstream: `skills/docs-refresh/SKILL.md`
-- Example implementation: `clickhouse-docs/`
+- Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
+- Build index: `skills/hiivmind-corpus-build/SKILL.md`
+- Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`

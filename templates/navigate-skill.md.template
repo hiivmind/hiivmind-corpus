@@ -1,11 +1,11 @@
 ---
-name: {{project_name}}-navigate
+name: hiivmind-corpus-{{project_name}}-navigate
 description: Find relevant {{project_display_name}} documentation. Use when working with {{project_display_name}} code, APIs, or configuration.
 ---
 
-# {{project_display_name}} Documentation Navigator
+# {{project_display_name}} Corpus Navigator
 
-Find and retrieve relevant documentation from the {{project_display_name}} docs.
+Find and retrieve relevant documentation from the {{project_display_name}} corpus.
 
 ## Process
 

@@ -1,15 +1,15 @@
 ---
-name: docs-initial-analysis
-description: Analyze documentation and build the initial index collaboratively. Use after generating a new docs plugin.
+name: hiivmind-corpus-build
+description: Analyze documentation and build the initial corpus index collaboratively. Use after running hiivmind-corpus-init.
 ---
 
-# Documentation Index Initialization
+# Corpus Index Builder
 
 Clone the documentation source and build the index collaboratively with the user.
 
 ## Prerequisites
 
-Run from within a docs plugin directory (e.g., `clickhouse-docs/`).
+Run from within a corpus skill directory (e.g., `hiivmind-corpus-polars/`).
 
 Requires `data/config.yaml` with source configuration:
 ```yaml
@@ -142,7 +142,7 @@ git commit -m "Initialize {project} docs index"
 
 ## Example Session
 
-**User**: "Initialize the prisma-docs index"
+**User**: "Build the hiivmind-corpus-prisma index"
 
 **Step 1**: Clone `https://github.com/prisma/docs`
 
@@ -166,7 +166,6 @@ git commit -m "Initialize {project} docs index"
 
 ## Reference
 
-- Initialize plugin: `skills/docs-plugin-init/SKILL.md`
-- Enhance topics: `skills/docs-enhance/SKILL.md`
-- Refresh from upstream: `skills/docs-refresh/SKILL.md`
-- Example implementation: `clickhouse-docs/`
+- Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
+- Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
+- Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`

@@ -1,39 +1,39 @@
-# Documentation Navigation Skills
+# hiivmind-corpus
 
-Claude Code skills for indexing and navigating open source project documentation.
+Claude Code skills for creating and maintaining documentation corpus indexes.
 
 ## What is a "meta-skill"?
 
 This is a skill that **creates other skills**.
 
-Most Claude Code skills help you do something directly—write code, search files, fetch data. This plugin is different: it helps you **build custom skills** for navigating any project's documentation.
+Most Claude Code skills help you do something directly—write code, search files, fetch data. This plugin is different: it helps you **build custom corpus skills** for navigating any project's documentation.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  This Plugin (meta-skill)                                       │
-│                                                                 │
-│  docs-plugin-init  →  docs-initial-analysis  →  docs-refresh   │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │  prisma-docs    │  │  clickhouse-docs│  │  react-docs     │ │
-│  │  (skill)        │  │  (skill)        │  │  (skill)        │ │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘ │
-└───────────┼─────────────────────┼─────────────────────┼─────────┘
-            ▼                     ▼                     ▼
-     Prisma docs            ClickHouse docs        React docs
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  hiivmind-corpus (meta-skill)                                               │
+│                                                                             │
+│  corpus-init  →  corpus-build  →  corpus-refresh                            │
+│       │                                                                     │
+│       ▼                                                                     │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐ │
+│  │ hiivmind-corpus-    │  │ hiivmind-corpus-    │  │ hiivmind-corpus-    │ │
+│  │ prisma              │  │ clickhouse          │  │ react               │ │
+│  └──────────┬──────────┘  └──────────┬──────────┘  └──────────┬──────────┘ │
+└─────────────┼─────────────────────────┼─────────────────────────┼───────────┘
+              ▼                         ▼                         ▼
+       Prisma docs               ClickHouse docs              React docs
 ```
 
-The skills you generate are:
+The corpus skills you generate are:
 - **Persistent** — committed to your repo, survive across sessions
 - **Tailored** — built collaboratively around your actual use case
 - **Maintainable** — track upstream changes, know when they're stale
 
-Think of it as a skill factory: you feed it a documentation source, and it produces a specialized navigation skill for that project.
+Think of it as a skill factory: you feed it a documentation source, and it produces a specialized corpus skill for that project.
 
-## Two ways to create documentation skills
+## Two ways to create corpus skills
 
-When you run `docs-plugin-init`, you'll choose where the skill should live:
+When you run `hiivmind-corpus-init`, you'll choose where the skill should live:
 
 ### Project-local skill
 
@@ -41,7 +41,7 @@ When you run `docs-plugin-init`, you'll choose where the skill should live:
 your-project/
 ├── .claude-plugin/
 │   └── skills/
-│       └── polars-docs/      ← Created here
+│       └── hiivmind-corpus-polars/    ← Created here
 │           ├── SKILL.md
 │           └── data/
 └── src/
@@ -58,7 +58,7 @@ your-project/
 ### Standalone plugin
 
 ```
-polars-docs/                   ← Created as separate directory/repo
+hiivmind-corpus-polars/            ← Created as separate directory/repo
 ├── .claude-plugin/
 │   └── plugin.json
 ├── skills/navigate/
@@ -75,7 +75,7 @@ polars-docs/                   ← Created as separate directory/repo
 
 | Aspect | Project-local | Standalone |
 |--------|---------------|------------|
-| Location | `.claude-plugin/skills/{name}/` | `{name}/` separate repo |
+| Location | `.claude-plugin/skills/hiivmind-corpus-{lib}/` | `hiivmind-corpus-{lib}/` separate repo |
 | Installation | None—just open the project | Marketplace install required |
 | Scope | This project only | All your projects |
 | Team sharing | Automatic (via git) | Each person installs |
@@ -85,16 +85,16 @@ polars-docs/                   ← Created as separate directory/repo
 
 ```bash
 # Add the marketplace
-/plugin marketplace add hiivmind/hiivmind-skills-documentation-navigation
+/plugin marketplace add hiivmind/hiivmind-corpus
 
 # Install the plugin
-/plugin install documentation-skills@hiivmind-skills-documentation-navigation
+/plugin install hiivmind-corpus
 ```
 
 ## Overview
 
 This plugin provides skills to:
-- Generate documentation plugins for any open source project
+- Generate corpus skills for any open source project
 - Build collaborative, human-readable indexes
 - Keep indexes in sync with upstream changes
 - Navigate docs with or without a local clone
@@ -117,7 +117,7 @@ Without structured indexing, Claude investigates libraries by:
 - Large doc sites are hard to navigate systematically
 - Training cutoff means stale knowledge for fast-moving projects
 
-### What this skill suite provides
+### What hiivmind-corpus provides
 
 | Capability | Benefit |
 |------------|---------|
@@ -129,7 +129,7 @@ Without structured indexing, Claude investigates libraries by:
 
 ### When to use this vs. default lookup
 
-**Use this skill suite when:**
+**Use hiivmind-corpus when:**
 - Documentation is large (100+ pages)
 - You have specific, recurring needs (not one-off questions)
 - Docs change frequently
@@ -150,50 +150,50 @@ The collaborative index building. Rather than Claude guessing what matters, you 
 ```
 .
 ├── .claude-plugin/
-│   └── plugin.json              # Root plugin manifest
+│   └── plugin.json                 # Root plugin manifest
 ├── skills/
-│   ├── docs-plugin-init/        # Create new doc plugins
-│   ├── docs-initial-analysis/   # Analyze docs, build index
-│   ├── docs-enhance/            # Deepen specific topics
-│   └── docs-refresh/            # Refresh from upstream changes
-├── templates/                   # Templates for generated plugins
-└── docs/                        # Specifications
+│   ├── hiivmind-corpus-init/       # Create new corpus skills
+│   ├── hiivmind-corpus-build/      # Analyze docs, build index
+│   ├── hiivmind-corpus-enhance/    # Deepen specific topics
+│   └── hiivmind-corpus-refresh/    # Refresh from upstream changes
+├── templates/                      # Templates for generated skills
+└── docs/                           # Specifications
 ```
 
 ## Workflow
 
 ```
-docs-plugin-init  →  docs-initial-analysis  →  docs-refresh
-  (structure)             (index)               (upstream diff)
-                             ↓
-                       docs-enhance
-                      (deepen topics)
+hiivmind-corpus-init  →  hiivmind-corpus-build  →  hiivmind-corpus-refresh
+     (structure)              (index)                 (upstream diff)
+                                 ↓
+                        hiivmind-corpus-enhance
+                           (deepen topics)
 ```
 
 | Skill | When | What |
 |-------|------|------|
-| `docs-plugin-init` | Once per project | Creates folder structure, config, navigate skill |
-| `docs-initial-analysis` | Once per documentation source | Analyzes docs, builds index collaboratively with user |
-| `docs-enhance` | As needed | Expands coverage on specific topics in existing index |
-| `docs-refresh` | Ongoing | Compares upstream diff, refreshes index when needed |
+| `hiivmind-corpus-init` | Once per project | Creates folder structure, config, navigate skill |
+| `hiivmind-corpus-build` | Once per documentation source | Analyzes docs, builds index collaboratively with user |
+| `hiivmind-corpus-enhance` | As needed | Expands coverage on specific topics in existing index |
+| `hiivmind-corpus-refresh` | Ongoing | Compares upstream diff, refreshes index when needed |
 
 ## Usage
 
-### Create a new documentation plugin
+### Create a new corpus skill
 
 ```
-"Create a docs plugin for ClickHouse"
+"Create a corpus skill for ClickHouse"
 ```
 
 This will:
 1. Clone the docs repo temporarily
 2. Analyze structure (framework, file types, organization)
-3. Generate `clickhouse-docs/` with config and navigate skill
+3. Generate `hiivmind-corpus-clickhouse/` with config and navigate skill
 
-### Initialize the index
+### Build the index
 
 ```
-"Initialize the clickhouse-docs index"
+"Build the hiivmind-corpus-clickhouse index"
 ```
 
 This will:
@@ -217,8 +217,8 @@ The per-project navigate skill will:
 ### Enhance a topic
 
 ```
-"Enhance the Query Optimization section in clickhouse-docs"
-"I need more detail on migrations in prisma-docs"
+"Enhance the Query Optimization section in hiivmind-corpus-clickhouse"
+"I need more detail on migrations in hiivmind-corpus-prisma"
 ```
 
 This will:
@@ -227,11 +227,11 @@ This will:
 3. Explore docs for additional relevant content
 4. Collaboratively expand the section
 
-### Update from upstream
+### Refresh from upstream
 
 ```
-"Check if clickhouse-docs needs updating"
-"Update the clickhouse-docs index"
+"Check if hiivmind-corpus-clickhouse needs updating"
+"Refresh the hiivmind-corpus-clickhouse index"
 ```
 
 ## Design Principles
@@ -242,14 +242,14 @@ This will:
 
 **Works without local clone**: Navigate skill can fetch from raw GitHub URLs when `.source/` doesn't exist.
 
-**Per-project discoverability**: Each doc plugin has its own navigate skill with a specific description (e.g., "Find ClickHouse documentation for data modeling, ETL, query optimization").
+**Per-project discoverability**: Each corpus skill has its own navigate skill with a specific description (e.g., "Find ClickHouse documentation for data modeling, ETL, query optimization").
 
-**Centralized refresh**: One `docs-refresh` skill works across all doc plugins.
+**Centralized refresh**: One `hiivmind-corpus-refresh` skill works across all corpus skills.
 
-## Example: ClickHouse Docs
+## Example: ClickHouse Corpus
 
 ```
-clickhouse-docs/
+hiivmind-corpus-clickhouse/
 ├── .claude-plugin/plugin.json
 ├── skills/navigate/SKILL.md     # "Find ClickHouse documentation..."
 ├── data/
@@ -267,41 +267,32 @@ The index covers:
 
 ## Adding a New Documentation Source
 
-1. Run `docs-plugin-init` with the repo URL
-2. Run `docs-initial-analysis` from the new plugin directory
+1. Run `hiivmind-corpus-init` with the repo URL
+2. Run `hiivmind-corpus-build` from the new skill directory
 3. Collaborate on index contents
 4. Commit `data/index.md` and `data/config.yaml`
 
-The navigate skill is immediately usable. Run `docs-refresh` periodically to check for upstream changes.
+The navigate skill is immediately usable. Run `hiivmind-corpus-refresh` periodically to check for upstream changes.
 
 ## Repository Organization
 
-This repository contains the **meta-plugin** (skills for generating and maintaining doc plugins) plus **one reference implementation** (clickhouse-docs). Generated documentation plugins should live in their own repositories.
+This repository contains the **meta-plugin** (skills for generating and maintaining corpus skills). Generated corpus skills should live in their own repositories following the `hiivmind-corpus-{project}` naming convention.
 
 ### Why separate repos?
 
 **Indexes are personal.** The collaborative index you build reflects *your* priorities and use cases. Someone focused on ClickHouse analytics has different needs than someone building ETL pipelines. A centralized collection of "everyone's indexes" has limited value.
 
-**Independent lifecycles.** Your doc plugin updates when *you* need it updated, not when someone else changes theirs.
+**Independent lifecycles.** Your corpus skill updates when *you* need it updated, not when someone else changes theirs.
 
-**Lightweight installation.** Users install only the doc plugins they actually use.
+**Lightweight installation.** Users install only the corpus skills they actually use.
 
 ### Recommended approach
 
 | Repository | Contents |
 |------------|----------|
-| This repo | Meta-plugin skills + templates + reference implementation |
-| `your-org/prisma-docs` | Your Prisma documentation plugin |
-| `your-org/react-docs` | Your React documentation plugin |
-
-### The clickhouse-docs example
-
-The `clickhouse-docs/` directory serves as:
-- A working reference implementation
-- A test case for meta-plugin changes
-- An example of index structure and organization
-
-Feel free to use it directly, or use it as a template for your own plugins.
+| `hiivmind/hiivmind-corpus` | Meta-plugin skills + templates |
+| `hiivmind/hiivmind-corpus-prisma` | Prisma documentation corpus |
+| `hiivmind/hiivmind-corpus-react` | React documentation corpus |
 
 ## Future Enhancements
 

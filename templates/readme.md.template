@@ -1,4 +1,4 @@
-# {{project_display_name}} Documentation Plugin
+# {{project_display_name}} Documentation Corpus
 
 A Claude Code plugin providing always-current access to {{project_display_name}} documentation with intelligent navigation.
 
@@ -14,10 +14,10 @@ A Claude Code plugin providing always-current access to {{project_display_name}}
 
 ```bash
 # Add the marketplace containing this plugin
-/plugin marketplace add hiivmind/documentation_skills
+/plugin marketplace add hiivmind/hiivmind-corpus-{{project_name}}
 
 # Install the plugin
-/plugin install {{project_name}}-docs
+/plugin install hiivmind-corpus-{{project_name}}
 
 # Restart Claude Code
 ```
@@ -67,34 +67,24 @@ Rebuild the {{project_display_name}} documentation index from scratch
 
 ## Skills
 
-### {{project_name}}-navigate
+### hiivmind-corpus-{{project_name}}-navigate
 
 Finds relevant documentation for {{project_display_name}}-related coding tasks. Automatically invoked when you ask about:
 
 {{skill_topics}}
 
-### {{project_name}}-maintain
-
-Manages the documentation index:
-
-- **build**: Full index rebuild
-- **update**: Incremental update from git diff
-- **status**: Check index freshness
-
 ## File Structure
 
 ```
-{{project_name}}-docs/
+hiivmind-corpus-{{project_name}}/
 ├── .claude-plugin/
 │   └── plugin.json           # Plugin manifest
 ├── skills/
-│   ├── navigate/
-│   │   └── SKILL.md          # Documentation navigation
-│   └── maintain/
-│       └── SKILL.md          # Index maintenance
+│   └── navigate/
+│       └── SKILL.md          # Documentation navigation
 ├── data/
 │   ├── config.yaml           # Source repo + settings
-│   └── index.yaml            # Generated documentation index
+│   └── index.md              # Generated documentation index
 ├── .source/                  # Cloned docs repo (gitignored)
 └── README.md
 ```
