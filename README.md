@@ -107,14 +107,19 @@ The collaborative index building. Rather than Claude guessing what matters, you 
 │   ├── docs-enhance/            # Deepen specific topics
 │   └── docs-refresh/            # Refresh from upstream changes
 ├── templates/                   # Templates for generated plugins
-├── docs/                        # Specifications
+└── docs/                        # Specifications
+```
+
+## Outputs (Example)
+```
+
+.
 └── clickhouse-docs/             # Example implementation
     ├── .claude-plugin/
     ├── skills/navigate/         # Per-project navigation skill
     └── data/
         ├── config.yaml          # Source metadata
         └── index.md             # Human-readable index
-```
 
 ## Workflow
 
