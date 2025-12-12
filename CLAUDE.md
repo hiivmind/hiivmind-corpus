@@ -127,3 +127,48 @@ When answering questions, the navigate skill:
 ## Working with Templates
 
 Templates in `templates/` use placeholders like `{{project_name}}`, `{{repo_url}}`, etc. The `hiivmind-corpus-init` skill fills these based on target repository analysis.
+
+## Maintaining Skill Alignment
+
+**IMPORTANT**: All 6 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
+
+### Cross-Cutting Concerns
+
+These features span multiple skills and must stay synchronized:
+
+| Feature | Relevant Skills | What to Check |
+|---------|-----------------|---------------|
+| Destination types | init, enhance, refresh, upgrade | Prerequisites table lists all 4 types |
+| Tiered indexes | build, enhance, refresh, upgrade | Detection logic, update handling |
+| Source types (git/local/web) | add-source, build, enhance, refresh | Path formats, fetch methods |
+| `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
+| Project awareness | init, upgrade | Template exists, navigate skill section |
+| Config schema | all skills | Schema fields, validation |
+
+### When Adding New Features
+
+1. **Implement in the primary skill** (where the feature originates)
+2. **Update skills that validate prerequisites** (enhance, refresh) with awareness
+3. **Update hiivmind-corpus-upgrade** to detect and apply the feature to existing corpora
+4. **Update templates** if the navigate skill needs new sections
+5. **Update this CLAUDE.md** with the feature in Key Design Decisions and/or this table
+
+### Skill Dependency Chain
+
+```
+init ──────────► templates/
+                    │
+add-source ◄───────┤
+                    │
+build ◄────────────┤
+                    │
+enhance ◄──────────┤ (must know all features to validate)
+                    │
+refresh ◄──────────┤ (must know all features to validate)
+                    │
+upgrade ◄──────────┘ (must know all features to retrofit)
+```
+
+### Reference Sections
+
+Every skill has a `## Reference` section at the bottom listing all other skills. When adding a new skill, update all existing skills' Reference sections.
