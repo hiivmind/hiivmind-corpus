@@ -497,3 +497,4 @@ Updated config with new SHA: def456
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
+- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`

@@ -11,11 +11,13 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 ## Architecture
 
 ```
-├── skills/                           # Four core skills (the meta-plugin)
+├── skills/                           # Six core skills (the meta-plugin)
 │   ├── hiivmind-corpus-init/         # Step 1: Create skill structure from template
 │   ├── hiivmind-corpus-build/        # Step 2: Analyze docs, build index with user
+│   ├── hiivmind-corpus-add-source/   # Add git repos, local docs, or web pages
 │   ├── hiivmind-corpus-enhance/      # Deepen coverage on specific topics
-│   └── hiivmind-corpus-refresh/      # Refresh index from upstream changes
+│   ├── hiivmind-corpus-refresh/      # Refresh index from upstream changes
+│   └── hiivmind-corpus-upgrade/      # Upgrade existing corpora to latest standards
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -30,12 +32,17 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
                                  ↓
                         hiivmind-corpus-enhance
                             (as needed)
+                                 ↓
+                        hiivmind-corpus-upgrade
+                      (when meta-plugin updates)
 ```
 
 1. **hiivmind-corpus-init**: Clones target repo, analyzes structure, generates skill directory
-2. **hiivmind-corpus-build**: Analyzes docs, builds `index.md` collaboratively with user
-3. **hiivmind-corpus-enhance**: Deepens coverage on specific topics (runs on existing index)
-4. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
+2. **hiivmind-corpus-add-source**: Adds git repos, local documents, or web pages to existing corpus
+3. **hiivmind-corpus-build**: Analyzes docs, builds `index.md` collaboratively with user
+4. **hiivmind-corpus-enhance**: Deepens coverage on specific topics (runs on existing index)
+5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
+6. **hiivmind-corpus-upgrade**: Updates existing corpora to latest template standards
 
 ## Two Destination Types
 
@@ -61,7 +68,8 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 ├── SKILL.md                     # Navigate skill
 ├── data/
 │   ├── config.yaml
-│   └── index.md
+│   ├── index.md
+│   └── project-awareness.md     # Snippet for project CLAUDE.md
 └── .source/                     # Gitignored
 ```
 
@@ -72,7 +80,8 @@ hiivmind-corpus-{project}/
 ├── skills/navigate/SKILL.md     # Project-specific navigation skill
 ├── data/
 │   ├── config.yaml              # Source repo URL, branch, last indexed commit SHA
-│   └── index.md                 # Human-readable markdown index
+│   ├── index.md                 # Human-readable markdown index
+│   └── project-awareness.md     # Snippet for project CLAUDE.md
 ├── .source/                     # Local clone (gitignored)
 └── README.md
 ```
@@ -81,7 +90,7 @@ hiivmind-corpus-{project}/
 
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
-- Skills: `hiivmind-corpus-init`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`
+- Skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-upgrade`
 - Generated skills: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
 
 ## Key Design Decisions
@@ -91,6 +100,8 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - **Works without local clone**: Falls back to raw GitHub URLs
 - **Change tracking**: Stores commit SHA to know when index is stale
 - **Per-project skills**: Each corpus skill has its own navigate skill for discoverability
+- **Project awareness**: Corpora include snippets for injecting into project CLAUDE.md files
+- **Upgradeable**: `hiivmind-corpus-upgrade` brings existing corpora to latest template standards
 
 ## Index Format
 

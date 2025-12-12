@@ -441,3 +441,4 @@ User: "The detailed actions sub-index"
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`
+- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`

@@ -275,3 +275,4 @@ Example entries:
 - Build full index: `skills/hiivmind-corpus-build/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
 - Refresh sources: `skills/hiivmind-corpus-refresh/SKILL.md`
+- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`
