@@ -79,6 +79,55 @@ If cache miss, look up the URL in `data/config.yaml` and fetch fresh content.
 - **Local sources**: `data/uploads/{source_id}/` (user-uploaded files)
 - **Web cache**: `.cache/web/{source_id}/` (fetched web content, gitignored)
 
+## Large Structured Files (schemas, specs, configs)
+
+For large files like GraphQL schemas, OpenAPI specs, or JSON configs, **DO NOT read the entire file**. Use Grep to search precisely:
+
+**GraphQL Schema patterns:**
+```bash
+# Find a type definition
+grep -n "^type Repository " schema.graphql -A 30
+
+# Find an input type
+grep -n "^input CreateIssueInput " schema.graphql -A 20
+
+# Find a mutation
+grep -n "createIssue" schema.graphql -B 2 -A 15
+
+# Find all fields returning a specific type
+grep -n ": Repository" schema.graphql
+
+# Find enum values
+grep -n "^enum IssueState " schema.graphql -A 10
+```
+
+**OpenAPI/Swagger patterns:**
+```bash
+# Find an endpoint
+grep -n "/repos/{owner}/{repo}/issues" openapi.yaml -A 30
+
+# Find a schema definition
+grep -n "^  Issue:" openapi.yaml -A 40
+```
+
+**General patterns:**
+```bash
+# Find definition with context
+grep -n "^{keyword}" file -A 20
+
+# Find all references to something
+grep -n "{keyword}" file
+
+# Case-insensitive search
+grep -ni "{keyword}" file
+```
+
+**When to use Grep vs Read:**
+- File > 1000 lines → prefer Grep
+- Looking for specific definition → Grep with `-A` context
+- Need surrounding context → Grep with `-B` and `-A`
+- Need to understand overall structure → Read first 100 lines, then Grep
+
 ## Output
 
 - Cite the source ID and file path for reference
