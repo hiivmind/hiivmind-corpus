@@ -28,16 +28,24 @@ Clone this repository to your Claude Code plugins directory.
 
 ## First-Time Setup
 
-After installing, invoke the maintenance skill to build the index:
+After installing, use the `hiivmind-corpus-build` skill to build the index:
 
 ```
 Please build the {{project_display_name}} documentation index
 ```
 
-This will:
-1. Clone the {{project_display_name}} docs repository to `.source/`
-2. Build the full index
-3. Write `data/config.yaml` and `data/index.yaml`
+This requires the `hiivmind-corpus` meta-plugin to be installed.
+
+## Maintenance Skills
+
+This corpus is managed by **hiivmind-corpus** skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-add-source` | Add new documentation sources |
+| `hiivmind-corpus-build` | Build/rebuild the documentation index |
+| `hiivmind-corpus-enhance` | Deepen coverage on specific topics |
+| `hiivmind-corpus-refresh` | Update index from upstream changes |
 
 ## Usage
 
@@ -51,18 +59,24 @@ The navigation skill is model-invoked. Simply ask questions about {{project_disp
 
 Claude will automatically find and cite relevant documentation.
 
-### Manual Index Updates
+### Index Updates
 
-Check if updates are available:
+Refresh from upstream changes (uses `hiivmind-corpus-refresh`):
 
 ```
-Check if the {{project_display_name}} documentation index needs updating
+Refresh the {{project_display_name}} corpus from upstream
 ```
 
-Force a full rebuild:
+Full rebuild (uses `hiivmind-corpus-build`):
 
 ```
 Rebuild the {{project_display_name}} documentation index from scratch
+```
+
+Enhance a specific topic (uses `hiivmind-corpus-enhance`):
+
+```
+Add more detail about authentication to the {{project_display_name}} index
 ```
 
 ## Skills
@@ -91,15 +105,13 @@ hiivmind-corpus-{{project_name}}/
 
 ## Configuration
 
-Edit `data/config.yaml` to customize:
+The `data/config.yaml` and `data/index.md` files are managed by hiivmind-corpus skills. Do not edit them manually.
 
-- **include_patterns**: File patterns to index
-- **exclude_patterns**: Files to skip
-- **language_filter**: Documentation language
-- **priority_paths**: Sections to index with more detail
+To add new sources, use `hiivmind-corpus-add-source`. To rebuild or enhance the index, use `hiivmind-corpus-build` or `hiivmind-corpus-enhance`.
 
 ## Requirements
 
+- `hiivmind-corpus` meta-plugin installed (provides maintenance skills)
 - Git (for cloning and updating documentation)
 - Claude Code with plugin support
 

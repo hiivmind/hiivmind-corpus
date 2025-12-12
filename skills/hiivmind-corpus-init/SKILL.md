@@ -7,41 +7,134 @@ description: Initialize a documentation corpus skill for any open source project
 
 Generate a documentation corpus skill structure for any open source project.
 
+## Scope Boundary
+
+**This skill ONLY creates the directory structure and placeholder files.**
+
+| This Skill Does | This Skill Does NOT Do |
+|-----------------|------------------------|
+| Create directories | Build the index |
+| Clone source repos | Analyze documentation content |
+| Generate config.yaml | Populate index.md with entries |
+| Create placeholder index.md | Read/summarize doc files |
+| Generate SKILL.md, README.md | Answer questions about the docs |
+
+**STOP after Phase 6 (Verify).** Do not attempt to build the index - that is `hiivmind-corpus-build`'s job.
+
 ## Process
 
 ```
-1. INPUT      →  2. SCAFFOLD    →  3. CLONE       →  4. RESEARCH  →  5. GENERATE  →  6. VERIFY
-   (gather)       (create dir)      (into scaffold)   (analyze)      (files)         (confirm)
+1. INPUT      →  2. SCAFFOLD    →  3. CLONE       →  4. RESEARCH  →  5. GENERATE  →  6. VERIFY  →  STOP
+   (gather)       (create dir)      (into scaffold)   (analyze)      (files)         (confirm)      ↓
+                                                                                              recommend
+                                                                                            corpus-build
 ```
-
-**Note:** After generating, run `hiivmind-corpus-build` to build the index collaboratively.
 
 ## Phase 1: Input Gathering
 
-Before doing anything, collect required information:
+Before doing anything, **detect the current context** and collect required information.
 
-### First: Where should this skill live?
+### First: Detect Context
 
-**Ask the user** which approach they want:
+Run these checks to understand where you're running:
 
-| Approach | Location | Best For |
-|----------|----------|----------|
-| **Project-local** | `.claude-plugin/skills/hiivmind-corpus-{lib}/` | This project only, team sharing |
-| **Standalone plugin** | `hiivmind-corpus-{lib}/` separate directory | Personal reuse across all repos |
+```bash
+# Check if we're in a git repo
+git rev-parse --show-toplevel 2>/dev/null && echo "GIT_REPO=true" || echo "GIT_REPO=false"
 
-**Project-local skill:**
-- Lives inside the current project's `.claude-plugin/` directory
-- No marketplace installation needed—just having the project open activates it
-- Great for teams: everyone who clones the project gets the skill automatically
+# Check for existing hiivmind-corpus marketplace
+ls .claude-plugin/marketplace.json 2>/dev/null && echo "HAS_MARKETPLACE=true" || echo "HAS_MARKETPLACE=false"
+
+# Check for existing corpus plugins (subdirectories with hiivmind-corpus- prefix)
+ls -d hiivmind-corpus-*/ 2>/dev/null && echo "HAS_CORPUS_PLUGINS=true" || echo "HAS_CORPUS_PLUGINS=false"
+
+# Check if this looks like an established project (non-corpus)
+ls package.json pyproject.toml Cargo.toml go.mod setup.py requirements.txt 2>/dev/null && echo "ESTABLISHED_PROJECT=true" || echo "ESTABLISHED_PROJECT=false"
+
+# Check for substantial code files
+find . -maxdepth 2 -name "*.py" -o -name "*.ts" -o -name "*.js" -o -name "*.go" -o -name "*.rs" 2>/dev/null | head -5
+```
+
+Based on these checks, determine which **Context** applies:
+
+---
+
+### Context A: Established Non-Corpus Repository
+
+**Detected when:** Running from a repo with project files (package.json, pyproject.toml, src/, etc.) that is NOT a hiivmind-corpus marketplace.
+
+**Confirm with user:** "This looks like an established project ({detected type}). Is that correct?"
+
+**Destination options:**
+
+| Option | Location | Best For |
+|--------|----------|----------|
+| **User-level** | `~/.claude/skills/hiivmind-corpus-{lib}/` | Personal use across all projects |
+| **Repo-local** | `{REPO_ROOT}/.claude-plugin/skills/hiivmind-corpus-{lib}/` | Team sharing, project-specific |
+
+**User-level skill:**
+- Lives in your personal Claude config (`~/.claude/skills/`)
+- Available in all your projects automatically
+- Not shared with teammates
+- Example: "I want Polars docs everywhere I work"
+
+**Repo-local skill:**
+- Lives inside this project's `.claude-plugin/` directory
+- No marketplace installation needed—just opening the project activates it
+- Great for teams: everyone who clones the repo gets the skill automatically
 - Scoped to this project's specific needs
-- Example: A data analysis project that needs Polars docs
+- Example: A data analysis project where the whole team needs Polars docs
 
-**Standalone plugin:**
-- Creates a separate `hiivmind-corpus-{lib}/` directory (typically its own repo, or a subdirectory of a broader corpus collection)
-- Requires marketplace installation to use
-- Reusable across all your projects and Claude instances
-- Independent lifecycle from any specific project
-- Example: "I always want React docs available everywhere"
+---
+
+### Context B: Fresh Repository / New Directory
+
+**Detected when:** Running from an empty or near-empty directory, OR a new git repo with minimal files.
+
+**Destination options:**
+
+| Option | Location | Best For |
+|--------|----------|----------|
+| **User-level** | `~/.claude/skills/hiivmind-corpus-{lib}/` | Personal use, no repo needed |
+| **Single-corpus repo** | `{PWD}/` (marketplace + plugin at root) | One corpus per repo, simple structure |
+| **Multi-corpus repo** | `{PWD}/hiivmind-corpus-{lib}/` (plugin as subdirectory) | Multiple corpora in one repo |
+
+**User-level skill:**
+- Same as Context A - personal use across all projects
+
+**Single-corpus repo:**
+- This directory becomes a standalone corpus plugin
+- Marketplace and plugin manifests at the same level
+- Simple structure for single-purpose repos
+- Example: `hiivmind-corpus-react/` containing just React docs
+
+**Multi-corpus repo:**
+- This directory becomes a marketplace containing multiple corpus plugins
+- Each corpus is a subdirectory (e.g., `hiivmind-corpus-react/`, `hiivmind-corpus-vue/`)
+- Marketplace at root references all plugins via `marketplace.json`
+- Example: `hiivmind-corpus-frontend/` containing React, Vue, and Svelte corpora
+
+---
+
+### Context C: Existing Hiivmind-Corpus Marketplace
+
+**Detected when:** Running from a repo that already has `.claude-plugin/marketplace.json` OR existing `hiivmind-corpus-*/` subdirectories.
+
+**Confirm with user:** "This looks like an existing corpus marketplace. Add another corpus here?"
+
+**Destination option:**
+
+| Option | Location | Best For |
+|--------|----------|----------|
+| **Add to marketplace** | `{PWD}/hiivmind-corpus-{lib}/` | Extending an existing multi-corpus repo |
+
+**Add to marketplace:**
+- Creates new corpus plugin as a subdirectory
+- Automatically registers in existing `marketplace.json`
+- Shares marketplace infrastructure with sibling corpora
+- Example: Adding Vue docs to an existing frontend corpus marketplace
+
+---
 
 ### Then: Initial source type
 
@@ -78,40 +171,100 @@ Examples:
 
 ### Determining Destination Path
 
-Based on the user's choice:
+Based on the detected context and user's choice:
 
-**Project-local:**
+**User-level skill** (Context A or B):
 ```bash
-SKILL_ROOT="${PWD}/.claude-plugin/skills/{skill-name}"
+SKILL_ROOT="${HOME}/.claude/skills/{skill-name}"
+DESTINATION_TYPE="user-level"
 ```
 
-**Standalone plugin:**
+**Repo-local skill** (Context A):
 ```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SKILL_ROOT="${REPO_ROOT}/.claude-plugin/skills/{skill-name}"
+DESTINATION_TYPE="repo-local"
+```
+
+**Single-corpus repo** (Context B):
+```bash
+PLUGIN_ROOT="${PWD}"
+DESTINATION_TYPE="single-corpus"
+```
+
+**Multi-corpus repo** (Context B, new marketplace):
+```bash
+MARKETPLACE_ROOT="${PWD}"
 PLUGIN_ROOT="${PWD}/{skill-name}"
+DESTINATION_TYPE="multi-corpus-new"
+```
+
+**Add to marketplace** (Context C):
+```bash
+MARKETPLACE_ROOT="${PWD}"
+PLUGIN_ROOT="${PWD}/{skill-name}"
+DESTINATION_TYPE="multi-corpus-existing"
 ```
 
 ## Phase 2: Scaffold
 
 Create the directory structure **before cloning**.
 
-### Project-local Scaffold
+### User-level Skill Scaffold
 
 ```bash
 SKILL_NAME="hiivmind-corpus-polars"
-SKILL_ROOT="${PWD}/.claude-plugin/skills/${SKILL_NAME}"
+SKILL_ROOT="${HOME}/.claude/skills/${SKILL_NAME}"
+
+# Create skill directory (creates ~/.claude/skills/ if needed)
+mkdir -p "${SKILL_ROOT}"
+```
+
+### Repo-local Skill Scaffold
+
+```bash
+SKILL_NAME="hiivmind-corpus-polars"
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SKILL_ROOT="${REPO_ROOT}/.claude-plugin/skills/${SKILL_NAME}"
 
 # Create skill directory (parent .claude-plugin/ may already exist)
 mkdir -p "${SKILL_ROOT}"
 ```
 
-### Standalone Plugin Scaffold
+### Single-corpus Repo Scaffold
+
+```bash
+PLUGIN_ROOT="${PWD}"
+
+# Directory already exists (we're in it)
+# Just create subdirectories as needed in Phase 5
+```
+
+### Multi-corpus Repo Scaffold (New Marketplace)
 
 ```bash
 PLUGIN_NAME="hiivmind-corpus-polars"
-PLUGIN_ROOT="${PWD}/${PLUGIN_NAME}"
+MARKETPLACE_ROOT="${PWD}"
+PLUGIN_ROOT="${MARKETPLACE_ROOT}/${PLUGIN_NAME}"
 
-# Create the plugin directory
+# Create plugin subdirectory
 mkdir -p "${PLUGIN_ROOT}"
+
+# Create marketplace manifest if it doesn't exist
+mkdir -p "${MARKETPLACE_ROOT}/.claude-plugin"
+```
+
+### Add to Marketplace Scaffold (Existing Marketplace)
+
+```bash
+PLUGIN_NAME="hiivmind-corpus-polars"
+MARKETPLACE_ROOT="${PWD}"
+PLUGIN_ROOT="${MARKETPLACE_ROOT}/${PLUGIN_NAME}"
+
+# Create plugin subdirectory
+mkdir -p "${PLUGIN_ROOT}"
+
+# marketplace.json already exists - will update in Phase 5
 ```
 
 Now you have a destination for everything that follows.
@@ -122,13 +275,13 @@ Clone the source repo **inside the skill/plugin directory**, using the source ID
 
 **Skip this phase if user chose "Start empty".**
 
-### Project-local Clone
+### User-level or Repo-local Skill Clone
 
 ```bash
 git clone --depth 1 {repo_url} "${SKILL_ROOT}/.source/{source_id}"
 ```
 
-### Standalone Plugin Clone
+### Plugin Clone (Single-corpus, Multi-corpus, or Add to Marketplace)
 
 ```bash
 git clone --depth 1 {repo_url} "${PLUGIN_ROOT}/.source/{source_id}"
@@ -194,11 +347,14 @@ Templates are in this plugin's `templates/` directory. To find them:
 
 | Template | Purpose | Used By |
 |----------|---------|---------|
-| `navigate-skill.md.template` | The navigate skill | Both |
-| `config.yaml.template` | Source config + index tracking | Both |
-| `plugin.json.template` | Plugin manifest | Standalone only |
-| `readme.md.template` | Plugin documentation | Standalone only |
-| `gitignore.template` | Ignore `.source/` | Standalone only |
+| `navigate-skill.md.template` | The navigate skill | All types |
+| `config.yaml.template` | Source config + index tracking | All types |
+| `plugin.json.template` | Plugin manifest | Plugin types only |
+| `readme.md.template` | Plugin documentation | Single-corpus only |
+| `gitignore.template` | Ignore `.source/` | Plugin types only |
+| `claude.md.template` | CLAUDE.md for single corpus plugin | Single-corpus only |
+| `marketplace.json.template` | Marketplace registry | Multi-corpus only |
+| `marketplace-claude.md.template` | CLAUDE.md for multi-corpus marketplace | Multi-corpus only |
 
 ### Template Placeholders
 
@@ -208,6 +364,8 @@ Fill these from Phase 1 inputs and Phase 4 research:
 |-------------|--------|---------|
 | `{{project_name}}` | Derived from repo (lowercase) | `polars` |
 | `{{project_display_name}}` | Human-readable name | `Polars` |
+| `{{plugin_name}}` | Full plugin directory name | `hiivmind-corpus-polars` |
+| `{{marketplace_name}}` | Marketplace directory name (multi-corpus only) | `hiivmind-corpus-frontend` |
 | `{{source_id}}` | Derived from repo (lowercase) | `polars` |
 | `{{repo_url}}` | User input | `https://github.com/pola-rs/polars` |
 | `{{repo_owner}}` | Extracted from URL | `pola-rs` |
@@ -216,27 +374,25 @@ Fill these from Phase 1 inputs and Phase 4 research:
 | `{{docs_root}}` | From research | `docs/` |
 | `{{description}}` | Generated | `Always-current Polars documentation` |
 | `{{author_name}}` | Ask or default | User's name |
-| `{{keywords_json}}` | Generated (standalone only) | `"dataframes", "python", "rust"` |
-| `{{example_questions}}` | Generated (standalone only) | Example usage questions |
-| `{{skill_topics}}` | Generated (standalone only) | Topics the skill covers |
+| `{{keywords_json}}` | Generated (plugin only) | `"dataframes", "python", "rust"` |
+| `{{example_questions}}` | Generated (plugin only) | Example usage questions |
+| `{{skill_topics}}` | Generated (plugin only) | Topics the skill covers |
 
 **For "Start empty" corpora:** Leave the `sources:` array empty in config.yaml. User will add sources later via `hiivmind-corpus-add-source`.
 
-### Project-local Structure
+### User-level Skill Structure
 
 ```
-.claude-plugin/
-└── skills/
-    └── {skill-name}/
-        ├── SKILL.md              # From navigate-skill.md.template
-        ├── data/
-        │   ├── config.yaml       # From config.yaml.template
-        │   ├── index.md          # Placeholder (see below)
-        │   └── uploads/          # For local sources (created when needed)
-        ├── .source/              # Cloned git sources (gitignored)
-        │   └── {source_id}/      # Each source in its own directory
-        └── .cache/               # Cached web content (gitignored)
-            └── web/
+~/.claude/skills/{skill-name}/
+├── SKILL.md              # From navigate-skill.md.template
+├── data/
+│   ├── config.yaml       # From config.yaml.template
+│   ├── index.md          # Placeholder (see below)
+│   └── uploads/          # For local sources (created when needed)
+├── .source/              # Cloned git sources
+│   └── {source_id}/      # Each source in its own directory
+└── .cache/               # Cached web content
+    └── web/
 ```
 
 **Files from templates:**
@@ -251,17 +407,46 @@ Fill these from Phase 1 inputs and Phase 4 research:
   > Run `hiivmind-corpus-build` to build this index.
   ```
 
+---
+
+### Repo-local Skill Structure
+
+```
+{repo-root}/.claude-plugin/
+└── skills/
+    └── {skill-name}/
+        ├── SKILL.md              # From navigate-skill.md.template
+        ├── data/
+        │   ├── config.yaml       # From config.yaml.template
+        │   ├── index.md          # Placeholder
+        │   └── uploads/          # For local sources (created when needed)
+        ├── .source/              # Cloned git sources (gitignored)
+        │   └── {source_id}/      # Each source in its own directory
+        └── .cache/               # Cached web content (gitignored)
+            └── web/
+```
+
+**Files from templates:**
+- `SKILL.md` ← `templates/navigate-skill.md.template`
+- `data/config.yaml` ← `templates/config.yaml.template`
+
+**Create manually:**
+- `data/index.md` - Simple placeholder (same as user-level)
+
 **Parent `.gitignore`** - Ensure the project's `.gitignore` includes:
 ```
 .claude-plugin/skills/*/.source/
+.claude-plugin/skills/*/.cache/
 ```
 
 ---
 
-### Standalone Plugin Structure
+### Single-corpus Repo Structure
+
+The current directory becomes the plugin root:
 
 ```
-{plugin-name}/
+{current-directory}/                  # e.g., hiivmind-corpus-react/
 ├── .claude-plugin/
 │   └── plugin.json               # From plugin.json.template
 ├── skills/
@@ -275,6 +460,7 @@ Fill these from Phase 1 inputs and Phase 4 research:
 │   └── {source_id}/              # Each source in its own directory
 ├── .cache/                       # Cached web content (gitignored)
 │   └── web/
+├── CLAUDE.md                     # From claude.md.template
 ├── .gitignore                    # From gitignore.template
 └── README.md                     # From readme.md.template
 ```
@@ -283,84 +469,294 @@ Fill these from Phase 1 inputs and Phase 4 research:
 - `.claude-plugin/plugin.json` ← `templates/plugin.json.template`
 - `skills/navigate/SKILL.md` ← `templates/navigate-skill.md.template`
 - `data/config.yaml` ← `templates/config.yaml.template`
+- `CLAUDE.md` ← `templates/claude.md.template`
 - `.gitignore` ← `templates/gitignore.template`
 - `README.md` ← `templates/readme.md.template`
 
 **Create manually:**
-- `data/index.md` - Simple placeholder (same as project-local)
+- `data/index.md` - Simple placeholder
+
+---
+
+### Multi-corpus Repo Structure (New Marketplace)
+
+The current directory becomes a marketplace with this corpus as first plugin:
+
+```
+{marketplace-root}/                   # e.g., hiivmind-corpus-frontend/
+├── .claude-plugin/
+│   ├── plugin.json               # Marketplace manifest (name, description)
+│   └── marketplace.json          # References child plugins
+├── CLAUDE.md                     # Marketplace CLAUDE.md (see below)
+├── .gitignore                    # From gitignore.template
+├── README.md                     # Marketplace README
+│
+└── {plugin-name}/                    # e.g., hiivmind-corpus-react/
+    ├── .claude-plugin/
+    │   └── plugin.json           # From plugin.json.template
+    ├── skills/
+    │   └── navigate/
+    │       └── SKILL.md          # From navigate-skill.md.template
+    ├── data/
+    │   ├── config.yaml           # From config.yaml.template
+    │   ├── index.md              # Placeholder
+    │   └── uploads/
+    ├── .source/                  # Cloned git sources (gitignored)
+    └── .cache/                   # Cached web content (gitignored)
+```
+
+**Marketplace files:**
+- `.claude-plugin/plugin.json` - Marketplace manifest (create manually with marketplace name)
+- `.claude-plugin/marketplace.json` ← `templates/marketplace.json.template`
+- `CLAUDE.md` - Marketplace CLAUDE.md explaining multi-corpus structure
+- `.gitignore` ← `templates/gitignore.template`
+- `README.md` - Marketplace README (create manually)
+
+**Plugin files (in subdirectory):**
+- Same as single-corpus, but inside `{plugin-name}/` subdirectory
+
+---
+
+### Add to Marketplace Structure (Existing Marketplace)
+
+Add new plugin as a sibling to existing plugins:
+
+```
+{marketplace-root}/                   # Already exists
+├── .claude-plugin/
+│   ├── plugin.json               # Already exists
+│   └── marketplace.json          # UPDATE to add new plugin reference
+├── CLAUDE.md                     # Already exists
+├── existing-plugin-1/            # Already exists
+├── existing-plugin-2/            # Already exists
+│
+└── {new-plugin-name}/                # NEW - e.g., hiivmind-corpus-vue/
+    ├── .claude-plugin/
+    │   └── plugin.json           # From plugin.json.template
+    ├── skills/
+    │   └── navigate/
+    │       └── SKILL.md          # From navigate-skill.md.template
+    ├── data/
+    │   ├── config.yaml           # From config.yaml.template
+    │   ├── index.md              # Placeholder
+    │   └── uploads/
+    ├── .source/                  # Cloned git sources (gitignored)
+    └── .cache/                   # Cached web content (gitignored)
+```
+
+**Update existing file:**
+- `.claude-plugin/marketplace.json` - Add new plugin to the `plugins` array
+
+**Create plugin files (in subdirectory):**
+- Same as single-corpus, but inside `{new-plugin-name}/` subdirectory
 
 ## Phase 6: Verify
 
 Confirm the structure is complete:
 
-**Project-local:**
+**User-level or Repo-local skill:**
 ```bash
 ls -la "${SKILL_ROOT}"
+ls -la "${SKILL_ROOT}/data"
 ```
 
-**Standalone plugin:**
+**Single-corpus repo:**
 ```bash
 ls -la "${PLUGIN_ROOT}"
+ls -la "${PLUGIN_ROOT}/skills/navigate"
+ls -la "${PLUGIN_ROOT}/data"
+```
+
+**Multi-corpus repo (new or existing):**
+```bash
+ls -la "${MARKETPLACE_ROOT}"
+ls -la "${PLUGIN_ROOT}"
+ls -la "${PLUGIN_ROOT}/skills/navigate"
+cat "${MARKETPLACE_ROOT}/.claude-plugin/marketplace.json"
 ```
 
 **Keep `.source/`** - it will be reused by `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, and `hiivmind-corpus-refresh`.
 
+## Next Step: STOP HERE and Offer Options
+
+**Your work is done.** Do NOT proceed to build the index. Instead:
+
+1. **Confirm completion** to the user:
+   > "The corpus structure has been created at `{path}`. The `data/index.md` is a placeholder."
+
+2. **Offer next step options**:
+
+   | Option | Skill | When to Recommend |
+   |--------|-------|-------------------|
+   | **Add more sources** | `hiivmind-corpus-add-source` | User mentioned multiple sources, or corpus would benefit from additional docs |
+   | **Build the index** | `hiivmind-corpus-build` | Single source is sufficient, user ready to proceed |
+
+   Example recommendation:
+   > "What would you like to do next?
+   > - **Add more sources** - Run `hiivmind-corpus-add-source` to add web pages, additional git repos, or local documents
+   > - **Build the index** - Run `hiivmind-corpus-build` to analyze the documentation and create the index collaboratively"
+
+3. **Do NOT**:
+   - Read documentation files to summarize them
+   - Populate `data/index.md` with entries
+   - Analyze the cloned repo's content beyond basic framework detection (Phase 4)
+   - Offer to "continue" or "also build the index"
+   - Automatically proceed to either next step without user confirmation
+
+The index building is intentionally a separate step because:
+- It requires user collaboration to prioritize topics
+- It can take significant time and context
+- The user may want to add more sources first (web docs, examples repo, blog posts, etc.)
+
 ## Example Walkthroughs
 
-### Example A: Project-local (data analysis project needs Polars)
+### Example A: User-level skill (personal docs everywhere)
 
-**User**: "I'm working on a data analysis project and need better access to Polars docs. Can you set that up?"
+**User**: "I want Polars docs available in all my projects"
+
+**Context Detection**
+- Running from: `~/projects/my-python-app/` (a Python project)
+- Detected: Established non-corpus project (pyproject.toml found)
+- Confirm: "This looks like a Python project. Is that correct?"
+- User chooses: **User-level** skill
 
 **Phase 1 - Input**
-- Destination: **Project-local** (user wants it for this project)
+- Destination: **User-level** (`~/.claude/skills/hiivmind-corpus-polars/`)
 - Initial source: **Git repository**
 - Repo URL: `https://github.com/pola-rs/polars`
 - Skill name: `hiivmind-corpus-polars`
 - Source ID: `polars`
-- Docs path: `docs/`
 
 **Phase 2 - Scaffold**
 ```bash
-mkdir -p ./.claude-plugin/skills/hiivmind-corpus-polars
+mkdir -p ~/.claude/skills/hiivmind-corpus-polars
 ```
 
 **Phase 3 - Clone**
 ```bash
-git clone --depth 1 https://github.com/pola-rs/polars .claude-plugin/skills/hiivmind-corpus-polars/.source/polars
+git clone --depth 1 https://github.com/pola-rs/polars ~/.claude/skills/hiivmind-corpus-polars/.source/polars
 ```
 
-**Phase 4 - Research**
-- Framework: MkDocs
-- 150 markdown files
-- Docs root: `docs/`
+**Phase 5 - Generate**
+Create skill files in `~/.claude/skills/hiivmind-corpus-polars/`
+
+**Result:** Skill structure created. Not shared with teammates.
+
+**Next Steps:**
+- To add more sources (web docs, examples): `hiivmind-corpus-add-source`
+- To build the index now: `hiivmind-corpus-build`
+
+---
+
+### Example B: Repo-local skill (team sharing)
+
+**User**: "I'm working on a data analysis project and the whole team needs Polars docs"
+
+**Context Detection**
+- Running from: `~/projects/team-analytics/` (a team Python project)
+- Detected: Established non-corpus project (pyproject.toml found)
+- Confirm: "This looks like a Python project. Is that correct?"
+- User chooses: **Repo-local** skill
+
+**Phase 1 - Input**
+- Destination: **Repo-local** (`{repo}/.claude-plugin/skills/hiivmind-corpus-polars/`)
+- Initial source: **Git repository**
+- Repo URL: `https://github.com/pola-rs/polars`
+- Skill name: `hiivmind-corpus-polars`
+- Source ID: `polars`
+
+**Phase 2 - Scaffold**
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+mkdir -p "${REPO_ROOT}/.claude-plugin/skills/hiivmind-corpus-polars"
+```
+
+**Phase 3 - Clone**
+```bash
+git clone --depth 1 https://github.com/pola-rs/polars "${REPO_ROOT}/.claude-plugin/skills/hiivmind-corpus-polars/.source/polars"
+```
 
 **Phase 5 - Generate**
 Create skill files in `.claude-plugin/skills/hiivmind-corpus-polars/`
 
-**Phase 6 - Verify**
-```bash
-ls -la .claude-plugin/skills/hiivmind-corpus-polars/
+**Phase 6 - Additional**
+Add to project's `.gitignore`:
+```
+.claude-plugin/skills/*/.source/
+.claude-plugin/skills/*/.cache/
 ```
 
-**Result:** Skill is immediately available in this project. Teammates who clone the repo will also have access (after ensuring `.source/` is gitignored).
+**Result:** Skill structure created. Commit the skill (minus `.source/`).
+
+**Next Steps:**
+- To add more sources (web docs, examples): `hiivmind-corpus-add-source`
+- To build the index now: `hiivmind-corpus-build`
 
 ---
 
-### Example B: Standalone plugin (reusable React docs)
+### Example C: Single-corpus repo (dedicated React docs)
 
-**User**: "Create a corpus skill for React that I can use across all my projects"
+**User**: "Create a standalone React docs corpus I can publish"
+
+**Context Detection**
+- Running from: `~/corpus/hiivmind-corpus-react/` (empty new directory)
+- Detected: Fresh/empty directory
+- User chooses: **Single-corpus repo**
 
 **Phase 1 - Input**
-- Destination: **Standalone plugin** (user wants reusability)
+- Destination: **Single-corpus** (this directory becomes the plugin)
 - Initial source: **Git repository**
 - Repo URL: `https://github.com/reactjs/react.dev`
 - Plugin name: `hiivmind-corpus-react`
 - Source ID: `react`
-- Docs path: `src/content/`
 
 **Phase 2 - Scaffold**
 ```bash
-mkdir -p ./hiivmind-corpus-react
+# Already in the directory, just create subdirs in Phase 5
+PLUGIN_ROOT="${PWD}"
+```
+
+**Phase 3 - Clone**
+```bash
+git clone --depth 1 https://github.com/reactjs/react.dev ./.source/react
+```
+
+**Phase 5 - Generate**
+Create full plugin structure at repo root:
+- `.claude-plugin/plugin.json`
+- `skills/navigate/SKILL.md`
+- `data/config.yaml`, `data/index.md`
+- `CLAUDE.md`, `README.md`, `.gitignore`
+
+**Result:** Plugin structure created. Push to GitHub and install via marketplace.
+
+**Next Steps:**
+- To add more sources (tutorials, blog posts, examples repo): `hiivmind-corpus-add-source`
+- To build the index now: `hiivmind-corpus-build`
+
+---
+
+### Example D: Multi-corpus repo (new frontend docs collection)
+
+**User**: "I want to create a corpus repo that will hold React, Vue, and Svelte docs"
+
+**Context Detection**
+- Running from: `~/corpus/hiivmind-corpus-frontend/` (empty new directory)
+- Detected: Fresh/empty directory
+- User chooses: **Multi-corpus repo** (new marketplace)
+
+**Phase 1 - Input**
+- Destination: **Multi-corpus new** (marketplace at root, plugins as subdirectories)
+- Marketplace name: `hiivmind-corpus-frontend`
+- First plugin: `hiivmind-corpus-react`
+- Repo URL: `https://github.com/reactjs/react.dev`
+- Source ID: `react`
+
+**Phase 2 - Scaffold**
+```bash
+MARKETPLACE_ROOT="${PWD}"
+mkdir -p "${MARKETPLACE_ROOT}/.claude-plugin"
+mkdir -p "${MARKETPLACE_ROOT}/hiivmind-corpus-react"
 ```
 
 **Phase 3 - Clone**
@@ -368,52 +764,69 @@ mkdir -p ./hiivmind-corpus-react
 git clone --depth 1 https://github.com/reactjs/react.dev ./hiivmind-corpus-react/.source/react
 ```
 
-**Phase 4 - Research**
-- Framework: Next.js with MDX
-- Nav: Defined in `src/sidebarLearn.json`
-- Docs root: `src/content/`
-
 **Phase 5 - Generate**
-Create full plugin structure in `hiivmind-corpus-react/`
+Create marketplace files at root:
+- `.claude-plugin/plugin.json` (marketplace manifest)
+- `.claude-plugin/marketplace.json` (references child plugins)
+- `CLAUDE.md`, `README.md`, `.gitignore`
 
-**Phase 6 - Verify**
-```bash
-ls -la ./hiivmind-corpus-react/
-```
+Create plugin files in `hiivmind-corpus-react/`:
+- Standard plugin structure
 
-**Next step**: User creates a git repo, publishes to marketplace, then installs via `/plugin install`.
+**Result:** Marketplace and first plugin structure created.
+
+**Next Steps:**
+- To add more corpora (Vue, Svelte): run `hiivmind-corpus-init` again
+- To add more sources to React (tutorials, examples): `hiivmind-corpus-add-source`
+- To build the React index now: `hiivmind-corpus-build`
 
 ---
 
-### Example C: Start empty (multi-source corpus)
+### Example E: Add to existing marketplace
 
-**User**: "I want to create a corpus that combines React, our internal docs, and some blog posts"
+**User**: "Add Vue docs to my frontend corpus collection"
+
+**Context Detection**
+- Running from: `~/corpus/hiivmind-corpus-frontend/` (existing marketplace)
+- Detected: Existing hiivmind-corpus marketplace (has `.claude-plugin/marketplace.json`)
+- Confirm: "This looks like an existing corpus marketplace. Add another corpus here?"
+- User confirms: Yes
 
 **Phase 1 - Input**
-- Destination: **Standalone plugin**
-- Initial source: **Start empty**
-- Plugin name: `hiivmind-corpus-fullstack`
+- Destination: **Add to marketplace** (new plugin as subdirectory)
+- Plugin name: `hiivmind-corpus-vue`
+- Repo URL: `https://github.com/vuejs/docs`
+- Source ID: `vue`
 
 **Phase 2 - Scaffold**
 ```bash
-mkdir -p ./hiivmind-corpus-fullstack
+mkdir -p ./hiivmind-corpus-vue
 ```
 
 **Phase 3 - Clone**
-Skipped (user chose "Start empty")
-
-**Phase 4 - Research**
-Skipped
-
-**Phase 5 - Generate**
-Create plugin structure with empty `sources:` array in config.yaml
-
-**Phase 6 - Verify**
 ```bash
-ls -la ./hiivmind-corpus-fullstack/
+git clone --depth 1 https://github.com/vuejs/docs ./hiivmind-corpus-vue/.source/vue
 ```
 
-**Next step**: User runs `hiivmind-corpus-add-source` to add React (git), internal docs (local), and blog posts (web).
+**Phase 5 - Generate**
+Create plugin files in `hiivmind-corpus-vue/`:
+- Standard plugin structure
+
+Update existing `marketplace.json`:
+```json
+{
+  "plugins": [
+    { "path": "hiivmind-corpus-react" },
+    { "path": "hiivmind-corpus-vue" }  // Added
+  ]
+}
+```
+
+**Result:** Vue corpus structure added alongside React in the same marketplace.
+
+**Next Steps:**
+- To add more sources to Vue (tutorials, composition API guide): `hiivmind-corpus-add-source`
+- To build the Vue index now: `hiivmind-corpus-build`
 
 ## Reference
 
