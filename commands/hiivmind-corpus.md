@@ -1,30 +1,147 @@
 ---
-description: Discover and interact with installed hiivmind-corpus documentation corpora
-argument-hint: [corpus-name] [optional query]
-allowed-tools: ["Read", "Glob", "Bash", "AskUserQuestion", "Skill"]
+description: Unified entry point for all corpus operations - describe what you need in natural language
+argument-hint: Describe your goal (e.g., "index React docs", "refresh my polars corpus", or just a corpus name)
+allowed-tools: ["Read", "Write", "Bash", "Glob", "Grep", "TodoWrite", "AskUserQuestion", "Skill", "Task", "WebFetch"]
 ---
 
 # Corpus Gateway
 
-Interactive gateway for discovering and navigating installed hiivmind-corpus documentation corpora.
+Unified entry point for all hiivmind-corpus operations. Analyze the user's request and route to the appropriate skill(s), orchestrating multi-step workflows automatically.
 
-## Arguments
+**User request:** $ARGUMENTS
 
-**Input**: $ARGUMENTS
+---
 
-Parse the input to determine mode:
+## Step 1: Context Detection
 
-| Pattern | Mode | Action |
-|---------|------|--------|
-| (empty) | Discovery | List all corpora → interactive selection → corpus menu |
-| `polars` | Corpus menu | Show actions for specified corpus |
-| `polars "lazy api"` | Direct query | Navigate directly with the query |
+First, detect the current directory context:
 
-## Mode: Discovery (No Arguments)
+```bash
+# Check if in a corpus directory
+test -f data/config.yaml && echo "IN_CORPUS=true"
+
+# Check if in a marketplace
+test -f .claude-plugin/marketplace.json && echo "IN_MARKETPLACE=true"
+
+# Check for corpus subdirectories
+ls -d hiivmind-corpus-*/ 2>/dev/null && echo "HAS_CORPUS_CHILDREN=true"
+
+# Check if established project (non-corpus)
+ls package.json pyproject.toml Cargo.toml go.mod setup.py requirements.txt 2>/dev/null && echo "IN_PROJECT=true"
+
+# Check user-level corpora
+ls ~/.claude/skills/hiivmind-corpus-*/ 2>/dev/null && echo "HAS_USER_CORPORA=true"
+
+# Check marketplace corpora
+ls ~/.claude/plugins/marketplaces/hiivmind-corpus-*/ ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ 2>/dev/null && echo "HAS_MARKETPLACE_CORPORA=true"
+```
+
+---
+
+## Step 2: Intent Detection
+
+If `$ARGUMENTS` is empty → Go to **Mode: Interactive Menu**
+
+If `$ARGUMENTS` is provided → Analyze intent using these patterns:
+
+### Intent → Skill Mapping
+
+| Intent Keywords | Primary Skill | Secondary Skills |
+|-----------------|---------------|------------------|
+| create, new, index, set up, scaffold, initialize, start | `init` | Often followed by `build` |
+| add, include, import, fetch, clone, source | `add-source` | May trigger `build` |
+| build, analyze, create index, scan, index | `build` | - |
+| expand, deepen, more detail, enhance, elaborate | `enhance` | - |
+| update, refresh, sync, check, upstream, stale | `refresh` | May trigger `enhance` |
+| upgrade, migrate, latest, standards, template | `upgrade` | - |
+| status, info, up to date, current | `refresh` (status mode) | - |
+| navigate, find, search, look up, what does, how do | `navigate` | - |
+| list, show, available, installed, discover | Discovery mode | - |
+
+### Compound Intent Detection
+
+Some requests imply multiple skills - use TodoWrite to track:
+
+| Request Pattern | Skill Sequence |
+|-----------------|----------------|
+| "index {project} docs" (not in corpus) | init → build |
+| "add {source} and include in index" | add-source → build (partial) |
+| "refresh and expand {section}" | refresh → enhance |
+| "create corpus with {source1} and {source2}" | init → add-source → build |
+| "set up {project} with blog posts too" | init → add-source (web) → build |
+
+### Context + Intent Matrix
+
+| Context | init | add-source | build | enhance | refresh | upgrade | navigate |
+|---------|------|------------|-------|---------|---------|---------|----------|
+| In corpus directory | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| In marketplace | ✅ (add) | Via child | Via child | Via child | Via child | ✅ (batch) | Via child |
+| In project (no corpus) | ✅ | After init | After init | After build | After build | ❌ | ❌ |
+| Fresh directory | ✅ | After init | After init | After build | After build | ❌ | ❌ |
+| Has installed corpora | Ask which | Ask which | Ask which | Ask which | Ask which | Ask which | Ask which |
+
+---
+
+## Step 3: Routing
+
+Based on detected intent, route appropriately:
+
+### Single Skill Dispatch
+
+Load the appropriate skill with context:
+
+```markdown
+**Context**: {detected context}
+**Intent**: {detected intent}
+**Target corpus**: {corpus name if identified}
+**Location**: {corpus path if known}
+
+Loading {skill-name} skill...
+```
+
+### Multi-Skill Orchestration
+
+For compound intents, create a workflow with TodoWrite:
+
+```markdown
+## Workflow: {Goal Description}
+
+1. [ ] {First skill action}
+2. [ ] {Second skill action}
+3. [ ] {Third skill action}
+4. [ ] Verify and suggest next steps
+```
+
+Then execute skills sequentially:
+1. **Complete current skill's workflow** - Don't interrupt mid-skill
+2. **Summarize what was done** - "Corpus structure created at X"
+3. **Transition naturally** - "Now let's build the index"
+4. **Load next skill** - Use Skill tool to load next skill
+5. **Continue with context** - Pass relevant info to next skill
+
+### Ambiguity Resolution
+
+When intent is unclear, ask using AskUserQuestion:
+
+```
+I'm not sure what you'd like to do. Which of these fits?
+
+1. **Create new corpus** - Set up documentation indexing for a project
+2. **Add sources** - Include additional repos, files, or web pages
+3. **Build/rebuild index** - Analyze docs and create the index
+4. **Enhance coverage** - Add more detail to specific topics
+5. **Refresh from upstream** - Check for and apply doc updates
+6. **Upgrade structure** - Apply latest corpus template standards
+7. **Navigate/search** - Ask questions about existing corpora
+```
+
+---
+
+## Mode: Interactive Menu (No Arguments)
 
 When invoked without arguments, discover all installed corpora and present an interactive selection.
 
-### Step 1: Discover Corpora
+### Discover Corpora
 
 Find all installed hiivmind-corpus plugins:
 
@@ -52,221 +169,204 @@ ls -d ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/.claude-plugin 2>/dev/n
 done
 ```
 
-### Step 2: Check Status
+### Check Status
 
-For each corpus found, check if it's built:
+For each corpus, determine status:
+- **placeholder**: index.md contains "Run hiivmind-corpus-build"
+- **built**: index.md has real entries
+- **stale**: local clone HEAD differs from indexed SHA
 
-```bash
-# Check if index has real content (not placeholder)
-if grep -q "Run.*hiivmind-corpus-build" "$corpus_path/data/index.md" 2>/dev/null; then
-  echo "placeholder"
-elif [ -f "$corpus_path/data/index.md" ]; then
-  echo "built"
-else
-  echo "missing"
-fi
-```
+### Present Interactive Selection
 
-### Step 3: Present Selection
-
-If corpora found, use AskUserQuestion to present interactive list:
+Use AskUserQuestion:
 
 ```
-Which corpus would you like to use?
+What would you like to do with documentation corpora?
 
-Options:
-- hiivmind-corpus-polars (built) - Polars DataFrame documentation
-- hiivmind-corpus-ibis (built) - Ibis SQL expression documentation
-- hiivmind-corpus-github (stale) - GitHub API and Actions documentation
+**Available corpora:**
+- hiivmind-corpus-polars (✓ built)
+- hiivmind-corpus-ibis (✓ built)
+- hiivmind-corpus-github (⚠ stale)
+
+**Actions:**
+- Select a corpus to work with
+- Create a new corpus
+- Refresh all stale corpora
 ```
 
-Include status indicators:
-- ✓ built - Index is ready
-- ⚠ stale - Source updated since last index
-- ○ placeholder - Needs `hiivmind-corpus-build`
+### Corpus Action Menu
 
-### Step 4: Route to Corpus Menu
-
-After user selects a corpus, proceed to **Mode: Corpus Menu**.
-
----
-
-## Mode: Corpus Menu (With Corpus Name)
-
-When a corpus name is provided (or selected), show the action menu for that corpus.
-
-### Step 1: Validate Corpus
-
-Verify the corpus exists and resolve its path:
-
-```bash
-# Try each location
-CORPUS_PATH=""
-for path in \
-  ~/.claude/skills/$CORPUS_NAME \
-  .claude-plugin/skills/$CORPUS_NAME \
-  ~/.claude/plugins/marketplaces/$CORPUS_NAME \
-  ~/.claude/plugins/marketplaces/*/$CORPUS_NAME
-do
-  if [ -d "$path" ]; then
-    CORPUS_PATH="$path"
-    break
-  fi
-done
-```
-
-If not found:
-> Corpus `{name}` not found. Run `/hiivmind-corpus` to see available corpora.
-
-### Step 2: Check Status
-
-Determine corpus status:
-
-```bash
-# Check build status
-if grep -q "Run.*hiivmind-corpus-build" "$CORPUS_PATH/data/index.md" 2>/dev/null; then
-  STATUS="placeholder"
-elif [ -f "$CORPUS_PATH/data/index.md" ]; then
-  STATUS="built"
-else
-  STATUS="missing"
-fi
-
-# Check staleness for built corpora
-if [ "$STATUS" = "built" ]; then
-  INDEXED_SHA=$(yq '.sources[0].last_commit_sha' "$CORPUS_PATH/data/config.yaml" 2>/dev/null)
-  SOURCE_ID=$(yq '.sources[0].id' "$CORPUS_PATH/data/config.yaml" 2>/dev/null)
-  CURRENT_SHA=$(git -C "$CORPUS_PATH/.source/$SOURCE_ID" rev-parse HEAD 2>/dev/null)
-  if [ -n "$CURRENT_SHA" ] && [ "$CURRENT_SHA" != "$INDEXED_SHA" ]; then
-    STATUS="stale"
-  fi
-fi
-```
-
-### Step 3: Present Action Menu
-
-Use AskUserQuestion to show available actions:
+After corpus selection, show context-aware actions:
 
 **For built/stale corpora:**
-```
-What would you like to do with {corpus_name}?
-
 - Navigate - Ask questions about this documentation
 - Check freshness - See if the source has updates
 - Enhance - Add more depth to specific topics
 - Refresh - Sync index with upstream changes
-```
 
 **For placeholder corpora:**
-```
-The {corpus_name} corpus hasn't been built yet.
-
-- Build now - Run hiivmind-corpus-build to create the index
+- Build now - Create the index collaboratively
 - Add sources - Add more documentation sources first
-```
-
-### Step 4: Dispatch to Skill
-
-Based on selection, invoke the appropriate skill:
-
-| Action | Dispatch To |
-|--------|-------------|
-| Navigate | Load `hiivmind-corpus-navigate` skill with corpus context |
-| Check freshness | Load `hiivmind-corpus-refresh` skill (dry-run mode) |
-| Enhance | Load `hiivmind-corpus-enhance` skill |
-| Refresh | Load `hiivmind-corpus-refresh` skill |
-| Build now | Load `hiivmind-corpus-build` skill |
-| Add sources | Load `hiivmind-corpus-add-source` skill |
-
-When dispatching, provide corpus context:
-> Working with corpus: {corpus_name}
-> Location: {corpus_path}
-> Status: {status}
 
 ---
 
-## Mode: Direct Query (With Corpus + Query)
+## Context-Aware Responses
 
-When both corpus name and query are provided, navigate directly.
-
-### Parse Arguments
-
-Split arguments into corpus name and query:
+### In Corpus Directory
 
 ```
-/hiivmind-corpus polars "how do I filter a dataframe"
-             ^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-             corpus   query
+You're in the hiivmind-corpus-polars corpus. What would you like to do?
+
+- Navigate: Ask questions about Polars documentation
+- Refresh: Check for upstream updates
+- Enhance: Add more detail to specific topics
+- Add sources: Include additional documentation
 ```
 
-### Dispatch to Navigate
+### In Marketplace with Multiple Corpora
 
-1. Resolve corpus path (as in Corpus Menu Step 1)
-2. Read the corpus's `data/index.md`
-3. Find relevant entries matching the query
-4. Fetch and present documentation
+```
+This marketplace contains 4 corpora:
+- hiivmind-corpus-polars
+- hiivmind-corpus-ibis
+- hiivmind-corpus-narwhals
+- hiivmind-corpus-substrait
 
-Invoke the per-corpus navigate skill with the query:
-> **Corpus**: {corpus_name}
-> **Query**: {query}
-> **Location**: {corpus_path}
+Which one would you like to work with? (Or "all" for batch operations)
+```
+
+### In Project Without Corpus
+
+```
+This looks like a {detected type} project. Would you like to:
+
+1. **Create a repo-local corpus** - Team sharing via git
+2. **Create a user-level corpus** - Personal use across projects
+3. **Check for existing corpora** - See what's already installed
+```
+
+---
+
+## Example Sessions
+
+### Natural Language: New Corpus
+
+**User:** `/hiivmind-corpus index the polars python library`
+
+**Response:**
+```
+I'll help you create a Polars documentation corpus.
+
+## Workflow: Index Polars Documentation
+
+1. [ ] Initialize corpus structure
+2. [ ] Build documentation index
+
+Loading hiivmind-corpus-init skill...
+```
+
+### Natural Language: Enhancement
+
+**User:** `/hiivmind-corpus I need more detail on the lazy API`
+
+**Response:**
+```
+You're in the Polars corpus. I'll help enhance the lazy API coverage.
+
+Loading hiivmind-corpus-enhance skill...
+
+Target: lazy API section
+```
+
+### Natural Language: Status Check
+
+**User:** `/hiivmind-corpus is my polars corpus up to date?`
+
+**Response:**
+```
+Checking status of your Polars corpus...
+
+Loading hiivmind-corpus-refresh skill (status mode)...
+```
+
+### Natural Language: Multi-Source Setup
+
+**User:** `/hiivmind-corpus set up react docs with kent's testing blog too`
+
+**Response:**
+```
+I'll create a React corpus with both the official docs and Kent's blog.
+
+## Workflow: Create React Corpus with Multiple Sources
+
+1. [ ] Initialize corpus structure
+2. [ ] Clone React docs repo
+3. [ ] Add Kent's testing blog (web source)
+4. [ ] Build combined index
+
+Loading hiivmind-corpus-init skill...
+```
+
+### No Arguments: Interactive Menu
+
+**User:** `/hiivmind-corpus`
+
+**Response:**
+```
+What would you like to do with documentation corpora?
+
+**Installed corpora:**
+- hiivmind-corpus-polars (✓ built) - Polars DataFrame documentation
+- hiivmind-corpus-ibis (✓ built) - Ibis SQL expressions
+- hiivmind-corpus-github (⚠ stale) - GitHub API and Actions
+
+**Quick actions:**
+1. Select a corpus to navigate or manage
+2. Create a new corpus
+3. Refresh all stale corpora (1 stale)
+```
 
 ---
 
 ## Error Handling
 
-**No corpora installed:**
+**No corpora and no clear intent:**
 ```
-No hiivmind-corpus documentation corpora are installed.
+No documentation corpora are installed yet.
 
-To get started:
-- Create a new corpus: Use `hiivmind-corpus-init`
-- Install from marketplace: `/plugin install hiivmind-corpus-polars@hiivmind`
-```
+Would you like to:
+1. **Create a new corpus** - Index documentation for a project
+2. **Install from marketplace** - `/plugin install hiivmind-corpus-polars@hiivmind`
 
-**Invalid corpus name:**
-```
-Corpus `{name}` not found.
-
-Available corpora:
-- hiivmind-corpus-polars
-- hiivmind-corpus-ibis
-
-Did you mean one of these?
+Or describe what you'd like to index: "/hiivmind-corpus index the react docs"
 ```
 
-**Query on placeholder corpus:**
+**Unrecognized project/library:**
 ```
-Cannot navigate `{corpus}` - the index hasn't been built yet.
+I'm not familiar with "{project}". Could you provide:
+1. The GitHub repository URL, or
+2. The documentation website URL
 
-Would you like to build it now? (This requires collaborative review)
-```
-
----
-
-## Examples
-
-**List all corpora:**
-```
-/hiivmind-corpus
+I'll help set up a corpus from there.
 ```
 
-**Open menu for specific corpus:**
+**Conflicting context:**
 ```
-/hiivmind-corpus polars
-```
+You're already in the hiivmind-corpus-polars corpus.
 
-**Query directly:**
-```
-/hiivmind-corpus polars "lazy evaluation"
-/hiivmind-corpus github "create a workflow"
+Did you mean to:
+1. Work with this corpus (navigate, enhance, refresh)
+2. Create a different corpus elsewhere
+3. Something else?
 ```
 
 ---
 
 ## Notes
 
-- This command is the primary entry point for corpus interaction
-- Uses `hiivmind-corpus-discover` logic for finding corpora
-- Routes to per-corpus navigate skills for actual documentation fetching
-- All corpus names use the `hiivmind-corpus-` prefix for consistency
+- **Natural language first**: Describe your goal and the command routes automatically
+- **Menu fallback**: No arguments shows interactive corpus selection
+- **Multi-skill orchestration**: Compound requests chain skills with progress tracking
+- **Context-aware**: Adapts suggestions based on current directory
+- Uses `hiivmind-corpus-discover` logic for finding installed corpora
+- Uses `hiivmind-corpus-navigate` for documentation queries
