@@ -57,14 +57,39 @@ If grep finds matches:
 2. **Related hit**: Entry is in the right area → read that section for context
 3. **No hit in index**: The topic may not be indexed yet → report this as an index gap
 
-### Step 4: Report Index Gaps
+### Step 4: Handle Index Gaps
 
-If the user's question cannot be answered because the index lacks relevant entries:
+If the user's question cannot be answered because the index lacks relevant entries, **use AskUserQuestion** to clarify:
 
-> "The index doesn't have entries for '{term}'. The closest match is '{related_section}'.
-> If this topic should be covered, consider running `hiivmind-corpus-enhance` to add depth to this area."
+**Present these options:**
 
-This is valuable feedback for corpus improvement.
+1. **Clarify the request** - Maybe the question can be rephrased
+   - "Could you rephrase your question? I searched for '{terms}' but found no matches."
+   - Suggest alternative terms: "Did you mean '{synonym}' or '{related_term}'?"
+
+2. **Show what's available** - Help the user find related content
+   - "The closest sections I found are: {list nearby sections}"
+   - "Would any of these help: {list related entries}?"
+
+3. **Identify an index gap** - If the user confirms their request was valid
+   - "This topic isn't covered in the current index."
+   - Offer next steps:
+     - `hiivmind-corpus-enhance` - Add depth to a specific topic area
+     - `hiivmind-corpus-add-source` - Add another documentation source
+     - `hiivmind-corpus-refresh` - Check if upstream docs have new content
+
+**Example response:**
+
+> I searched the index for "filtering", "views", and "projects" but found no direct matches.
+>
+> **Options:**
+> 1. **Rephrase**: Did you mean "customizing views" or "project settings"?
+> 2. **Related sections**: The "Projects" section covers Views & Layouts, Fields, and Automations
+> 3. **Index gap**: If you expected this topic to be covered, the index may need:
+>    - Enhancing with `hiivmind-corpus-enhance` for more depth
+>    - A new source added with `hiivmind-corpus-add-source`
+>
+> Which would you like to explore?
 
 ## Tiered Index Navigation
 
