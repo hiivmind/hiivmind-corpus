@@ -2,10 +2,12 @@
   "name": "hiivmind-corpus",
   "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
   "version": "1.0.0",
+  "license": "MIT",
   "author": {
     "name": "Nathaniel Ramm"
   },
   "repository": "https://github.com/hiivmind/hiivmind-corpus",
+  "homepage": "https://github.com/hiivmind/hiivmind-corpus#readme",
   "keywords": [
     "documentation",
     "corpus",

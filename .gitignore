@@ -1,0 +1,19 @@
+# Source clones (gitignored in generated corpora)
+.source/
+
+# Web cache
+.cache/
+
+# Local Claude config
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
