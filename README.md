@@ -179,6 +179,8 @@ This means rediscovering the same things every session, no memory of what's rele
 
 The collaborative index building. Rather than Claude guessing what matters, you tell it: "I care about data modeling and ETL, skip the deployment stuff." That context persists across sessions.
 
+It also aids **feature discovery**. Ask "What useful Polars features have I missed in my project?" and Claude can scan your code against the index to suggest capabilities you're not using yet.
+
 ### When to use this
 
 | Use hiivmind-corpus when | Default lookup is fine when |
