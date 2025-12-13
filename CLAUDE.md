@@ -24,6 +24,12 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 ├── commands/                         # Slash commands
 │   └── hiivmind-corpus.md            # Gateway command for corpus interaction
 │
+├── lib/corpus/                       # Shell function library
+│   ├── corpus-discovery-functions.sh # Find corpora across all locations
+│   ├── corpus-status-functions.sh    # Check index status and freshness
+│   ├── corpus-path-functions.sh      # Resolve paths within corpora
+│   └── corpus-index.md               # Library documentation
+│
 ├── templates/                        # Templates for generating new corpus skills
 │
 └── docs/                             # Specifications and design docs
@@ -111,6 +117,29 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
 - Generated navigate skills: `hiivmind-corpus-{project}-navigate` (per-corpus navigation)
 
+## Shell Function Library
+
+The `lib/corpus/` directory contains reusable bash functions following hiivmind-pulse-gh patterns:
+
+```bash
+# Source the library
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-status-functions.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-path-functions.sh"
+
+# Composable operations
+discover_all | filter_built | list_names
+get_index_status "$corpus_path"
+get_navigate_skill_path "$corpus_path"
+```
+
+| File | Functions | Purpose |
+|------|-----------|---------|
+| `corpus-discovery-functions.sh` | `discover_*`, `filter_*`, `format_*` | Find installed corpora |
+| `corpus-status-functions.sh` | `get_*`, `check_*`, `compare_*` | Status and freshness |
+| `corpus-path-functions.sh` | `get_*_path`, `resolve_*`, `exists_*` | Path resolution |
+| `corpus-index.md` | - | Full function documentation |
+
 ## Key Design Decisions
 
 - **Human-readable indexes**: Simple markdown with headings, not complex schemas
@@ -123,6 +152,7 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - **Discoverable**: `hiivmind-corpus-discover` finds corpora across all installation types
 - **Unified access**: `/hiivmind-corpus` gateway provides single entry point for all corpus interaction
 - **Global navigation**: `hiivmind-corpus-navigate` routes queries across all installed corpora
+- **Composable library**: `lib/corpus/` provides pipe-first bash functions for discovery and status
 
 ## Index Format
 

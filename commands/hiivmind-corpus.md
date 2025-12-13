@@ -169,30 +169,24 @@ What would you like to do?
 
 ### Discovery Commands (only run when needed)
 
-Use simple for loops with `basename` (avoid `${d##*/}` which fails with trailing slashes):
+Source the corpus library and use composable functions:
 
 ```bash
-# User-level corpora
-for d in ~/.claude/skills/hiivmind-corpus-*/; do
-  [ -d "$d" ] || continue
-  name=$(basename "$d")
-  echo "user-level|$name|$d"
-done
+# Source the library
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
 
-# Repo-local corpora
-for d in .claude-plugin/skills/hiivmind-corpus-*/; do
-  [ -d "$d" ] || continue
-  name=$(basename "$d")
-  echo "repo-local|$name|$d"
-done
+# Discover all corpora with status
+discover_all | format_table
+# Output: name|type|status|path
 
-# Marketplace corpora (multi-corpus marketplaces)
-for d in ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/; do
-  [ -d "$d" ] || continue
-  name=$(basename "$d")
-  echo "marketplace|$name|$d"
-done
+# Or discover specific locations
+discover_marketplace | filter_built | list_names
+
+# Count corpora
+discover_all | count_corpora
 ```
+
+**Library location:** `lib/corpus/` - see `corpus-index.md` for full function reference.
 
 ### Status Detection (only when listing or managing)
 

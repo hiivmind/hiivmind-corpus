@@ -27,82 +27,74 @@ Scan these locations in order to find all installed corpora:
 
 ## Discovery Process
 
-### Step 1: Scan All Locations
+### Using the Corpus Library
 
-Run these commands to find corpora:
-
-```bash
-# User-level corpora
-ls -d ~/.claude/skills/hiivmind-corpus-*/ 2>/dev/null
-
-# Repo-local corpora (in current working directory)
-ls -d .claude-plugin/skills/hiivmind-corpus-*/ 2>/dev/null
-
-# Marketplace single-corpus plugins
-ls -d ~/.claude/plugins/marketplaces/hiivmind-corpus-*/ 2>/dev/null
-
-# Marketplace multi-corpus (child plugins)
-ls -d ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ 2>/dev/null
-```
-
-### Step 2: Validate Each Corpus
-
-For each directory found, verify it's a valid corpus by checking for required files:
+Source the library functions for composable discovery:
 
 ```bash
-# Check for skill file
-ls {corpus_path}/SKILL.md 2>/dev/null || ls {corpus_path}/skills/navigate/SKILL.md 2>/dev/null
-
-# Check for config
-ls {corpus_path}/data/config.yaml 2>/dev/null
-
-# Check for index
-ls {corpus_path}/data/index.md 2>/dev/null
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-status-functions.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-path-functions.sh"
 ```
 
-### Step 3: Determine Status
-
-For each valid corpus, determine its build status:
-
-**Placeholder** - Index exists but contains only the placeholder text:
-```bash
-grep -q "Run.*hiivmind-corpus-build" {corpus_path}/data/index.md && echo "placeholder"
-```
-
-**Built** - Index has real entries (no placeholder text):
-```bash
-grep -qv "Run.*hiivmind-corpus-build" {corpus_path}/data/index.md && echo "built"
-```
-
-**Stale** (for git sources) - Local clone is newer than indexed SHA:
-```bash
-# Get indexed SHA from config
-INDEXED_SHA=$(yq '.sources[0].last_commit_sha' {corpus_path}/data/config.yaml)
-
-# Get current clone HEAD
-CLONE_HEAD=$(git -C {corpus_path}/.source/{source_id} rev-parse HEAD 2>/dev/null)
-
-# Compare
-[ "$CLONE_HEAD" != "$INDEXED_SHA" ] && echo "stale"
-```
-
-### Step 4: Extract Metadata
-
-For each corpus, extract display information:
+### Step 1: Discover All Corpora
 
 ```bash
-# Get display name from skill
-grep -m1 "^name:" {corpus_path}/SKILL.md | sed 's/name: //'
+# Discover all corpora with name, type, status, and path
+discover_all | format_table
+# Output: name|type|status|path
 
-# Or from navigate skill for marketplace plugins
-grep -m1 "^name:" {corpus_path}/skills/navigate/SKILL.md | sed 's/name: //'
-
-# Count sources
-yq '.sources | length' {corpus_path}/data/config.yaml
-
-# Get last indexed date
-yq '.index.last_updated_at' {corpus_path}/data/config.yaml
+# Or discover specific locations
+discover_user_level
+discover_repo_local
+discover_marketplace
+discover_marketplace_single
 ```
+
+### Step 2: Filter and List
+
+```bash
+# Only built corpora
+discover_all | filter_built | list_names
+
+# Only placeholder corpora (need building)
+discover_all | filter_placeholder
+
+# Find specific corpus
+discover_all | filter_name "polars"
+
+# Count total
+discover_all | count_corpora
+```
+
+### Step 3: Get Status Details
+
+For detailed status on a specific corpus:
+
+```bash
+# Get index status
+get_index_status "$corpus_path"  # Returns: built | placeholder | no-index
+
+# Check freshness
+compare_freshness "$corpus_path" "$source_id"  # Returns: current | stale | unknown
+
+# Full status report
+report_corpus_status "$corpus_path"
+```
+
+### Step 4: Resolve Paths
+
+```bash
+# Get key paths
+get_index_path "$corpus_path"
+get_config_path "$corpus_path"
+get_navigate_skill_path "$corpus_path"
+
+# List source IDs
+list_source_ids "$corpus_path"
+```
+
+**Library reference:** See `lib/corpus/corpus-index.md` for full function documentation.
 
 ## Output Format
 
@@ -166,14 +158,22 @@ Adjust file lookups based on type.
 
 ## Quick Commands
 
-For fast discovery without detailed analysis:
+Using the library for fast discovery:
 
 ```bash
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+
 # Count total installed corpora
-(ls -d ~/.claude/skills/hiivmind-corpus-*/ ~/.claude/plugins/marketplaces/hiivmind-corpus-*/ ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ .claude-plugin/skills/hiivmind-corpus-*/ 2>/dev/null) | wc -l
+discover_all | count_corpora
 
 # List names only
-(ls -d ~/.claude/skills/hiivmind-corpus-*/ ~/.claude/plugins/marketplaces/hiivmind-corpus-*/ ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ .claude-plugin/skills/hiivmind-corpus-*/ 2>/dev/null) | xargs -I{} basename {}
+discover_all | list_names
+
+# Built corpora only
+discover_all | filter_built | list_names
+
+# Simple formatted list
+discover_all | format_simple
 ```
 
 ## Integration with Gateway Command
@@ -211,6 +211,7 @@ Skip and note in output:
 
 ## Reference
 
+- **Corpus library**: `lib/corpus/corpus-index.md` - Full function documentation
 - Initialize new corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build corpus index: `skills/hiivmind-corpus-build/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
