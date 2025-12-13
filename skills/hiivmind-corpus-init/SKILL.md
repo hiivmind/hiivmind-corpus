@@ -373,7 +373,8 @@ Fill these from Phase 1 inputs and Phase 4 research:
 | `{{repo_name}}` | Extracted from URL | `polars` |
 | `{{branch}}` | Usually `main` | `main` |
 | `{{docs_root}}` | From research | `docs/` |
-| `{{description}}` | Generated | `Always-current Polars documentation` |
+| `{{description}}` | Generated (marketplace) | `Documentation corpus for data tools` |
+| `{{plugin_description}}` | Generated (per-plugin) | `Always-current Polars documentation` |
 | `{{author_name}}` | Ask or default | User's name |
 | `{{keywords_json}}` | Generated (plugin only) | `"dataframes", "python", "rust"` |
 | `{{example_questions}}` | Generated (plugin only) | Example usage questions |
