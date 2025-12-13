@@ -81,7 +81,7 @@ Add more detail about authentication to the {{project_display_name}} index
 
 ## Skills
 
-### hiivmind-corpus-{{project_name}}-navigate
+### hiivmind-corpus-navigate-{{project_name}}
 
 Finds relevant documentation for {{project_display_name}}-related coding tasks. Automatically invoked when you ask about:
 

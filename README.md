@@ -153,7 +153,7 @@ Each corpus includes `data/project-awareness.md` — a snippet for any project's
 ```markdown
 # Polars Documentation Corpus
 
-Use **hiivmind-corpus-polars-navigate** when working with Polars.
+Use **hiivmind-corpus-navigate-polars** when working with Polars.
 ```
 
 This makes Claude proactively use the corpus in projects that need it.

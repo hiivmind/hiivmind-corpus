@@ -1,5 +1,5 @@
 ---
-name: hiivmind-corpus-{{project_name}}-navigate
+name: hiivmind-corpus-navigate-{{project_name}}
 description: Find relevant {{project_display_name}} documentation. Use when working with {{project_display_name}} code, APIs, or configuration.
 ---
 

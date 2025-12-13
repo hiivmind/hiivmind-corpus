@@ -194,7 +194,7 @@ corpora:
     status: built
     sources: 1
     last_indexed: "2025-12-10"
-    navigate_skill: hiivmind-corpus-polars-navigate
+    navigate_skill: hiivmind-corpus-navigate-polars
 ```
 
 ## Error Handling

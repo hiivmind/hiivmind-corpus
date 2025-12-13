@@ -118,7 +118,7 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - Discovery skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`
 - Gateway command: `/hiivmind-corpus`
 - Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
-- Generated navigate skills: `hiivmind-corpus-{project}-navigate` (per-corpus navigation)
+- Generated navigate skills: `hiivmind-corpus-navigate-{project}` (per-corpus navigation)
 
 ## Shell Function Library
 

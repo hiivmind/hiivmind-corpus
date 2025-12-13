@@ -1,6 +1,6 @@
 # {{project_display_name}} Documentation Corpus
 
-A curated documentation corpus for {{project_display_name}} is available. Use the **hiivmind-corpus-{{project_name}}-navigate** skill when you need to look up {{project_display_name}} documentation.
+A curated documentation corpus for {{project_display_name}} is available. Use the **hiivmind-corpus-navigate-{{project_name}}** skill when you need to look up {{project_display_name}} documentation.
 
 ## When to Use
 
