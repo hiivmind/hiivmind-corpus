@@ -9,15 +9,62 @@ Find and retrieve relevant documentation from the {{project_display_name}} corpu
 
 ## Process
 
-1. **Read the index**: `data/index.md`
-2. **Check for tiered index**: If main index links to sub-indexes (e.g., `→ See [index-actions.md]`), this is a tiered corpus
-3. **Find relevant section**: Match user's question to index sections
-4. **For tiered indexes**: Read the appropriate sub-index file for detailed entries
-5. **Parse path format**: `{source_id}:{relative_path}`
-6. **Check for `⚡ GREP` marker** - if present, use Grep instead of Read (see Large Structured Files section)
-7. **Look up source** in `data/config.yaml` by ID
-8. **Get content** based on source type (see Source Access below)
-9. **Answer** with citation to source and file path
+1. **Search the indexes first** (see Index Search section below)
+   - Extract key concepts from the question
+   - Grep the indexes for those terms
+   - If matches found → use those entries directly
+2. **If no search matches, navigate by section**:
+   - Read the index: `data/index.md`
+   - Check for tiered index (if main index links to sub-indexes like `→ See [index-actions.md]`)
+   - Find relevant section and read sub-index if tiered
+3. **Parse path format**: `{source_id}:{relative_path}`
+4. **Check for `⚡ GREP` marker** - if present, use Grep instead of Read (see Large Structured Files section)
+5. **Look up source** in `data/config.yaml` by ID
+6. **Get content** based on source type (see Source Access below)
+7. **Answer** with citation to source and file path
+
+## Index Search (Recommended First Step)
+
+**Before reading sections sequentially, SEARCH the indexes for relevant terms.**
+
+### Step 1: Extract Key Concepts
+
+Analyze the user's question and extract:
+- **Explicit terms**: Words directly used in the question
+- **Synonyms**: Related terms (e.g., "filter" → also try "view", "query", "search")
+- **Domain terms**: Technical concepts that might appear in docs (e.g., "tag" → also try "label", "field")
+
+Example: "How do I filter GitHub projects by tag?"
+- Explicit: `filter`, `projects`, `tag`
+- Synonyms: `view`, `query`, `search`
+- Domain: `label`, `field`, `custom field`
+
+### Step 2: Search All Index Files
+
+```bash
+# Search for each term across all index files
+grep -ri "filter" data/ --include="*.md"
+grep -ri "tag" data/ --include="*.md"
+grep -ri "label" data/ --include="*.md"
+```
+
+**Tip:** Search for the most specific term first. If no matches, broaden to synonyms.
+
+### Step 3: Use Search Results
+
+If grep finds matches:
+1. **Direct hit**: Entry description matches the question → use that path
+2. **Related hit**: Entry is in the right area → read that section for context
+3. **No hit in index**: The topic may not be indexed yet → report this as an index gap
+
+### Step 4: Report Index Gaps
+
+If the user's question cannot be answered because the index lacks relevant entries:
+
+> "The index doesn't have entries for '{term}'. The closest match is '{related_section}'.
+> If this topic should be covered, consider running `hiivmind-corpus-enhance` to add depth to this area."
+
+This is valuable feedback for corpus improvement.
 
 ## Tiered Index Navigation
 
