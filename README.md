@@ -25,8 +25,8 @@ The corpus skills you generate are:
 
 ## Installation
 
-```bash
-claude mcp add-json hiivmind-corpus '{"type":"stdio","command":"claude","args":["mcp","serve","/path/to/hiivmind-corpus"]}'
+```
+/install hiivmind/hiivmind-corpus
 ```
 
 ## The Six Skills
