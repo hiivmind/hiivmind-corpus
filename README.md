@@ -2,7 +2,9 @@
 
 A Claude Code plugin for creating persistent, curated documentation indexes from any documentation source—reliable, up-to-date, authoritative context that persists across sessions.
 
-Instead of relying on Claude training data, web searches, or guessing URLs on demand, you build a human-curated index once and use it everywhere. The index can track upstream changes, so you know exactly how fresh your documentation is and where it came from.
+Think of it like [Claude Projects](https://claude.ai) for Claude Code—but better. With Projects, you dump docs, code, and PDFs into a collection that persists across chats. But everything consumes context, there's no way to prioritize what matters, no freshness tracking, no namespacing, no search.
+
+A corpus solves all of this. You build a curated index once, Claude searches it directly without filling your context window, and the index tracks exactly where everything came from and how fresh it is. Install as many as you need—they're lightweight and independent.
 
 ## Getting Started
 
