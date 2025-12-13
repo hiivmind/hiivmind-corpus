@@ -187,14 +187,30 @@ The collaborative index building. Rather than Claude guessing what matters, you 
 
 It also aids **feature discovery**. Ask "What useful Polars features have I missed in my project?" and Claude can scan your code against the index to suggest capabilities you're not using yet.
 
-### When to use this
+### Corpus vs MCP-based documentation
 
-| Use hiivmind-corpus when | Default lookup is fine when |
-|--------------------------|----------------------------|
-| Documentation is large (100+ pages) | Quick one-off question |
-| Recurring needs, not one-off questions | Small library with simple docs |
-| Docs change frequently | Just need a code snippet |
-| Official docs are authoritative | Docs are stable and well-known |
+| Aspect | hiivmind-corpus | MCP documentation servers |
+|--------|-----------------|---------------------------|
+| **Index** | Curated markdown, human-guided | Auto-generated or none |
+| **Persistence** | Committed to repo, survives sessions | Fresh each session |
+| **Curation** | You decide what matters | Generic structure |
+| **Offline** | Works with local clone | Requires live connection |
+| **Upstream tracking** | Knows when stale via commit SHA | Always fetches latest |
+| **Setup cost** | Higher (collaborative building) | Lower (configure and go) |
+| **Query cost** | Low (read local index) | Higher (API calls per query) |
+
+**Use hiivmind-corpus when:**
+- Documentation is large and you need systematic coverage
+- You have recurring needs (not one-off questions)
+- You want to curate what's relevant to YOUR work
+- Feature discovery matters ("what am I missing?")
+- Team needs shared, consistent documentation context
+
+**Use MCP servers when:**
+- You need always-current information (live APIs, changelogs)
+- Documentation is small or well-structured
+- One-off queries without curation needs
+- Integration with external services (databases, issue trackers)
 
 ### Why corpora are independent
 
