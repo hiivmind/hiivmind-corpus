@@ -187,30 +187,21 @@ The collaborative index building. Rather than Claude guessing what matters, you 
 
 It also aids **feature discovery**. Ask "What useful Polars features have I missed in my project?" and Claude can scan your code against the index to suggest capabilities you're not using yet.
 
-### Corpus vs MCP-based documentation
+### Why not MCP-based documentation?
 
-| Aspect | hiivmind-corpus | MCP documentation servers |
-|--------|-----------------|---------------------------|
-| **Index** | Curated markdown, human-guided | Auto-generated or none |
-| **Persistence** | Committed to repo, survives sessions | Fresh each session |
-| **Curation** | You decide what matters | Generic structure |
-| **Offline** | Works with local clone | Requires live connection |
-| **Upstream tracking** | Knows when stale via commit SHA | Always fetches latest |
-| **Setup cost** | Higher (collaborative building) | Lower (configure and go) |
-| **Query cost** | Low (read local index) | Higher (API calls per query) |
+MCP documentation servers typically use vector databases and embeddings to index docs. Here's why we think the corpus approach is better:
 
-**Use hiivmind-corpus when:**
-- Documentation is large and you need systematic coverage
-- You have recurring needs (not one-off questions)
-- You want to curate what's relevant to YOUR work
-- Feature discovery matters ("what am I missing?")
-- Team needs shared, consistent documentation context
+**Known freshness.** With hiivmind-corpus, you know exactly how old your sources are—commit SHA tracking tells you precisely. With MCP/vector solutions, who knows when they last re-indexed or refreshed their embeddings?
 
-**Use MCP servers when:**
-- You need always-current information (live APIs, changelogs)
-- Documentation is small or well-structured
-- One-off queries without curation needs
-- Integration with external services (databases, issue trackers)
+**Zero infrastructure.** No vector databases, no embedding models, no server deployments, no API keys. Just markdown files in your repo.
+
+**Zero cost.** On Claude Code's non-API plans, there's no setup cost and no per-query cost. MCP servers often require paid embedding APIs or hosted vector databases.
+
+**Human curation beats auto-indexing.** You decide what matters. "I care about data modeling and ETL, skip the deployment stuff" isn't something a vector embedding understands.
+
+**Fast local access.** Yes, you need to be online (Claude needs it), but local file caches are dramatically faster and more searchable than web fetches or API calls to vector databases.
+
+**Portable and versionable.** Your index is just markdown—commit it, diff it, review it, share it with your team. Try doing that with vector embeddings.
 
 ### Why corpora are independent
 
