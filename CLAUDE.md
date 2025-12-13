@@ -44,21 +44,16 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
 6. **hiivmind-corpus-upgrade**: Updates existing corpora to latest template standards
 
-## Two Destination Types
+## Four Destination Types
 
-`hiivmind-corpus-init` asks users to choose where the skill should live:
+`hiivmind-corpus-init` detects context and offers appropriate destinations:
 
-### Project-local skill
-- Created in `.claude-plugin/skills/hiivmind-corpus-{lib}/` within an existing project
-- No marketplace installation needed—just opening the project activates it
-- Great for teams: everyone who clones the repo gets the skill
-- Example: A data analysis project that needs Polars docs
-
-### Standalone plugin
-- Created as a separate `hiivmind-corpus-{lib}/` directory (becomes its own repo)
-- Requires marketplace installation for reuse
-- Available across all projects for the user
-- Example: "I always want React docs available everywhere"
+| Type | Location | Best For |
+|------|----------|----------|
+| **User-level** | `~/.claude/skills/hiivmind-corpus-{lib}/` | Personal use everywhere |
+| **Repo-local** | `{repo}/.claude-plugin/skills/hiivmind-corpus-{lib}/` | Team sharing via git |
+| **Single-corpus** | `hiivmind-corpus-{lib}/` (standalone repo) | Marketplace publishing |
+| **Multi-corpus** | `{marketplace}/hiivmind-corpus-{lib}/` | Marketplace publishing (related projects) |
 
 ## Generated Structures
 
@@ -172,3 +167,42 @@ upgrade ◄──────────┘ (must know all features to retrofit
 ### Reference Sections
 
 Every skill has a `## Reference` section at the bottom listing all other skills. When adding a new skill, update all existing skills' Reference sections.
+
+## Plugin Development Resources
+
+**IMPORTANT**: This is a Claude Code plugin. When working on plugin structure, installation, or distribution, use the `plugin-dev` skills for authoritative guidance.
+
+### Available Plugin-Dev Skills
+
+| Skill | Use When |
+|-------|----------|
+| `plugin-dev:plugin-structure` | Plugin manifest, directory layout, component organization |
+| `plugin-dev:skill-development` | Writing SKILL.md files, descriptions, progressive disclosure |
+| `plugin-dev:command-development` | Slash commands, YAML frontmatter, arguments |
+| `plugin-dev:agent-development` | Subagent definitions, triggering, tools |
+| `plugin-dev:hook-development` | Event hooks, PreToolUse/PostToolUse, validation |
+| `plugin-dev:mcp-integration` | MCP server configuration, external services |
+| `plugin-dev:plugin-settings` | Plugin configuration, .local.md files |
+
+### Plugin Installation (Marketplace)
+
+Users install this plugin via the Claude Code marketplace:
+
+```bash
+# Add the marketplace
+/plugin marketplace add hiivmind/hiivmind-corpus
+
+# Install the plugin
+/plugin install hiivmind-corpus@hiivmind
+```
+
+Or interactively via `/plugin`.
+
+### Key Plugin Conventions
+
+- **Manifest location**: `.claude-plugin/plugin.json` (required)
+- **Component directories**: At plugin root, NOT inside `.claude-plugin/`
+- **Path references**: Use `${CLAUDE_PLUGIN_ROOT}` for portability
+- **Naming**: kebab-case for all directories and files
+
+When in doubt about plugin structure or Claude Code conventions, invoke the relevant `plugin-dev` skill rather than guessing.
