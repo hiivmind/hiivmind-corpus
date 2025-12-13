@@ -158,6 +158,34 @@ Use **hiivmind-corpus-polars-navigate** when working with Polars.
 
 This makes Claude proactively use the corpus in projects that need it.
 
+### Multi-Source Corpora
+
+A single corpus can combine multiple source types—git repos, web pages, and local uploads:
+
+```
+data/
+├── config.yaml              # Sources array with git, web, local entries
+├── index.md                 # Unified index with source prefixes
+└── uploads/team-standards/  # Local documents
+.source/                     # Git clones (gitignored)
+├── react/
+└── tanstack-query/
+.cache/web/kent-blog/        # Cached web content (gitignored)
+```
+
+Index entries use `{source_id}:{path}` format to identify the source:
+
+```markdown
+## React Fundamentals
+- **Hooks Overview** `react:reference/hooks.md` - Introduction to hooks
+
+## Testing
+- **Implementation Details** `web:kent-blog/testing-impl.md` - What not to test
+- **Our Standards** `local:team-standards/testing.md` - Team conventions
+```
+
+Use `add-source` to extend any corpus with additional git repos, web articles, or local files.
+
 ## Design Principles
 
 - **Human-readable indexes** — Simple markdown with headings, not complex schemas
@@ -254,29 +282,20 @@ hiivmind-corpus-polars/
 └── .source/polars/              # gitignored
 ```
 
-**Multi-source corpus:**
+**Multi-corpus repo (marketplace):**
 ```
-hiivmind-corpus-fullstack/
-├── skills/navigate/SKILL.md
-├── data/
-│   ├── config.yaml
-│   ├── index.md                 # Unified with source prefixes
-│   ├── project-awareness.md
-│   └── uploads/team-standards/  # Local docs
-├── .source/                     # gitignored
-│   ├── react/
-│   └── tanstack-query/
-└── .cache/web/kent-blog/        # gitignored
-```
-
-**Index format:**
-```markdown
-## React Fundamentals
-- **Hooks Overview** `react:reference/hooks.md` - Introduction to hooks
-
-## Testing
-- **Implementation Details** `web:kent-blog/testing-impl.md` - What not to test
-- **Our Standards** `local:team-standards/testing.md` - Team conventions
+hiivmind-corpus-data/                # Marketplace root
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json             # Lists child plugins
+├── hiivmind-corpus-polars/          # Child plugin
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/navigate/SKILL.md
+│   └── data/
+├── hiivmind-corpus-ibis/            # Child plugin
+│   └── ...
+└── hiivmind-corpus-narwhals/        # Child plugin
+    └── ...
 ```
 
 ## License
