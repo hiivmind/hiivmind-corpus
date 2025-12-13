@@ -11,13 +11,18 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 ## Architecture
 
 ```
-├── skills/                           # Six core skills (the meta-plugin)
+├── skills/                           # Eight core skills (the meta-plugin)
 │   ├── hiivmind-corpus-init/         # Step 1: Create skill structure from template
 │   ├── hiivmind-corpus-build/        # Step 2: Analyze docs, build index with user
 │   ├── hiivmind-corpus-add-source/   # Add git repos, local docs, or web pages
 │   ├── hiivmind-corpus-enhance/      # Deepen coverage on specific topics
 │   ├── hiivmind-corpus-refresh/      # Refresh index from upstream changes
-│   └── hiivmind-corpus-upgrade/      # Upgrade existing corpora to latest standards
+│   ├── hiivmind-corpus-upgrade/      # Upgrade existing corpora to latest standards
+│   ├── hiivmind-corpus-discover/     # Find all installed corpora
+│   └── hiivmind-corpus-navigate/     # Global navigation across all corpora
+│
+├── commands/                         # Slash commands
+│   └── hiivmind-corpus.md            # Gateway command for corpus interaction
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -27,6 +32,13 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 ## Skill Lifecycle
 
 ```
+                        /hiivmind-corpus (gateway command)
+                                 │
+                    hiivmind-corpus-discover ← finds installed corpora
+                                 │
+                    hiivmind-corpus-navigate ← queries across all corpora
+                                 │
+                                 ▼
 hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
        (once)                 (once)                  (periodic)
                                  ↓
@@ -37,12 +49,20 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
                       (when meta-plugin updates)
 ```
 
+**Creation & Maintenance Skills:**
 1. **hiivmind-corpus-init**: Clones target repo, analyzes structure, generates skill directory
 2. **hiivmind-corpus-add-source**: Adds git repos, local documents, or web pages to existing corpus
 3. **hiivmind-corpus-build**: Analyzes docs, builds `index.md` collaboratively with user
 4. **hiivmind-corpus-enhance**: Deepens coverage on specific topics (runs on existing index)
 5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
 6. **hiivmind-corpus-upgrade**: Updates existing corpora to latest template standards
+
+**Discovery & Navigation Skills:**
+7. **hiivmind-corpus-discover**: Scans for installed corpora across user-level, repo-local, and marketplace locations
+8. **hiivmind-corpus-navigate**: Global navigator that routes queries to appropriate per-corpus navigate skills
+
+**Gateway Command:**
+- **/hiivmind-corpus**: Interactive entry point for discovering and interacting with installed corpora
 
 ## Four Destination Types
 
@@ -85,8 +105,11 @@ hiivmind-corpus-{project}/
 
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
-- Skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-upgrade`
-- Generated skills: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
+- Creation skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-upgrade`
+- Discovery skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`
+- Gateway command: `/hiivmind-corpus`
+- Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
+- Generated navigate skills: `hiivmind-corpus-{project}-navigate` (per-corpus navigation)
 
 ## Key Design Decisions
 
@@ -97,6 +120,9 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - **Per-project skills**: Each corpus skill has its own navigate skill for discoverability
 - **Project awareness**: Corpora include snippets for injecting into project CLAUDE.md files
 - **Upgradeable**: `hiivmind-corpus-upgrade` brings existing corpora to latest template standards
+- **Discoverable**: `hiivmind-corpus-discover` finds corpora across all installation types
+- **Unified access**: `/hiivmind-corpus` gateway provides single entry point for all corpus interaction
+- **Global navigation**: `hiivmind-corpus-navigate` routes queries across all installed corpora
 
 ## Index Format
 
@@ -125,7 +151,7 @@ Templates in `templates/` use placeholders like `{{project_name}}`, `{{repo_url}
 
 ## Maintaining Skill Alignment
 
-**IMPORTANT**: All 6 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
+**IMPORTANT**: All 8 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
 
 ### Cross-Cutting Concerns
 
@@ -133,12 +159,14 @@ These features span multiple skills and must stay synchronized:
 
 | Feature | Relevant Skills | What to Check |
 |---------|-----------------|---------------|
-| Destination types | init, enhance, refresh, upgrade | Prerequisites table lists all 4 types |
+| Destination types | init, enhance, refresh, upgrade, discover | Prerequisites table lists all 4 types |
 | Tiered indexes | build, enhance, refresh, upgrade | Detection logic, update handling |
 | Source types (git/local/web) | add-source, build, enhance, refresh | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
 | Project awareness | init, upgrade | Template exists, navigate skill section |
 | Config schema | all skills | Schema fields, validation |
+| Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
+| Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
 
 ### When Adding New Features
 
@@ -151,6 +179,12 @@ These features span multiple skills and must stay synchronized:
 ### Skill Dependency Chain
 
 ```
+/hiivmind-corpus (gateway command)
+         │
+         ├── discover ◄──── scans all installation locations
+         │
+         └── navigate ◄──── routes to per-corpus navigate skills
+                    │
 init ──────────► templates/
                     │
 add-source ◄───────┤

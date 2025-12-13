@@ -329,3 +329,6 @@ This helps track which corpora have been upgraded.
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
 - Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`
+- Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
+- Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
+- Gateway command: `commands/hiivmind-corpus.md`

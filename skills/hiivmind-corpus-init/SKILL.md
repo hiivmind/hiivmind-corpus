@@ -845,3 +845,6 @@ Update existing `marketplace.json`:
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
 - Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`
 - Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`
+- Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
+- Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
+- Gateway command: `commands/hiivmind-corpus.md`
