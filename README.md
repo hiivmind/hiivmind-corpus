@@ -1,6 +1,24 @@
 # hiivmind-corpus
 
-A meta-plugin that creates documentation corpus skills for Claude Code.
+A Claude Code plugin for creating persistent, curated documentation indexes from any documentation source—reliable, up-to-date, authoritative context that persists across sessions.
+
+Instead of relying on Claude training data, web searches, or guessing URLs on demand, you build a human-curated index once and use it everywhere. The index can track upstream changes, so you know exactly how fresh your documentation is and where it came from.
+
+## Getting Started
+
+```
+/hiivmind-corpus
+```
+
+One command, natural language. Describe what you need:
+
+- *"Create a corpus for Polars"* → scaffolds a new corpus
+- *"What corpora do I have?"* → discovers all installed corpora
+- *"How do I use lazy frames in Polars?"* → navigates across your corpora
+- *"Refresh my React corpus"* → checks for upstream changes
+- *"Add the TanStack Query docs to my fullstack corpus"* → extends with new sources
+
+## What It Creates
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -35,30 +53,44 @@ The corpus skills you generate are:
 
 Or use `/plugin` to browse and install interactively.
 
-## The Six Skills
+## The Eight Skills
 
-| Skill | Process | Purpose |
-|-------|---------|---------|
-| **init** | `INPUT → SCAFFOLD → CLONE → RESEARCH → GENERATE → VERIFY` | Create corpus structure |
-| **add-source** | `LOCATE → TYPE → COLLECT → SETUP → INDEX?` | Add git/local/web sources |
-| **build** | `PREPARE → SCAN → ASK → BUILD → SAVE` | Build index collaboratively |
-| **enhance** | `VALIDATE → READ → ASK → EXPLORE → ENHANCE → SAVE` | Deepen topic coverage |
-| **refresh** | `VALIDATE → DETECT → CHECK → REPORT/UPDATE` | Sync with upstream changes |
-| **upgrade** | `LOCATE → DETECT → COMPARE → REPORT → APPLY → VERIFY` | Update to latest standards |
+| Skill | Purpose |
+|-------|---------|
+| **discover** | Find all installed corpora across user-level, repo-local, and marketplace locations |
+| **navigate** | Query across all your corpora—routes to the right per-corpus navigate skill |
+| **init** | Create corpus structure from a GitHub repo URL |
+| **add-source** | Add git repos, local documents, or web pages to existing corpora |
+| **build** | Build index collaboratively with user guidance |
+| **enhance** | Deepen topic coverage in specific areas |
+| **refresh** | Sync with upstream changes (compare SHAs, update index) |
+| **upgrade** | Update existing corpora to latest template standards |
 
 ### Skill Lifecycle
 
 ```
-┌─────────┐    ┌────────────┐    ┌───────┐
-│  init   │ →  │ add-source │ →  │ build │
-└─────────┘    └────────────┘    └───────┘
-                                     ↓
-┌─────────┐    ┌─────────┐    ┌─────────┐
-│ upgrade │ ←  │ refresh │ ←  │ enhance │
-└─────────┘    └─────────┘    └─────────┘
-     ↑              ↑              ↑
-     └──────────────┴──────────────┘
-              (as needed)
+                    /hiivmind-corpus
+                           │
+            ┌──────────────┼──────────────┐
+            ▼              ▼              ▼
+       ┌──────────┐  ┌──────────┐  ┌──────────┐
+       │ discover │  │ navigate │  │   init   │
+       └──────────┘  └──────────┘  └────┬─────┘
+            │              │             │
+            └──────────────┘             ▼
+         (query existing)        ┌────────────┐
+                                 │ add-source │
+                                 └─────┬──────┘
+                                       ▼
+┌─────────┐    ┌─────────┐    ┌─────────────┐
+│ upgrade │ ←  │ refresh │ ←  │    build    │
+└─────────┘    └─────────┘    └──────┬──────┘
+     ↑              ↑                │
+     └──────────────┴────────────────┘
+                (as needed)          ▼
+                                ┌─────────┐
+                                │ enhance │
+                                └─────────┘
 ```
 
 ## Where Corpora Live
@@ -84,41 +116,18 @@ All paths in the index use `{source_id}:{relative_path}` format.
 
 ## Quick Start
 
-**Create a corpus:**
-```
-"Create a corpus skill for Polars"
-```
-→ runs `init` → scaffolds structure → clones docs
+Just type `/hiivmind-corpus` and describe what you need:
 
-**Build the index:**
-```
-"Build the polars corpus index"
-```
-→ runs `build` → scans sources → collaboratively creates index
-
-**Add more sources:**
-```
-"Add Kent C. Dodds testing blog posts to my corpus"
-```
-→ runs `add-source` → fetches/caches content → offers to index
-
-**Check for updates:**
-```
-"Check if my corpus needs updating"
-```
-→ runs `refresh status` → compares SHAs → reports changes
-
-**Deepen a topic:**
-```
-"Enhance the Query Optimization section"
-```
-→ runs `enhance` → searches sources → expands index collaboratively
-
-**Upgrade to latest:**
-```
-"Upgrade my polars corpus to latest standards"
-```
-→ runs `upgrade` → detects missing features → applies updates
+| You say... | What happens |
+|------------|--------------|
+| *"Create a corpus for Polars"* | `init` scaffolds structure, clones docs |
+| *"What corpora do I have?"* | `discover` lists all installed corpora |
+| *"How do lazy frames work?"* | `navigate` searches your corpora and fetches docs |
+| *"Build the polars index"* | `build` scans sources, collaboratively creates index |
+| *"Add TanStack Query to my fullstack corpus"* | `add-source` clones repo, offers to index |
+| *"Check if my corpus needs updating"* | `refresh` compares SHAs, reports changes |
+| *"Enhance the Query Optimization section"* | `enhance` searches sources, expands index |
+| *"Upgrade my polars corpus"* | `upgrade` applies latest template standards |
 
 ## Advanced Features
 
@@ -188,9 +197,11 @@ Use `add-source` to extend any corpus with additional git repos, web articles, o
 
 ## Design Principles
 
+- **Unified access** — One command (`/hiivmind-corpus`) to create, discover, navigate, and maintain all corpora
 - **Human-readable indexes** — Simple markdown with headings, not complex schemas
 - **Collaborative building** — User guides what's important, not automation
 - **Works without local clone** — Falls back to raw GitHub URLs
+- **Discoverable** — `discover` finds all installed corpora; `navigate` queries across them
 - **Per-project discoverability** — Each corpus has its own navigate skill description
 - **Project awareness** — Corpora include snippets for CLAUDE.md injection
 - **Upgradeable** — Existing corpora update to latest standards via `upgrade`
