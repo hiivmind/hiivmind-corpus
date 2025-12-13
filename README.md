@@ -6,6 +6,8 @@ Think of it like [Claude Projects](https://claude.ai) for Claude Code—but bett
 
 A corpus solves all of this. You build a curated index once, Claude searches it directly without filling your context window, and the index tracks exactly where everything came from and how fresh it is. Install as many as you need—they're lightweight and independent.
 
+This follows the ["just in time" context pattern](https://www.anthropic.com/engineering/claude-code-best-practices) recommended by Anthropic: rather than loading all documentation up front, the index maintains lightweight identifiers (file paths, URLs) that Claude uses to dynamically load relevant content at runtime. It mirrors how humans work—we don't memorize entire corpuses, we build indexing systems to retrieve information on demand.
+
 ## Getting Started
 
 ```
