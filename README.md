@@ -25,9 +25,15 @@ The corpus skills you generate are:
 
 ## Installation
 
+```bash
+# Add the marketplace
+/plugin marketplace add hiivmind/hiivmind-corpus
+
+# Install the plugin
+/plugin install hiivmind-corpus@hiivmind
 ```
-/install hiivmind/hiivmind-corpus
-```
+
+Or use `/plugin` to browse and install interactively.
 
 ## The Six Skills
 
