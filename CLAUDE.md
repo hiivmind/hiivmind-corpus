@@ -21,6 +21,9 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
 │   └── hiivmind-corpus-navigate/     # Global navigation across all corpora
 │
+├── agents/                           # Agent definitions for parallel operations
+│   └── source-scanner.md             # Parallel scanning of documentation sources
+│
 ├── commands/                         # Slash commands
 │   └── hiivmind-corpus.md            # Gateway command for corpus interaction
 │
@@ -72,6 +75,14 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 
 **Gateway Command:**
 - **/hiivmind-corpus**: Interactive entry point for discovering and interacting with installed corpora
+
+**Agents:**
+
+| Agent | Purpose | Model | Used By |
+|-------|---------|-------|---------|
+| `source-scanner` | Parallel scanning of documentation sources | haiku | build, refresh |
+
+Agents enable parallel processing of multi-source corpora. When a corpus has 2+ sources, skills spawn multiple `source-scanner` agents concurrently to analyze each source, then aggregate results. This provides 40-60% speedup for corpora with 3+ sources.
 
 ## Four Destination Types
 
@@ -208,6 +219,7 @@ These features span multiple skills and must stay synchronized:
 | Config schema | all skills | Schema fields, validation |
 | Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
+| Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
 
 ### When Adding New Features
 
@@ -230,11 +242,11 @@ init ──────────► templates/
                     │
 add-source ◄───────┤
                     │
-build ◄────────────┤
+build ◄────────────┤ ──► source-scanner agent (parallel multi-source)
                     │
 enhance ◄──────────┤ (must know all features to validate)
                     │
-refresh ◄──────────┤ (must know all features to validate)
+refresh ◄──────────┤ ──► source-scanner agent (parallel multi-source)
                     │
 upgrade ◄──────────┘ (must know all features to retrofit)
 ```

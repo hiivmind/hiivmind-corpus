@@ -81,6 +81,28 @@ For tiered indexes, note which sections/sub-indexes exist for change mapping lat
 
 ### Step 3: Check each source
 
+#### Parallel Status Checking (for multi-source corpora)
+
+**For single source:** Check directly using the commands below.
+
+**For multiple sources (2+):** Use the `source-scanner` agent for parallel status checking:
+
+1. For each source, spawn a `source-scanner` agent to:
+   - Verify source availability
+   - Check for upstream changes (git: compare SHAs, local: check mtimes, web: check cache age)
+2. Launch all agents in parallel (single message with multiple Task tool calls)
+3. Collect status results from each agent
+4. Aggregate into combined status report
+
+**Agent invocation pattern:**
+```
+Task tool with subagent_type="source-scanner":
+  prompt: "Check status for source '{source_id}' (type: {type}).
+           Last indexed SHA: {last_commit_sha}, Last indexed at: {last_indexed_at}"
+```
+
+#### Check by Source Type (single source or fallback)
+
 **For git sources:**
 ```bash
 # If .source/{source_id}/ exists
@@ -501,3 +523,4 @@ Updated config with new SHA: def456
 - Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`
+- **Agent:** Source scanner for parallel operations: `agents/source-scanner.md`
