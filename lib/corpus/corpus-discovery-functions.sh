@@ -245,3 +245,86 @@ format_table() {
         echo "$name|$type|$status|$path"
     done
 }
+
+# =============================================================================
+# KEYWORD EXTRACTION
+# =============================================================================
+# Pattern: get_{what}
+# Purpose: Extract corpus metadata for routing
+# Input: Corpus path
+# Output: Keyword data
+
+# Get corpus keywords from config.yaml
+# Falls back to inferring from corpus name if no keywords field
+# Args: corpus_path
+# Output: Comma-separated keywords
+get_corpus_keywords() {
+    local corpus_path="$1"
+    local config_file="${corpus_path}data/config.yaml"
+
+    # Try explicit keywords first (from corpus.keywords array)
+    if [ -f "$config_file" ]; then
+        local keywords
+        keywords=$(yq -r '.corpus.keywords // empty | .[]?' "$config_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+        if [ -n "$keywords" ]; then
+            echo "$keywords"
+            return 0
+        fi
+    fi
+
+    # Fall back to name inference
+    local name
+    name=$(basename "$corpus_path" | sed 's/hiivmind-corpus-//' | tr '-' ',')
+    echo "$name"
+}
+
+# Get corpus display name from config.yaml
+# Falls back to corpus name if not set
+# Args: corpus_path
+# Output: Display name string
+get_corpus_display_name() {
+    local corpus_path="$1"
+    local config_file="${corpus_path}data/config.yaml"
+
+    if [ -f "$config_file" ]; then
+        local display_name
+        display_name=$(yq -r '.corpus.display_name // empty' "$config_file" 2>/dev/null)
+
+        if [ -n "$display_name" ]; then
+            echo "$display_name"
+            return 0
+        fi
+    fi
+
+    # Fall back to name from directory
+    basename "$corpus_path" | sed 's/hiivmind-corpus-//' | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g'
+}
+
+# Format for routing (includes keywords for query matching)
+# Input: discover_* output
+# Output: name|display_name|keywords|status|path
+format_routing() {
+    while IFS='|' read -r type name path; do
+        local status="unknown"
+        local index_file="${path}data/index.md"
+
+        if [ -f "$index_file" ]; then
+            if grep -q "Run hiivmind-corpus-build" "$index_file" 2>/dev/null; then
+                status="placeholder"
+            else
+                status="built"
+            fi
+        else
+            status="no-index"
+        fi
+
+        local display_name
+        display_name=$(get_corpus_display_name "$path")
+
+        local keywords
+        keywords=$(get_corpus_keywords "$path")
+
+        echo "$name|$display_name|$keywords|$status|$path"
+    done
+}

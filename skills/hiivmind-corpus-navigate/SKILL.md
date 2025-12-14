@@ -118,18 +118,52 @@ done
 
 This provides topic coverage for routing decisions.
 
-## Keyword Matching
+## Per-Session Corpus Routing
 
-Common keywords by corpus type:
+Keywords are discovered dynamically from each installed corpus's `config.yaml`. This ensures routing stays accurate as corpora are installed/uninstalled.
 
-| Corpus | Keywords |
-|--------|----------|
-| hiivmind-corpus-polars | polars, dataframe, lazy, expression, series, arrow |
-| hiivmind-corpus-ibis | ibis, sql, backend, duckdb, bigquery, postgres |
-| hiivmind-corpus-narwhals | narwhals, agnostic, pandas, polars, pyarrow |
-| hiivmind-corpus-github | github, actions, workflow, api, graphql, rest |
+### Building the Routing Table
 
-Use these for routing when explicit mentions are absent.
+On first documentation question in a session:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+
+# Discover all corpora with routing metadata
+discover_all | format_routing
+# Output: name|display_name|keywords|status|path
+
+# Example output:
+# hiivmind-corpus-polars|Polars|polars,dataframe,lazy,expression|built|/path/to/corpus
+# hiivmind-corpus-ibis|Ibis|ibis,sql,backend,duckdb|built|/path/to/corpus
+```
+
+This builds an in-memory routing table for the session. Keywords come from each corpus's `data/config.yaml`:
+
+```yaml
+corpus:
+  name: "polars"
+  display_name: "Polars"
+  keywords:
+    - polars
+    - dataframe
+    - lazy
+    - expression
+```
+
+If a corpus lacks explicit keywords, the name is inferred from the directory (e.g., `hiivmind-corpus-polars` → `polars`).
+
+### Keyword Matching Algorithm
+
+1. **Extract terms** from user query (nouns, technical terms, project names)
+2. **Score each corpus** by keyword matches:
+   - Exact match on project name → high confidence
+   - Multiple keyword matches → medium confidence
+   - Single keyword match → low confidence
+3. **Select routing**:
+   - Single high-confidence match → route directly
+   - Multiple matches → check project context or ask user
+   - No matches → report no relevant corpus installed
 
 ## Context-Aware Routing
 

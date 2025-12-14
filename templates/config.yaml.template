@@ -4,6 +4,11 @@ schema_version: 2
 corpus:
   name: "{{project_name}}"
   display_name: "{{project_display_name}}"
+  keywords:                    # Routing keywords for per-session discovery
+    - "{{project_name}}"
+{{#additional_keywords}}
+    - "{{.}}"
+{{/additional_keywords}}
   created_at: null
 
 # Multiple sources - each with its own type and tracking

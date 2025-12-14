@@ -169,6 +169,30 @@ Examples:
 
 **If ambiguous, ask the user.**
 
+### Then: Collect Corpus Keywords
+
+Ask the user for routing keywords that help the global navigate skill find this corpus:
+
+> "What keywords should route documentation questions to this corpus?"
+> "These help the global navigator find this corpus when users ask questions."
+
+**Suggest defaults based on:**
+- Project name (always included)
+- Domain terms (dataframe, sql, api, etc.)
+- Common aliases (pl for polars, gh for github)
+
+**Example prompts:**
+- Polars → suggest: `polars, dataframe, lazy, expression, series, pl`
+- Ibis → suggest: `ibis, sql, backend, duckdb, bigquery, postgres`
+- GitHub API → suggest: `github, actions, workflow, api, graphql, rest, gh`
+
+**User can:**
+- Accept defaults
+- Add more keywords
+- Remove suggested keywords
+
+Store as `additional_keywords` list for `config.yaml` template.
+
 ### Determining Destination Path
 
 Based on the detected context and user's choice:
@@ -377,6 +401,7 @@ Fill these from Phase 1 inputs and Phase 4 research:
 | `{{plugin_description}}` | Generated (per-plugin) | `Always-current Polars documentation` |
 | `{{author_name}}` | Ask or default | User's name |
 | `{{keywords_json}}` | Generated (plugin only) | `"dataframes", "python", "rust"` |
+| `{{additional_keywords}}` | From user (routing keywords) | `dataframe`, `lazy`, `expression` |
 | `{{example_questions}}` | Generated (plugin only) | Example usage questions |
 | `{{skill_topics}}` | Generated (plugin only) | Topics the skill covers |
 

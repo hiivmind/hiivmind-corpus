@@ -118,6 +118,13 @@ Present the current structure and ask:
    - "Should I find all related docs, or focus on the essentials?"
    - "Do you want subsections, or just more entries?"
 
+4. **Operational keywords?** (if applicable)
+   - "Is this corpus paired with a routing guide or decision tree?"
+   - "Should entries include searchable keywords for operational lookup?"
+   - "What vocabulary does your routing system use?"
+
+   If the user has a routing guide, ask to see the keyword vocabulary.
+
 ---
 
 ## Step 4: Explore
@@ -271,6 +278,45 @@ All paths use the format: `{source_id}:{relative_path}`
 - "Should I go deeper on any of these?"
 - "Any docs here that aren't actually useful?"
 - "Should I group these by source or by subtopic?"
+
+### Keyword Application (Optional)
+
+If the user indicated this is an operational corpus with keyword requirements:
+
+**Entry Keyword Format:**
+```markdown
+- **Entry Title** `source:path.md` - Description
+  Keywords: `keyword1`, `keyword2`, `keyword3`
+```
+
+**Identify Keywords for Each Entry:**
+1. **Domain terms** - milestones, issues, projects, etc.
+2. **Operation verbs** - create, update, delete, list, query
+3. **API-specific terms** - REST method, GraphQL mutation name, parameters
+4. **Common synonyms** - close/closed, merge/merged
+
+**Example with Keywords:**
+```markdown
+## Milestones
+
+### REST Operations
+- **Create Milestone** `rest:repos/milestones.md#create` - Create a new milestone
+  Keywords: `milestones`, `POST`, `create`, `title`, `due_on`, `description`
+
+- **Update Milestone** `rest:repos/milestones.md#update` - Modify existing milestone
+  Keywords: `milestones`, `PATCH`, `update`, `state`, `due_on`
+
+### GraphQL Operations
+- **List Milestones** `schema:schema.graphql` ⚡ GREP `repository.milestones` - Query milestones
+  Keywords: `milestones`, `repository`, `query`, `states`, `OPEN`, `CLOSED`
+```
+
+**Validate Against Routing Guide:**
+If user has a routing guide, cross-reference keywords:
+- "These are the keywords I've added. Do they match your routing guide?"
+- "Are there synonyms or alternative terms users might search?"
+
+**Keywords work with all entry types** including `⚡ GREP` markers.
 
 ---
 

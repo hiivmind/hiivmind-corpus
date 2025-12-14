@@ -50,12 +50,35 @@ grep -ri "label" data/ --include="*.md"
 
 **Tip:** Search for the most specific term first. If no matches, broaden to synonyms.
 
-### Step 3: Use Search Results
+### Step 2b: Search Entry Keywords (High Priority)
 
-If grep finds matches:
-1. **Direct hit**: Entry description matches the question → use that path
-2. **Related hit**: Entry is in the right area but doesn't directly answer → **GO TO STEP 4 IMMEDIATELY**
-3. **No hit in index**: The topic may not be indexed → **GO TO STEP 4 IMMEDIATELY**
+Index entries may have keyword lines for operational lookup:
+
+```markdown
+- **Entry Title** `source:path.md` - Description
+  Keywords: `keyword1`, `keyword2`, `keyword3`
+```
+
+**Search keywords specifically:**
+```bash
+# Find entries with specific keyword
+grep -ri "Keywords:.*filter" data/ --include="*.md"
+grep -ri "Keywords:.*POST" data/ --include="*.md"
+
+# Find all keyword lines (to understand vocabulary)
+grep -ri "Keywords:" data/ --include="*.md"
+```
+
+**Keyword matches are high-confidence** - if a user asks about "milestones" and an entry has `Keywords: \`milestones\`, \`create\``, that's a direct hit.
+
+### Step 3: Use Search Results (Priority Order)
+
+If grep finds matches, prioritize in this order:
+
+1. **Keyword match** (highest confidence): Entry has `Keywords:` line matching the search term → use that path immediately
+2. **Direct description hit**: Entry description directly matches the question → use that path
+3. **Related hit**: Entry is in the right area but doesn't directly answer → **GO TO STEP 4 IMMEDIATELY**
+4. **No hit in index**: The topic may not be indexed → **GO TO STEP 4 IMMEDIATELY**
 
 **IMPORTANT:** If you searched for "filter" and only found "Views & Layouts" without "filter" in the description, that's a **related hit, not a direct hit**. Stop and ask the user before exploring further.
 

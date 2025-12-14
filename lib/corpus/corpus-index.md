@@ -75,6 +75,13 @@ Pipe from `discover_*` functions:
 | `filter_placeholder` | - | Only corpora needing build |
 | `filter_name` | `pattern` | Corpora matching name pattern |
 
+### Keyword Extraction Primitives
+
+| Function | Args | Output |
+|----------|------|--------|
+| `get_corpus_keywords` | `corpus_path` | Comma-separated keywords (from config or inferred) |
+| `get_corpus_display_name` | `corpus_path` | Display name (from config or inferred) |
+
 ### Format Primitives
 
 Pipe from `discover_*` functions:
@@ -83,6 +90,7 @@ Pipe from `discover_*` functions:
 |----------|--------|
 | `format_simple` | `name (type) - status` |
 | `format_table` | `name\|type\|status\|path` |
+| `format_routing` | `name\|display_name\|keywords\|status\|path` |
 
 ### Count Primitives
 
@@ -104,6 +112,14 @@ discover_all | filter_name "polars"
 
 # Format for display
 discover_all | format_simple
+
+# Get routing metadata for all corpora (per-session routing)
+discover_all | format_routing
+# Output: name|display_name|keywords|status|path
+
+# Get keywords for a specific corpus
+keywords=$(get_corpus_keywords "/path/to/corpus")
+echo "Keywords: $keywords"  # e.g., "polars,dataframe,lazy,expression"
 ```
 
 ---

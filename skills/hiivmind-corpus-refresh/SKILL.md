@@ -247,6 +247,33 @@ For changes detected in each source:
 **Renamed files:**
 - Update path in index (keep same description)
 
+### Preserving Entry Keywords
+
+**IMPORTANT:** Entry keywords are human-curated and must be preserved during refresh.
+
+When updating entries, preserve any `Keywords:` lines:
+
+```markdown
+# Before refresh (entry with keywords)
+- **Milestones REST** `rest:repos/milestones.md` - REST API for milestones
+  Keywords: `milestones`, `POST`, `create`, `due_on`
+
+# After path change (keywords preserved)
+- **Milestones REST** `rest:repos/v2/milestones.md` - REST API for milestones
+  Keywords: `milestones`, `POST`, `create`, `due_on`
+```
+
+**When modifying entries:**
+- Keep existing keywords unless the content fundamentally changed
+- If content changed significantly, ask user: "Should the keywords for this entry be updated?"
+
+**When deleting entries:**
+- Keywords are deleted along with the entry (they're entry-specific)
+
+**When adding new entries:**
+- New entries don't get keywords automatically during refresh
+- Suggest: "Run `hiivmind-corpus-enhance` to add keywords to new entries if needed for operational lookup"
+
 ### Tiered Index Updates
 
 For tiered indexes, determine which file(s) to update based on changed paths:

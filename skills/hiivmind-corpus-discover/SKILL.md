@@ -44,6 +44,10 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-path-functions.sh"
 discover_all | format_table
 # Output: name|type|status|path
 
+# Discover with routing metadata (for global navigate)
+discover_all | format_routing
+# Output: name|display_name|keywords|status|path
+
 # Or discover specific locations
 discover_user_level
 discover_repo_local
@@ -111,11 +115,11 @@ Present discovered corpora in a structured format:
 
 ### Marketplace
 
-| Name | Display | Status | Sources | Last Indexed |
-|------|---------|--------|---------|--------------|
-| hiivmind-corpus-polars | Polars | built | 1 | 2025-12-10 |
-| hiivmind-corpus-ibis | Ibis | built | 1 | 2025-12-10 |
-| hiivmind-corpus-github | GitHub | stale | 2 | 2025-12-01 |
+| Name | Display | Keywords | Status | Sources | Last Indexed |
+|------|---------|----------|--------|---------|--------------|
+| hiivmind-corpus-polars | Polars | polars, dataframe, lazy | built | 1 | 2025-12-10 |
+| hiivmind-corpus-ibis | Ibis | ibis, sql, backend | built | 1 | 2025-12-10 |
+| hiivmind-corpus-github | GitHub | github, actions, api | stale | 2 | 2025-12-01 |
 
 **Total: 3 corpora installed**
 ```
@@ -192,6 +196,11 @@ corpora:
     type: marketplace-multi
     location: ~/.claude/plugins/marketplaces/hiivmind-corpus-data/hiivmind-corpus-polars
     status: built
+    keywords:                       # For per-session routing
+      - polars
+      - dataframe
+      - lazy
+      - expression
     sources: 1
     last_indexed: "2025-12-10"
     navigate_skill: hiivmind-corpus-navigate-polars

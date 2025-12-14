@@ -91,6 +91,23 @@ The templates are in the hiivmind-corpus plugin. Locate via:
 | README.md | `readme.md.template` | Exists? |
 | CLAUDE.md | `claude.md.template` | Exists? |
 
+### Config Schema Checks
+
+Read `data/config.yaml` and verify:
+
+| Field | Added In | Purpose | Check |
+|-------|----------|---------|-------|
+| `schema_version` | v1 | Version tracking | Must be present |
+| `corpus.keywords` | v4 | Per-session routing | Array of routing keywords |
+
+**Keywords check:**
+```bash
+# Check if keywords field exists
+yq '.corpus.keywords' data/config.yaml
+```
+
+If missing, suggest adding keywords based on corpus name and domain.
+
 ### Section Checks for Navigate Skill
 
 Read the current navigate skill and check for these sections:
@@ -124,6 +141,10 @@ Upgrade Report:
 ⚠️  MISSING FILES:
   - data/project-awareness.md
 
+⚠️  MISSING CONFIG FIELDS:
+  - corpus.keywords (for per-session routing)
+    Suggested: polars, dataframe, lazy, expression
+
 ⚠️  MISSING SECTIONS in navigate skill:
   - "Tiered Index Navigation" section
   - "Large Structured Files" section
@@ -137,6 +158,26 @@ Would you like to apply these upgrades?
 ## Step 5: Apply Upgrades
 
 For each missing component, apply the upgrade:
+
+### Adding Missing Config Fields
+
+**corpus.keywords:**
+1. Suggest keywords based on corpus name and domain:
+   - Project name (e.g., `polars` from `hiivmind-corpus-polars`)
+   - Domain terms (infer from index sections)
+   - Common aliases
+2. Ask user to confirm or modify suggestions
+3. Add to `data/config.yaml`:
+   ```yaml
+   corpus:
+     name: "polars"
+     display_name: "Polars"
+     keywords:           # NEW
+       - polars
+       - dataframe
+       - lazy
+       - expression
+   ```
 
 ### Adding Missing Files
 

@@ -220,6 +220,8 @@ These features span multiple skills and must stay synchronized:
 | Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
 | Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
+| Entry keywords | enhance, refresh, navigate (template) | Keyword line format, search logic, preserve on refresh |
+| Corpus keywords | discover, navigate (global), init, upgrade | config.yaml schema, per-session discovery |
 
 ### When Adding New Features
 
