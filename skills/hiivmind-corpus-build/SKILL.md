@@ -29,11 +29,17 @@ sources:
 
 ## Step 1: Prepare Sources
 
-Read config and ensure all sources are available:
+**See:** `lib/corpus/patterns/sources.md` for detailed source operations.
 
-```bash
-cat data/config.yaml
-```
+### Detect Available Tools
+
+Before proceeding, check tool availability (see `lib/corpus/patterns/tool-detection.md`):
+- Git: Required for git sources
+- YAML parsing: For reading config.yaml (yq, python+pyyaml, or grep fallback)
+
+### Read Configuration
+
+Read `data/config.yaml` to get source list (see `lib/corpus/patterns/config-parsing.md`).
 
 ### Prepare Each Source Type
 
@@ -44,33 +50,26 @@ For each source in `sources:` array:
 # Check if clone exists
 ls .source/{source_id}
 
-# If not, clone
+# If not, clone (shallow for efficiency)
 git clone --depth 1 {repo_url} .source/{source_id}
 
-# Get current SHA
-cd .source/{source_id} && git rev-parse HEAD
+# Get current SHA for tracking
+git -C .source/{source_id} rev-parse HEAD
 ```
 
 **Local sources:**
-```bash
-# Verify uploads directory exists and has files
-ls data/uploads/{source_id}
-find data/uploads/{source_id} -name "*.md" -o -name "*.mdx"
-```
-
-If directory is empty, notify user to place files there.
+- Verify `data/uploads/{source_id}/` exists and has files
+- If empty, notify user to place files there
 
 **Web sources:**
-```bash
-# Check cache exists
-ls .cache/web/{source_id}
-```
-
-If cache is missing, notify user to run `hiivmind-corpus-add-source` to fetch content.
+- Check `.cache/web/{source_id}/` exists
+- If missing, notify user to run `hiivmind-corpus-add-source` to fetch content
 
 ---
 
 ## Step 2: Scan All Sources
+
+**See:** `lib/corpus/patterns/scanning.md` for file discovery and analysis patterns.
 
 Analyze each source and present a combined summary to user.
 
@@ -525,6 +524,14 @@ Found 3 sources:
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/tool-detection.md` - Detect available tools
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/scanning.md` - File discovery and analysis
+- `lib/corpus/patterns/paths.md` - Path resolution
+
+**Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`

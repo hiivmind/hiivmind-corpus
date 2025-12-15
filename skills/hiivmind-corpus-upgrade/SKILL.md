@@ -63,6 +63,8 @@ Record the corpus type - it affects which templates apply.
 
 ## Step 3: Compare Against Templates
 
+**See:** `lib/corpus/patterns/config-parsing.md` for YAML extraction methods.
+
 Locate the hiivmind-corpus templates and compare:
 
 ### Find Template Source
@@ -93,6 +95,8 @@ The templates are in the hiivmind-corpus plugin. Locate via:
 
 ### Config Schema Checks
 
+**See:** `lib/corpus/patterns/config-parsing.md` for extraction methods with multiple tool implementations.
+
 Read `data/config.yaml` and verify:
 
 | Field | Added In | Purpose | Check |
@@ -100,9 +104,16 @@ Read `data/config.yaml` and verify:
 | `schema_version` | v1 | Version tracking | Must be present |
 | `corpus.keywords` | v4 | Per-session routing | Array of routing keywords |
 
-**Keywords check:**
+**Keywords check (using yq if available, or fallback):**
+
+Using Claude tools:
+```
+Read: data/config.yaml
+Check for presence of: corpus.keywords
+```
+
+Using bash with yq:
 ```bash
-# Check if keywords field exists
 yq '.corpus.keywords' data/config.yaml
 ```
 
@@ -365,6 +376,13 @@ This helps track which corpora have been upgraded.
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/discovery.md` - Corpus discovery algorithms
+- `lib/corpus/patterns/status.md` - Index status checking
+- `lib/corpus/patterns/paths.md` - Path resolution
+
+**Related skills:**
 - Initialize new corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`

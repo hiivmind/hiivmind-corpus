@@ -46,21 +46,17 @@ Requires:
 
 ## Step 1: Validate Prerequisites
 
+**See:** `lib/corpus/patterns/config-parsing.md` and `lib/corpus/patterns/status.md`
+
 Before proceeding, verify the corpus is ready for enhancement:
 
-```bash
-# Read config
-cat data/config.yaml
-```
-
 **Check 1: Sources exist**
+Read `data/config.yaml` and check the `sources:` array (see `lib/corpus/patterns/config-parsing.md`):
 - If `sources:` array is empty → **STOP**: Run `hiivmind-corpus-add-source` to add sources first
 - If sources exist → Continue
 
 **Check 2: Index exists**
-```bash
-cat data/index.md
-```
+Read `data/index.md` and check content (see `lib/corpus/patterns/status.md`):
 - If only placeholder text ("Run hiivmind-corpus-build...") → **STOP**: Run `hiivmind-corpus-build` first
 - If index has real entries → Continue
 
@@ -68,19 +64,17 @@ cat data/index.md
 
 ## Step 2: Read Index
 
-Load the current index to understand existing coverage:
+**See:** `lib/corpus/patterns/paths.md` for path resolution.
 
-```bash
-cat data/index.md
-```
+Load the current index to understand existing coverage by reading `data/index.md`.
 
 ### Detect Index Structure
 
 Check if this is a **tiered index** (for large corpora):
 
-```bash
-# Check for sub-index files
-ls data/index-*.md 2>/dev/null
+**Using Claude tools:**
+```
+Glob: data/index-*.md
 ```
 
 **Single index:** Only `data/index.md` exists
@@ -129,6 +123,8 @@ Present the current structure and ask:
 
 ## Step 4: Explore
 
+**See:** `lib/corpus/patterns/scanning.md` and `lib/corpus/patterns/sources.md`
+
 Search for relevant documentation not yet in the index.
 
 ### Identify Target Sources
@@ -136,43 +132,39 @@ Search for relevant documentation not yet in the index.
 Based on user's topic, determine which source(s) to explore:
 - Specific source if user mentioned it
 - All sources if topic is cross-cutting
-- Read `data/config.yaml` to see available sources
+- Read `data/config.yaml` to see available sources (see `lib/corpus/patterns/config-parsing.md`)
 
 ### Search by Source Type
 
 **Git sources** (`.source/{source_id}/`):
-```bash
-# Find docs in the target area
-find .source/{source_id}/{docs_root}/{topic_path} -name "*.md" -o -name "*.mdx"
 
-# Search for related content
-grep -r "{keyword}" .source/{source_id}/{docs_root} --include="*.md" -l
-
-# Read promising files
-head -50 .source/{source_id}/{docs_root}/path/to/file.md
+Using Claude tools:
+```
+Glob: .source/{source_id}/{docs_root}/{topic_path}/**/*.md
+Grep: {keyword}
+  path: .source/{source_id}/{docs_root}
+  glob: *.md
+  output_mode: files_with_matches
 ```
 
-If no local clone, use raw GitHub URLs:
+If no local clone, use raw GitHub URLs (see `lib/corpus/patterns/paths.md`):
 ```
 https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{docs_root}/{path}
 ```
 
 **Local sources** (`data/uploads/{source_id}/`):
-```bash
-# Find docs
-find data/uploads/{source_id} -name "*.md" -o -name "*.mdx"
-
-# Search content
-grep -r "{keyword}" data/uploads/{source_id} --include="*.md" -l
+```
+Glob: data/uploads/{source_id}/**/*.md
+Grep: {keyword}
+  path: data/uploads/{source_id}
+  glob: *.md
 ```
 
 **Web sources** (`.cache/web/{source_id}/`):
-```bash
-# Search cached content
-grep -r "{keyword}" .cache/web/{source_id} --include="*.md" -l
-
-# Read cached files
-cat .cache/web/{source_id}/{filename}.md
+```
+Glob: .cache/web/{source_id}/*.md
+Grep: {keyword}
+  path: .cache/web/{source_id}
 ```
 
 ### Cross-Source Discovery
@@ -201,11 +193,9 @@ kent-testing-blog (web):
 
 ### Detecting Large Structured Files
 
-When enhancing, check if any discovered files are too large to read:
+**See:** `lib/corpus/patterns/scanning.md` for large file detection.
 
-```bash
-wc -l {file_path}
-```
+When enhancing, check if any discovered files are too large to read (>1000 lines).
 
 **If file > 1000 lines**, mark it with `⚡ GREP` in the index:
 
@@ -483,6 +473,15 @@ User: "The detailed actions sub-index"
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/tool-detection.md` - Detect available tools
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/status.md` - Index status checking
+- `lib/corpus/patterns/paths.md` - Path resolution
+- `lib/corpus/patterns/scanning.md` - File discovery and analysis
+- `lib/corpus/patterns/sources.md` - Source operations
+
+**Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`

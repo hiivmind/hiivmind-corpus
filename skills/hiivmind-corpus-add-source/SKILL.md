@@ -21,10 +21,13 @@ Run from within a corpus skill directory containing `data/config.yaml`.
 
 ## Step 1: Locate Corpus
 
+**See:** `lib/corpus/patterns/config-parsing.md` for YAML extraction methods.
+
 Find and read `data/config.yaml`:
 
-```bash
-cat data/config.yaml
+Using Claude tools:
+```
+Read: data/config.yaml
 ```
 
 Verify:
@@ -79,6 +82,8 @@ Ask the user which type of source to add:
 ---
 
 ## Step 4: Setup Source
+
+**See:** `lib/corpus/patterns/sources.md` for detailed source operations.
 
 ### Git Source Setup
 
@@ -181,8 +186,17 @@ Ask user:
 
 ### Detecting Large Structured Files
 
+**See:** `lib/corpus/patterns/scanning.md` for large file detection patterns.
+
 Check for files that are too large to read directly:
 
+Using Claude tools:
+```
+Read: {source_path}/{file} (check line count)
+If > 1000 lines, mark with ⚡ GREP
+```
+
+Using bash:
 ```bash
 # Find files over 1000 lines
 wc -l {source_path}/*.graphql {source_path}/*.json {source_path}/*.yaml 2>/dev/null | awk '$1 > 1000'
@@ -271,6 +285,13 @@ Example entries:
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/scanning.md` - File discovery and large file detection
+- `lib/corpus/patterns/paths.md` - Path resolution
+
+**Related skills:**
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build full index: `skills/hiivmind-corpus-build/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`

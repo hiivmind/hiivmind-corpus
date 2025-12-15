@@ -36,6 +36,8 @@ Before doing anything, **detect the current context** and collect required infor
 
 ### First: Detect Context
 
+**See:** `lib/corpus/patterns/discovery.md` for context detection algorithms.
+
 Run these checks to understand where you're running:
 
 ```bash
@@ -295,6 +297,8 @@ Now you have a destination for everything that follows.
 
 ## Phase 3: Clone
 
+**See:** `lib/corpus/patterns/sources.md` for git clone operations.
+
 Clone the source repo **inside the skill/plugin directory**, using the source ID as a subdirectory name.
 
 **Skip this phase if user chose "Start empty".**
@@ -318,6 +322,8 @@ This ensures:
 - Easy cleanup later
 
 ## Phase 4: Research
+
+**See:** `lib/corpus/patterns/scanning.md` for documentation analysis patterns.
 
 Analyze the cloned documentation. **Do not assume** - investigate.
 
@@ -865,6 +871,13 @@ Update existing `marketplace.json`:
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/discovery.md` - Context detection algorithms
+- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/scanning.md` - File discovery and analysis
+- `lib/corpus/patterns/paths.md` - Path resolution
+
+**Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`

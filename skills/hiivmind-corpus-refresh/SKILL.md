@@ -50,28 +50,28 @@ Check currency of all sources.
 
 ### Step 1: Validate and Read config
 
-```bash
-cat data/config.yaml
-```
+**See:** `lib/corpus/patterns/config-parsing.md` and `lib/corpus/patterns/status.md`
+
+Read `data/config.yaml` to check configuration.
 
 **Check 1: Sources exist**
 - If `sources:` array is empty → **STOP**: Run `hiivmind-corpus-add-source` to add sources first
 - If sources exist → Continue
 
 **Check 2: Index exists**
-```bash
-cat data/index.md
-```
+Read `data/index.md` and check content:
 - If only placeholder text ("Run hiivmind-corpus-build...") → **STOP**: Run `hiivmind-corpus-build` first
 - If index has real entries → Continue
 
 ### Step 2: Detect Index Structure
 
+**See:** `lib/corpus/patterns/paths.md` for path resolution.
+
 Check if this is a **tiered index** (for large corpora):
 
-```bash
-# Check for sub-index files
-ls data/index-*.md 2>/dev/null
+**Using Claude tools:**
+```
+Glob: data/index-*.md
 ```
 
 **Single index:** Only `data/index.md` exists - changes update one file
@@ -81,9 +81,11 @@ For tiered indexes, note which sections/sub-indexes exist for change mapping lat
 
 ### Step 3: Check each source
 
+**See:** `lib/corpus/patterns/status.md` and `lib/corpus/patterns/sources.md`
+
 #### Parallel Status Checking (for multi-source corpora)
 
-**For single source:** Check directly using the commands below.
+**For single source:** Check directly using the patterns below.
 
 **For multiple sources (2+):** Use the `source-scanner` agent for parallel status checking:
 
@@ -106,19 +108,18 @@ Task tool with subagent_type="source-scanner":
 **For git sources:**
 ```bash
 # If .source/{source_id}/ exists
-cd .source/{source_id} && git fetch origin
-git rev-parse origin/{branch}
+git -C .source/{source_id} fetch origin
+git -C .source/{source_id} rev-parse origin/{branch}
 # Compare to last_commit_sha in config
 
 # If no local clone
 git ls-remote {repo_url} refs/heads/{branch}
 ```
 
+See `lib/corpus/patterns/sources.md` for detailed comparison algorithms.
+
 **For local sources:**
-```bash
-# Find files modified after last_indexed_at
-find data/uploads/{source_id} -type f -name "*.md" -newer {timestamp_reference}
-```
+- Compare file modification times against `last_indexed_at` in config
 
 **For web sources:**
 - Report cache age (days since `fetched_at`)
@@ -542,6 +543,14 @@ Updated config with new SHA: def456
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/tool-detection.md` - Detect available tools
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/status.md` - Index status and freshness checking
+- `lib/corpus/patterns/paths.md` - Path resolution
+- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+
+**Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`

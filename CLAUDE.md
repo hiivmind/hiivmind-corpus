@@ -27,14 +27,15 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 ├── commands/                         # Slash commands
 │   └── hiivmind-corpus.md            # Gateway command for corpus interaction
 │
-├── lib/corpus/                       # Shell function library
-│   ├── corpus-discovery-functions.sh # Find corpora across all locations
-│   ├── corpus-status-functions.sh    # Check index status and freshness
-│   ├── corpus-path-functions.sh      # Resolve paths within corpora
-│   ├── corpus-context-functions.sh   # Context detection for init
-│   ├── corpus-source-functions.sh    # Git/local/web source operations
-│   ├── corpus-scan-functions.sh      # File scanning and analysis
-│   └── corpus-index.md               # Library documentation
+├── lib/corpus/                       # Pattern documentation library
+│   └── patterns/                     # Tool-agnostic algorithm documentation
+│       ├── tool-detection.md         # Detecting available tools (yq, python, etc.)
+│       ├── config-parsing.md         # Extracting fields from config.yaml
+│       ├── discovery.md              # Finding installed corpora
+│       ├── status.md                 # Checking corpus freshness
+│       ├── paths.md                  # Resolving paths within corpora
+│       ├── sources.md                # Git/local/web source operations
+│       └── scanning.md               # File discovery and analysis
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -131,36 +132,40 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
 - Generated navigate skills: `hiivmind-corpus-navigate-{project}` (per-corpus navigation)
 
-## Shell Function Library
+## Pattern Documentation Library
 
-The `lib/corpus/` directory contains reusable bash functions following hiivmind-pulse-gh patterns:
+The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentation. Skills reference these patterns and adapt to available tools at runtime.
 
-```bash
-# Source the library
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-status-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-path-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-context-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-source-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-scan-functions.sh"
+**Design philosophy**: Instead of executable bash scripts (which lock into Linux/macOS), pattern documentation describes algorithms with multiple implementation options, letting the LLM adapt to the user's environment.
 
-# Composable operations
-discover_all | filter_built | list_names
-get_index_status "$corpus_path"
-analyze_context  # → "established-project" | "fresh" | "marketplace-existing"
-clone_source "https://github.com/user/repo" "source-id" "$corpus_path"
-count_docs ".source/polars/docs"
+| Pattern | Purpose | Key Sections |
+|---------|---------|--------------|
+| `tool-detection.md` | Detect available tools | Tool tiers, detection commands, capability matrix |
+| `config-parsing.md` | Extract YAML fields | yq, python+pyyaml, grep fallback methods |
+| `discovery.md` | Find installed corpora | Location types, scanning algorithms |
+| `status.md` | Check corpus freshness | Index status, SHA comparison |
+| `paths.md` | Resolve paths | Source reference parsing, path resolution |
+| `sources.md` | Git/local/web operations | Clone, fetch, pull, caching |
+| `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
+
+**How skills use patterns:**
+
+```markdown
+## Step 1: Validate Prerequisites
+
+**See:** `lib/corpus/patterns/config-parsing.md` and `lib/corpus/patterns/status.md`
+
+Read `data/config.yaml` to check configuration.
+
+Using Claude tools (preferred):
+- Read: data/config.yaml
+- Check for sources array
+
+Using bash with yq:
+- yq '.sources | length' data/config.yaml
 ```
 
-| File | Functions | Purpose |
-|------|-----------|---------|
-| `corpus-discovery-functions.sh` | `discover_*`, `filter_*`, `format_*` | Find installed corpora |
-| `corpus-status-functions.sh` | `get_*`, `check_*`, `compare_*` | Status and freshness |
-| `corpus-path-functions.sh` | `get_*_path`, `resolve_*`, `exists_*` | Path resolution |
-| `corpus-context-functions.sh` | `detect_*`, `analyze_*`, `scaffold_*`, `verify_*` | Context detection for init |
-| `corpus-source-functions.sh` | `clone_*`, `fetch_*`, `pull_*`, `parse_*` | Git/local/web source operations |
-| `corpus-scan-functions.sh` | `scan_*`, `detect_*`, `find_*`, `extract_*` | File scanning and analysis |
-| `corpus-index.md` | - | Full function documentation |
+**Tool detection strategy**: Skills detect tools once per session and use the best available option. Required tools (like git) are enforced; optional tools (like yq) have fallbacks.
 
 ## Key Design Decisions
 
@@ -174,7 +179,8 @@ count_docs ".source/polars/docs"
 - **Discoverable**: `hiivmind-corpus-discover` finds corpora across all installation types
 - **Unified access**: `/hiivmind-corpus` gateway provides single entry point for all corpus interaction
 - **Global navigation**: `hiivmind-corpus-navigate` routes queries across all installed corpora
-- **Composable library**: `lib/corpus/` provides pipe-first bash functions for discovery and status
+- **Tool-agnostic patterns**: `lib/corpus/patterns/` documents algorithms, not executable scripts
+- **Cross-platform**: Works on Linux, macOS, and Windows with appropriate tool fallbacks
 
 ## Index Format
 

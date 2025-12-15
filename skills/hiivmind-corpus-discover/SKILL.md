@@ -27,78 +27,74 @@ Scan these locations in order to find all installed corpora:
 
 ## Discovery Process
 
-### Using the Corpus Library
+**See:** `lib/corpus/patterns/discovery.md` for detailed algorithms and implementations.
 
-Source the library functions for composable discovery:
+### Step 1: Detect Available Tools
 
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-status-functions.sh"
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-path-functions.sh"
+Before discovery, check tool availability (see `lib/corpus/patterns/tool-detection.md`):
+- YAML parsing: yq, python+pyyaml, or grep fallback
+- Required for reading corpus config metadata
+
+### Step 2: Discover All Corpora
+
+Scan each location for `hiivmind-corpus-*/` directories with `data/config.yaml`:
+
+**Using Claude tools:**
+```
+Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/hiivmind-corpus-*/data/config.yaml
 ```
 
-### Step 1: Discover All Corpora
-
+**Using bash:**
 ```bash
-# Discover all corpora with name, type, status, and path
-discover_all | format_table
-# Output: name|type|status|path
+# User-level corpora
+for d in ~/.claude/skills/hiivmind-corpus-*/; do
+    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "user-level|$(basename "$d")|$d"
+done
 
-# Discover with routing metadata (for global navigate)
-discover_all | format_routing
-# Output: name|display_name|keywords|status|path
+# Repo-local corpora
+for d in ./.claude-plugin/skills/hiivmind-corpus-*/; do
+    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "repo-local|$(basename "$d")|$d"
+done
 
-# Or discover specific locations
-discover_user_level
-discover_repo_local
-discover_marketplace
-discover_marketplace_single
+# Marketplace corpora (see patterns/discovery.md for full list)
 ```
 
-### Step 2: Filter and List
+### Step 3: Get Status for Each Corpus
 
-```bash
-# Only built corpora
-discover_all | filter_built | list_names
+For each discovered corpus, determine status by reading `data/index.md`:
 
-# Only placeholder corpora (need building)
-discover_all | filter_placeholder
+**Algorithm:**
+1. If file missing → `no-index`
+2. If contains "Run hiivmind-corpus-build" → `placeholder`
+3. Otherwise → `built`
 
-# Find specific corpus
-discover_all | filter_name "polars"
-
-# Count total
-discover_all | count_corpora
+**Using Claude tools:**
+```
+Read: {corpus_path}/data/index.md
+Check for "Run hiivmind-corpus-build" text
 ```
 
-### Step 3: Get Status Details
+### Step 4: Extract Routing Metadata
 
-For detailed status on a specific corpus:
+For built corpora, extract keywords and display name for routing:
 
-```bash
-# Get index status
-get_index_status "$corpus_path"  # Returns: built | placeholder | no-index
+**See:** `lib/corpus/patterns/config-parsing.md` for YAML extraction methods.
 
-# Check freshness
-compare_freshness "$corpus_path" "$source_id"  # Returns: current | stale | unknown
+Fields to extract from `data/config.yaml`:
+- `.corpus.display_name` (or infer from name)
+- `.corpus.keywords[]` (or infer from name)
 
-# Full status report
-report_corpus_status "$corpus_path"
-```
+### Step 5: Resolve Paths
 
-### Step 4: Resolve Paths
+Path resolution patterns in `lib/corpus/patterns/paths.md`:
+- Config: `{corpus_path}/data/config.yaml`
+- Index: `{corpus_path}/data/index.md`
+- Navigate skill: `{corpus_path}/SKILL.md` or `{corpus_path}/skills/navigate/SKILL.md`
 
-```bash
-# Get key paths
-get_index_path "$corpus_path"
-get_config_path "$corpus_path"
-get_navigate_skill_path "$corpus_path"
-
-# List source IDs
-list_source_ids "$corpus_path"
-```
-
-**Library reference:** See `lib/corpus/corpus-index.md` for full function documentation.
+**Pattern documentation:** See `lib/corpus/patterns/` for full pattern library.
 
 ## Output Format
 
@@ -160,24 +156,25 @@ hiivmind-corpus-{project}/
 
 Adjust file lookups based on type.
 
-## Quick Commands
+## Quick Discovery Examples
 
-Using the library for fast discovery:
+**Using Claude tools (recommended):**
+```
+# Find all corpora
+Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/**/hiivmind-corpus-*/data/config.yaml
 
+# For each found, read config.yaml to get metadata
+Read: {path}/data/config.yaml
+```
+
+**Using bash (cross-platform examples in `lib/corpus/patterns/discovery.md`):**
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+# Count user-level corpora
+ls -d ~/.claude/skills/hiivmind-corpus-*/ 2>/dev/null | wc -l
 
-# Count total installed corpora
-discover_all | count_corpora
-
-# List names only
-discover_all | list_names
-
-# Built corpora only
-discover_all | filter_built | list_names
-
-# Simple formatted list
-discover_all | format_simple
+# List all corpus names
+for d in ~/.claude/skills/hiivmind-corpus-*/; do basename "$d"; done
 ```
 
 ## Integration with Gateway Command
@@ -220,7 +217,14 @@ Skip and note in output:
 
 ## Reference
 
-- **Corpus library**: `lib/corpus/corpus-index.md` - Full function documentation
+**Pattern documentation:**
+- `lib/corpus/patterns/tool-detection.md` - Detect available tools
+- `lib/corpus/patterns/discovery.md` - Corpus discovery algorithms
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/status.md` - Index status checking
+- `lib/corpus/patterns/paths.md` - Path resolution
+
+**Related skills:**
 - Initialize new corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build corpus index: `skills/hiivmind-corpus-build/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`

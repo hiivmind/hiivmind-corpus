@@ -18,23 +18,33 @@ Navigate across ALL installed hiivmind-corpus documentation corpora from a singl
 
 ### Step 1: Discover Available Corpora
 
-First, identify all installed corpora using the discover skill logic:
+**See:** `lib/corpus/patterns/discovery.md` for detailed discovery algorithms.
 
-```bash
-# Find all corpus locations
-USER_CORPORA=$(ls -d ~/.claude/skills/hiivmind-corpus-*/ 2>/dev/null)
-REPO_CORPORA=$(ls -d .claude-plugin/skills/hiivmind-corpus-*/ 2>/dev/null)
-MARKETPLACE_SINGLE=$(ls -d ~/.claude/plugins/marketplaces/hiivmind-corpus-*/ 2>/dev/null)
-MARKETPLACE_MULTI=$(ls -d ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ 2>/dev/null)
+First, identify all installed corpora using the discover pattern:
 
-# Combine all
-ALL_CORPORA="$USER_CORPORA $REPO_CORPORA $MARKETPLACE_SINGLE $MARKETPLACE_MULTI"
+**Using Claude tools (recommended):**
+```
+Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/hiivmind-corpus-*/data/config.yaml
 ```
 
-For each corpus, extract:
+**Using bash:**
+```bash
+# Find all corpus locations
+for d in ~/.claude/skills/hiivmind-corpus-*/ \
+         .claude-plugin/skills/hiivmind-corpus-*/ \
+         ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/ \
+         ~/.claude/plugins/marketplaces/hiivmind-corpus-*/; do
+    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "$d"
+done
+```
+
+For each corpus, extract (see `lib/corpus/patterns/config-parsing.md`):
 - **Name**: Directory name (e.g., `hiivmind-corpus-polars`)
-- **Display name**: From skill metadata (e.g., `Polars`)
-- **Keywords**: From config.yaml or infer from name
+- **Display name**: From `.corpus.display_name` in config.yaml
+- **Keywords**: From `.corpus.keywords[]` in config.yaml (or infer from name)
 
 ### Step 2: Analyze the Question
 
@@ -106,19 +116,19 @@ For questions spanning multiple technologies:
 
 ## Corpus Index Quick Reference
 
-Build a mental map of installed corpora:
+Build a mental map of installed corpora by reading their indexes:
 
-```bash
-# For each corpus, read its index summary
-for corpus in $ALL_CORPORA; do
-  echo "=== $(basename $corpus) ==="
-  head -20 "$corpus/data/index.md"
-done
+**Using Claude tools:**
+```
+For each discovered corpus path:
+  Read: {corpus_path}/data/index.md (first 50 lines)
 ```
 
 This provides topic coverage for routing decisions.
 
 ## Per-Session Corpus Routing
+
+**See:** `lib/corpus/patterns/discovery.md` and `lib/corpus/patterns/config-parsing.md`
 
 Keywords are discovered dynamically from each installed corpus's `config.yaml`. This ensures routing stays accurate as corpora are installed/uninstalled.
 
@@ -126,19 +136,20 @@ Keywords are discovered dynamically from each installed corpus's `config.yaml`. 
 
 On first documentation question in a session:
 
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+1. **Discover all corpora** (see Step 1 above)
+2. **For each corpus**, extract routing metadata from `data/config.yaml`:
+   - Display name: `.corpus.display_name`
+   - Keywords: `.corpus.keywords[]`
+3. **Check status**: Read `data/index.md` to determine if built or placeholder
 
-# Discover all corpora with routing metadata
-discover_all | format_routing
-# Output: name|display_name|keywords|status|path
-
-# Example output:
-# hiivmind-corpus-polars|Polars|polars,dataframe,lazy,expression|built|/path/to/corpus
-# hiivmind-corpus-ibis|Ibis|ibis,sql,backend,duckdb|built|/path/to/corpus
+**Output format:**
+```
+name|display_name|keywords|status|path
+hiivmind-corpus-polars|Polars|polars,dataframe,lazy,expression|built|/path/to/corpus
+hiivmind-corpus-ibis|Ibis|ibis,sql,backend,duckdb|built|/path/to/corpus
 ```
 
-This builds an in-memory routing table for the session. Keywords come from each corpus's `data/config.yaml`:
+Keywords come from each corpus's `data/config.yaml`:
 
 ```yaml
 corpus:
@@ -183,11 +194,13 @@ When working in a project, consider:
 
 ## Index Reading Pattern
 
+**See:** `lib/corpus/patterns/paths.md` for path resolution.
+
 For large indexes or tiered indexes:
 
 1. **Check for tiered structure**:
-   ```bash
-   ls {corpus_path}/data/index-*.md 2>/dev/null
+   ```
+   Glob: {corpus_path}/data/index-*.md
    ```
 
 2. **If tiered**: Read main index to find section, then read sub-index
@@ -239,6 +252,13 @@ This skill uses:
 
 ## Reference
 
+**Pattern documentation:**
+- `lib/corpus/patterns/discovery.md` - Corpus discovery algorithms
+- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
+- `lib/corpus/patterns/paths.md` - Path resolution
+- `lib/corpus/patterns/status.md` - Index status checking
+
+**Related skills:**
 - Discovery: `skills/hiivmind-corpus-discover/SKILL.md`
 - Per-corpus navigate: `templates/navigate-skill.md.template`
 - Gateway command: `commands/hiivmind-corpus.md`
