@@ -120,6 +120,56 @@ Present discovered corpora in a structured format:
 **Total: 3 corpora installed**
 ```
 
+## Cache Update (Optional)
+
+After discovery, optionally update the corpus cache in `~/.claude/CLAUDE.md`:
+
+### Step 6: Update User-Level Cache
+
+If `~/.claude/CLAUDE.md` exists:
+
+1. Read the file
+2. Look for cache markers: `<!-- hiivmind-corpus-cache -->` ... `<!-- /hiivmind-corpus-cache -->`
+3. If found: Replace content between markers with new table
+4. If not found: Do not add (awareness skill handles initial injection)
+
+**Cache table format:**
+
+```markdown
+<!-- hiivmind-corpus-cache -->
+| Corpus | Keywords | Location |
+|--------|----------|----------|
+| {name without hiivmind-corpus- prefix} | {keywords from config, comma-separated} | {full path} |
+<!-- /hiivmind-corpus-cache -->
+```
+
+**Using Claude Edit tool:**
+- old_string: existing cache block (including markers)
+- new_string: updated cache block with new discovery results
+
+**Example:**
+
+```
+old_string:
+<!-- hiivmind-corpus-cache -->
+| Corpus | Keywords | Location |
+|--------|----------|----------|
+| polars | dataframe, lazy | ~/.claude/plugins/... |
+<!-- /hiivmind-corpus-cache -->
+
+new_string:
+<!-- hiivmind-corpus-cache -->
+| Corpus | Keywords | Location |
+|--------|----------|----------|
+| polars | dataframe, lazy, expressions | ~/.claude/plugins/marketplaces/hiivmind-corpus-data/hiivmind-corpus-polars |
+| ibis | ibis, sql, backend | ~/.claude/plugins/marketplaces/hiivmind-corpus-data/hiivmind-corpus-ibis |
+<!-- /hiivmind-corpus-cache -->
+```
+
+**Note:** Cache update is opportunistic. If CLAUDE.md doesn't have the cache section, skip silently. The awareness skill (`hiivmind-corpus-awareness`) is responsible for initial injection.
+
+---
+
 ## Type Detection
 
 Determine corpus type based on its location:

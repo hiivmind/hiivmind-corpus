@@ -16,11 +16,42 @@ Navigate across ALL installed hiivmind-corpus documentation corpora from a singl
 
 ## Navigation Process
 
-### Step 1: Discover Available Corpora
+### Step 1: Check Cache, Then Discover
 
-**See:** `lib/corpus/patterns/discovery.md` for detailed discovery algorithms.
+**Performance optimization:** Check for a cached corpus list before running full discovery.
 
-First, identify all installed corpora using the discover pattern:
+#### Option A: Use Cached Corpus List (Fast Path)
+
+**Check for cache in user's CLAUDE.md:**
+
+```
+Read: ~/.claude/CLAUDE.md
+Look for: <!-- hiivmind-corpus-cache --> ... <!-- /hiivmind-corpus-cache -->
+```
+
+**If cache found and not empty:**
+1. Parse cache table to extract: name, keywords, location
+2. Use cached corpus list directly
+3. Skip full discovery scan
+
+**Cache format:**
+```markdown
+<!-- hiivmind-corpus-cache -->
+| Corpus | Keywords | Location |
+|--------|----------|----------|
+| polars | dataframe, lazy, expressions | ~/.claude/plugins/... |
+<!-- /hiivmind-corpus-cache -->
+```
+
+**Performance benefit:** Cache lookup is O(1) vs discovery which scans 4+ filesystem locations.
+
+**Note:** Cache may be stale if user installed/removed corpora since last `discover`. When corpus not found at cached path, fall back to full discovery.
+
+#### Option B: Full Discovery (Fallback)
+
+**If cache not found, empty, or stale:**
+
+Fall back to full discovery. See `lib/corpus/patterns/discovery.md` for detailed algorithms.
 
 **Using Claude tools (recommended):**
 ```
