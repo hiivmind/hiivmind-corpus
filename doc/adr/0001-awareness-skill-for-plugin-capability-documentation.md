@@ -1,7 +1,7 @@
 ---
 adr: 1
 title: "Awareness Skill for Plugin Capability Documentation"
-status: Proposed
+status: Accepted
 date: 2025-12-17
 milestone: "v1.1.0 - Awareness Skill"
 issue: 21
@@ -12,7 +12,7 @@ deciders: [nathanielramm]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
