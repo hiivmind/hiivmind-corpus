@@ -1,6 +1,6 @@
 ---
 name: hiivmind-corpus-refresh
-description: Refresh corpus index by comparing with upstream changes. Checks each source independently and updates based on diffs.
+description: Refresh corpus index by comparing with upstream changes. Use when "corpus outdated", "sync corpus", "update index", or when sources have changed upstream. Checks each source independently and updates based on diffs.
 ---
 
 # Corpus Index Refresh
@@ -85,23 +85,11 @@ For tiered indexes, note which sections/sub-indexes exist for change mapping lat
 
 #### Parallel Status Checking (for multi-source corpora)
 
+**See:** `lib/corpus/patterns/parallel-scanning.md` for agent invocation patterns.
+
 **For single source:** Check directly using the patterns below.
 
-**For multiple sources (2+):** Use the `source-scanner` agent for parallel status checking:
-
-1. For each source, spawn a `source-scanner` agent to:
-   - Verify source availability
-   - Check for upstream changes (git: compare SHAs, local: check mtimes, web: check cache age)
-2. Launch all agents in parallel (single message with multiple Task tool calls)
-3. Collect status results from each agent
-4. Aggregate into combined status report
-
-**Agent invocation pattern:**
-```
-Task tool with subagent_type="source-scanner":
-  prompt: "Check status for source '{source_id}' (type: {type}).
-           Last indexed SHA: {last_commit_sha}, Last indexed at: {last_indexed_at}"
-```
+**For multiple sources (2+):** Use the `source-scanner` agent for parallel status checking. Spawn one agent per source to verify availability and check for upstream changes, launch all in a single message, collect status results, and aggregate.
 
 #### Check by Source Type (single source or fallback)
 

@@ -75,31 +75,11 @@ Analyze each source and present a combined summary to user.
 
 ### Parallel Scanning (for multi-source corpora)
 
+**See:** `lib/corpus/patterns/parallel-scanning.md` for agent invocation patterns.
+
 **For single source:** Scan directly using the commands below (no agent overhead).
 
-**For multiple sources (2+):** Use the `source-scanner` agent for parallel scanning:
-
-1. For each source in config, spawn a `source-scanner` agent with:
-   - Source ID, type, and configuration
-   - Corpus root path
-2. Launch all agents in parallel (single message with multiple Task tool calls)
-3. Collect YAML results from each agent
-4. Aggregate into combined summary
-
-**Agent invocation pattern:**
-```
-Task tool with subagent_type="source-scanner":
-  prompt: "Scan source '{source_id}' (type: {type}) at corpus path '{corpus_path}'.
-           Config: repo_url={repo_url}, docs_root={docs_root}"
-```
-
-**Expected speedup:**
-| Sources | Sequential | With Agents | Improvement |
-|---------|-----------|-------------|-------------|
-| 1 | Baseline | No change | - |
-| 2 | 2x time | ~1.2x time | ~40% faster |
-| 3 | 3x time | ~1.3x time | ~55% faster |
-| 4+ | 4x+ time | ~1.5x time | ~60%+ faster |
+**For multiple sources (2+):** Use the `source-scanner` agent for parallel scanning. Spawn one agent per source, launch all in a single message, collect YAML results, and aggregate.
 
 ### Scan by Source Type (single source or fallback)
 

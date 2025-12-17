@@ -1,6 +1,6 @@
 ---
 name: hiivmind-corpus-navigate
-description: This skill should be used when the user asks "find in the docs", "check the documentation", "what do the docs say about", "look up in corpus", or asks questions that could be answered by installed documentation corpora. Routes queries across all installed hiivmind-corpus plugins.
+description: This skill should be used when the user asks "find in the docs", "check the documentation", "what do the docs say about", "look up in corpus", "search all corpora", "query documentation", or asks questions that could be answered by installed documentation corpora. Routes queries across all installed hiivmind-corpus plugins.
 ---
 
 # Global Corpus Navigator
