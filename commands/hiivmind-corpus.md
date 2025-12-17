@@ -37,7 +37,7 @@ Analyze intent using these patterns:
 | status, info, up to date, current | `refresh` (status mode) | - |
 | navigate, find, search, look up, what does, how do | `navigate` | - |
 | list, show, available, installed, discover | Discovery mode | - |
-| awareness, configure claude, setup claude, capabilities, tour, what can | `awareness` | - |
+| awareness, configure claude, setup claude, capabilities, tour, what can, claude.md | `awareness` | - |
 
 ### Compound Intent Detection
 
@@ -175,24 +175,34 @@ What would you like to do?
 
 ### Discovery Commands (only run when needed)
 
-Source the corpus library and use composable functions:
+**Preferred:** Use the `hiivmind-corpus-discover` skill directly - it handles all discovery logic and cache updates.
 
-```bash
-# Source the library
-source "${CLAUDE_PLUGIN_ROOT}/lib/corpus/corpus-discovery-functions.sh"
+**Using Claude tools:**
+```
+# Find all corpora
+Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/data/config.yaml
+Glob: ~/.claude/plugins/marketplaces/hiivmind-corpus-*/data/config.yaml
 
-# Discover all corpora with status
-discover_all | format_table
-# Output: name|type|status|path
-
-# Or discover specific locations
-discover_marketplace | filter_built | list_names
-
-# Count corpora
-discover_all | count_corpora
+# For each found, read config to get metadata
+Read: {path}/data/config.yaml
 ```
 
-**Library location:** `lib/corpus/` - see `corpus-index.md` for full function reference.
+**Using bash (when needed):**
+```bash
+# User-level corpora
+for d in ~/.claude/skills/hiivmind-corpus-*/; do
+    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "user-level|$(basename "$d")|$d"
+done
+
+# Marketplace corpora
+for d in ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/; do
+    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "marketplace|$(basename "$d")|$d"
+done
+```
+
+**Pattern documentation:** See `lib/corpus/patterns/discovery.md` for detailed algorithms.
 
 ### Status Detection (only when listing or managing)
 
