@@ -37,6 +37,7 @@ Analyze intent using these patterns:
 | status, info, up to date, current | `refresh` (status mode) | - |
 | navigate, find, search, look up, what does, how do | `navigate` | - |
 | list, show, available, installed, discover | Discovery mode | - |
+| awareness, configure claude, setup claude, capabilities, tour, what can | `awareness` | - |
 
 ### Compound Intent Detection
 
@@ -145,6 +146,7 @@ What would you like to do?
 2. **Create a new corpus** - Index documentation for a project
 3. **Manage existing corpus** - Refresh, enhance, or check status
 4. **List installed corpora** - See what's available
+5. **Configure CLAUDE.md awareness** - Teach Claude when to use this plugin
 ```
 
 ### Step 2: Route Based on Selection
@@ -166,6 +168,10 @@ What would you like to do?
 
 **If "List installed corpora"**:
 1. Now discover and display all corpora with status
+
+**If "Configure CLAUDE.md awareness"**:
+1. Load `hiivmind-corpus-awareness` skill directly
+2. Skill guides through injection target choice and CLAUDE.md editing
 
 ### Discovery Commands (only run when needed)
 

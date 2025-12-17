@@ -74,6 +74,9 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 7. **hiivmind-corpus-discover**: Scans for installed corpora across user-level, repo-local, and marketplace locations
 8. **hiivmind-corpus-navigate**: Global navigator that routes queries to appropriate per-corpus navigate skills
 
+**Setup & Configuration Skills:**
+9. **hiivmind-corpus-awareness**: Adds plugin awareness to CLAUDE.md, teaches Claude when to use corpus skills
+
 **Gateway Command:**
 - **/hiivmind-corpus**: Interactive entry point for discovering and interacting with installed corpora
 
@@ -128,6 +131,7 @@ All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
 - Creation skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-upgrade`
 - Discovery skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`
+- Setup skills: `hiivmind-corpus-awareness`
 - Gateway command: `/hiivmind-corpus`
 - Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
 - Generated navigate skills: `hiivmind-corpus-navigate-{project}` (per-corpus navigation)
@@ -209,7 +213,7 @@ Templates in `templates/` use placeholders like `{{project_name}}`, `{{repo_url}
 
 ## Maintaining Skill Alignment
 
-**IMPORTANT**: All 8 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
+**IMPORTANT**: All 9 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
 
 ### Cross-Cutting Concerns
 
@@ -228,6 +232,8 @@ These features span multiple skills and must stay synchronized:
 | Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
 | Entry keywords | enhance, refresh, navigate (template) | Keyword line format, search logic, preserve on refresh |
 | Corpus keywords | discover, navigate (global), init, upgrade | config.yaml schema, per-session discovery |
+| CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
+| Injection targets | awareness | User-level vs repo-level templates |
 
 ### When Adding New Features
 
@@ -242,9 +248,13 @@ These features span multiple skills and must stay synchronized:
 ```
 /hiivmind-corpus (gateway command)
          │
-         ├── discover ◄──── scans all installation locations
+         ├── discover ◄──── scans all installation locations, updates cache
+         │       │
+         │       └──► ~/.claude/CLAUDE.md (corpus cache)
+         │                     ▲
+         ├── navigate ◄────────┘ (checks cache first)
          │
-         └── navigate ◄──── routes to per-corpus navigate skills
+         └── awareness ◄──── edits CLAUDE.md with skill awareness
                     │
 init ──────────► templates/
                     │
