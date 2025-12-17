@@ -50,11 +50,11 @@ Add an awareness skill to hiivmind-corpus that:
 
 4. **Cache Format** - Machine-updateable section using HTML comment markers:
    ```markdown
-   <!-- Cache populated by discover skill - navigate checks this first -->
+   <!-- hiivmind-corpus-cache -->
    | Corpus | Keywords | Location |
    |--------|----------|----------|
    | polars | dataframe, lazy, expressions | ~/.claude/plugins/... |
-   <!-- End corpus cache -->
+   <!-- /hiivmind-corpus-cache -->
    ```
 
 5. **Pattern Library** - Create `lib/corpus/patterns/capability-awareness.md` with:

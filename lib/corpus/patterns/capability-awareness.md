@@ -198,12 +198,12 @@ Simpler template focused on specific corpora:
 The user-level cache uses HTML comments as markers for machine-updateable content:
 
 ```markdown
-<!-- Cache populated by discover skill - navigate checks this first -->
+<!-- hiivmind-corpus-cache -->
 | Corpus | Keywords | Location |
 |--------|----------|----------|
 | polars | dataframe, lazy, expressions | ~/.claude/plugins/marketplaces/hiivmind-corpus-polars |
 | react | components, hooks, jsx | ~/.claude/skills/hiivmind-corpus-react |
-<!-- End corpus cache -->
+<!-- /hiivmind-corpus-cache -->
 ```
 
 ### Navigate Behavior
@@ -233,10 +233,10 @@ Use [hiivmind-corpus](https://github.com/hiivmind/hiivmind-corpus) for documenta
 
 ### Installed Corpora
 
-<!-- Cache populated by discover skill - navigate checks this first -->
+<!-- hiivmind-corpus-cache -->
 | Corpus | Keywords | Location |
 |--------|----------|----------|
-<!-- End corpus cache -->
+<!-- /hiivmind-corpus-cache -->
 
 ### When to Use
 
