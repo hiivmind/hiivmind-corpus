@@ -81,7 +81,7 @@ For tiered indexes, note which sections/sub-indexes exist for change mapping lat
 
 ### Step 3: Check each source
 
-**See:** `lib/corpus/patterns/status.md` and `lib/corpus/patterns/sources.md`
+**See:** `lib/corpus/patterns/status.md` and `lib/corpus/patterns/sources/README.md`
 
 #### Parallel Status Checking (for multi-source corpora)
 
@@ -104,7 +104,7 @@ git -C .source/{source_id} rev-parse origin/{branch}
 git ls-remote {repo_url} refs/heads/{branch}
 ```
 
-See `lib/corpus/patterns/sources.md` for detailed comparison algorithms.
+See `lib/corpus/patterns/sources/git.md` for detailed SHA comparison algorithms.
 
 **For local sources:**
 - Compare file modification times against `last_indexed_at` in config
@@ -112,6 +112,24 @@ See `lib/corpus/patterns/sources.md` for detailed comparison algorithms.
 **For web sources:**
 - Report cache age (days since `fetched_at`)
 - Note: Re-fetching requires user approval
+
+**For generated-docs sources:**
+
+**See:** `lib/corpus/patterns/status.md` for generated-docs freshness checking.
+
+```bash
+# Check source repo SHA (not web output)
+git ls-remote {source_repo.url} refs/heads/{source_repo.branch}
+# Compare to source_repo.last_commit_sha in config
+```
+
+Report:
+- Source repo SHA comparison (current vs upstream)
+- Number of commits behind (if stale)
+- Note: "Source changed - docs may have been regenerated"
+- Optionally: Check sitemap for new/removed URLs
+
+**Important:** "Stale" for generated-docs means the *source repo* changed, not the web output. There may be a lag between source commits and doc site rebuild (CI/CD pipeline time).
 
 ### Step 4: Report status
 
@@ -142,6 +160,15 @@ Source Status:
    - Indexed: xyz789 (2025-12-07)
    - Upstream: xyz789
    - Status: UP TO DATE
+
+5. gh-cli-manual (generated-docs)
+   - Source repo: https://github.com/cli/cli
+   - Indexed SHA: abc123 (2025-12-01)
+   - Upstream SHA: def456
+   - Source status: STALE (23 commits behind)
+   - Web output: https://cli.github.com/manual
+   - URLs discovered: 165
+   - Note: Source changed - docs may have been regenerated
 ```
 
 For tiered indexes, also show which sub-indexes may need updates based on changed file paths.
@@ -214,6 +241,60 @@ For each URL in the source:
    - Compare with cached version (show diff if changed)
    - **Only save if user approves**
 4. If URL fails to fetch, warn but preserve existing cache
+
+#### Generated-Docs Sources
+
+**See:** `lib/corpus/patterns/sources/generated-docs.md` for generated-docs operations.
+
+Generated-docs sources track a source repository for change detection but fetch content live from the web.
+
+**Step 1: Check source repo for changes**
+```bash
+# Fetch upstream SHA
+upstream_sha=$(git ls-remote {source_repo.url} refs/heads/{source_repo.branch} | cut -f1)
+
+# Compare to indexed SHA
+# If different, source has changed
+```
+
+**Step 2: Re-discover URLs (if source changed)**
+
+If `sitemap_url` is configured:
+```bash
+# Fetch sitemap and extract URLs
+WebFetch: {sitemap_url}
+# Parse for new/removed URLs
+```
+
+Show user:
+- New URLs discovered (not in `discovered_urls`)
+- URLs no longer in sitemap (may have been removed)
+- Total URL count change
+
+**Step 3: Update discovered_urls in config**
+
+Ask user: "Source repo has N new commits. Re-discover URLs?"
+
+If yes:
+- Fetch sitemap/crawl
+- Compare to existing `discovered_urls`
+- Report additions/removals
+- Update config with new URL list
+
+**Step 4: Optionally enable caching**
+
+If `cache.enabled: true`:
+- Fetch changed/new URLs via WebFetch
+- Save to `.cache/web/{source_id}/`
+- Update cache metadata
+
+If `cache.enabled: false` (default):
+- No content fetching needed
+- Content is fetched live during navigation
+
+**Note:** Unlike web sources, generated-docs don't require pre-caching. The refresh primarily updates:
+1. `source_repo.last_commit_sha` - Track upstream changes
+2. `web_output.discovered_urls` - URL directory updates
 
 ### Step 3: Update index collaboratively
 
@@ -309,6 +390,33 @@ For each updated source:
     - url: "..."
       fetched_at: "{new_timestamp}"
       content_hash: "{new_hash}"
+  last_indexed_at: "{timestamp}"
+```
+
+**Generated-docs sources:**
+```yaml
+- id: "gh-cli-manual"
+  type: "generated-docs"
+
+  source_repo:
+    url: "https://github.com/cli/cli"
+    branch: "trunk"
+    docs_root: "cmd/"
+    last_commit_sha: "{new_sha}"      # Updated to upstream SHA
+
+  web_output:
+    base_url: "https://cli.github.com/manual"
+    sitemap_url: "https://cli.github.com/sitemap.xml"
+    discovered_urls:                   # Updated from sitemap re-discovery
+      - path: "/gh_pr_create"
+        title: "gh pr create"
+      - path: "/gh_issue_new"          # New URL discovered
+        title: "gh issue new"
+
+  cache:
+    enabled: false
+    dir: ".cache/web/gh-cli-manual/"
+
   last_indexed_at: "{timestamp}"
 ```
 
@@ -515,6 +623,68 @@ Updated config with new SHA: def456
 
 ---
 
+### Refreshing Generated-Docs Sources
+
+**User**: "refresh status gh-cli-manual"
+
+```
+gh-cli-manual (generated-docs):
+- Source repo: https://github.com/cli/cli
+- Branch: trunk
+- Indexed SHA: abc123 (2025-12-01)
+- Upstream SHA: def456
+- Source status: STALE (23 commits behind)
+- Web output: https://cli.github.com/manual
+- URLs discovered: 165
+- Note: Source changed - docs may have been regenerated
+```
+
+**User**: "refresh update"
+
+```
+Updating gh-cli-manual (generated-docs)...
+
+Source repo has 23 new commits since last check.
+Re-discover URLs from sitemap? [y/n]
+```
+
+User: "y"
+
+```
+Fetching sitemap from https://cli.github.com/sitemap.xml...
+
+URL changes detected:
++ /gh_attestation_verify (new)
++ /gh_attestation_trusted-root (new)
+- /gh_api_deprecated (removed)
+
+Total URLs: 167 (was 165)
+
+Update discovered_urls in config? [y/n]
+```
+
+User: "y"
+
+```
+Updated config:
+- source_repo.last_commit_sha: def456
+- web_output.discovered_urls: 167 URLs
+- last_indexed_at: 2025-12-18T10:00:00Z
+
+Add new command pages to index? [y/n]
+```
+
+User: "Yes, add them to the Commands section"
+
+```
+Updated index.md:
+- Added: **gh attestation verify** `gh-cli-manual:/gh_attestation_verify`
+- Added: **gh attestation trusted-root** `gh-cli-manual:/gh_attestation_trusted-root`
+- Removed: `gh-cli-manual:/gh_api_deprecated`
+```
+
+---
+
 ### Blocked: No Index Built
 
 **User**: "refresh status"
@@ -536,7 +706,7 @@ Updated config with new SHA: def456
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
 - `lib/corpus/patterns/status.md` - Index status and freshness checking
 - `lib/corpus/patterns/paths.md` - Path resolution
-- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
 
 **Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`

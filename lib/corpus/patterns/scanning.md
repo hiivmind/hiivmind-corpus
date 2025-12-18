@@ -657,6 +657,6 @@ Suggested structure:
 ## Related Patterns
 
 - **paths.md** - Resolving source locations
-- **sources.md** - Getting source content
+- **sources/** - Getting source content (git.md, local.md, web.md, generated-docs.md)
 - **config-parsing.md** - Reading source configuration
 - **status.md** - Using scan results for status reporting

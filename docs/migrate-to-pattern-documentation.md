@@ -179,7 +179,13 @@ lib/corpus/
 │   ├── discovery.md           # Finding installed corpora
 │   ├── status.md              # Index status and freshness
 │   ├── paths.md               # Path resolution (cross-platform)
-│   ├── sources.md             # Git/local/web source operations
+│   ├── sources/               # Git/local/web source operations (per-type)
+│   │   ├── README.md          # Overview and taxonomy
+│   │   ├── git.md             # Git repository operations
+│   │   ├── local.md           # Local file uploads
+│   │   ├── web.md             # Web content caching
+│   │   ├── generated-docs.md  # Hybrid git+web operations
+│   │   └── shared.md          # Cross-type utilities
 │   └── scanning.md            # Documentation file analysis
 ├── corpus-index.md            # Updated: Pattern index (was function index)
 └── *.sh                       # DELETED after migration
@@ -308,9 +314,9 @@ Output: ...
 
 **Cross-platform:** Path separator handling, home directory expansion
 
-### 6. sources.md
+### 6. sources/ (directory)
 
-**Purpose:** Git, local, and web source operations.
+**Purpose:** Git, local, web, and generated-docs source operations. Split into per-type files per ADR-0004.
 
 **Git operations:**
 - Clone (shallow)
@@ -439,7 +445,7 @@ See `lib/corpus/patterns/tool-detection.md` for details.
 │   │   ├── discovery.md              # Finding corpora
 │   │   ├── status.md                 # Index freshness
 │   │   ├── paths.md                  # Path resolution
-│   │   ├── sources.md                # Source operations
+│   │   ├── sources/                  # Source operations (per-type)
 │   │   └── scanning.md               # Doc analysis
 │   └── corpus-index.md               # Pattern index
 ```
@@ -464,7 +470,7 @@ Transform from function reference to pattern index:
 3. Create `lib/corpus/patterns/discovery.md`
 4. Create `lib/corpus/patterns/status.md`
 5. Create `lib/corpus/patterns/paths.md`
-6. Create `lib/corpus/patterns/sources.md`
+6. Create `lib/corpus/patterns/sources/` (git.md, local.md, web.md, generated-docs.md, shared.md)
 7. Create `lib/corpus/patterns/scanning.md`
 
 ### Phase 3: Skill Migration (8 files)

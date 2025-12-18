@@ -546,5 +546,5 @@ Try running hiivmind-corpus-refresh to update the index.
 
 - **config-parsing.md** - Reading source configuration
 - **discovery.md** - Finding corpus root paths
-- **sources.md** - Git clone and fetch operations
+- **sources/git.md** - Git clone and fetch operations
 - **status.md** - Checking if paths/clones exist

@@ -34,7 +34,13 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │       ├── discovery.md              # Finding installed corpora
 │       ├── status.md                 # Checking corpus freshness
 │       ├── paths.md                  # Resolving paths within corpora
-│       ├── sources.md                # Git/local/web source operations
+│       ├── sources/                  # Source type operations (per-type)
+│       │   ├── README.md             # Overview and taxonomy
+│       │   ├── git.md                # Git repository operations
+│       │   ├── local.md              # Local file uploads
+│       │   ├── web.md                # Web content caching
+│       │   ├── generated-docs.md     # Hybrid git+web operations
+│       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
 ├── templates/                        # Templates for generating new corpus skills
@@ -149,7 +155,7 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `discovery.md` | Find installed corpora | Location types, scanning algorithms |
 | `status.md` | Check corpus freshness | Index status, SHA comparison |
 | `paths.md` | Resolve paths | Source reference parsing, path resolution |
-| `sources.md` | Git/local/web operations | Clone, fetch, pull, caching |
+| `sources/` | Git/local/web operations | Per-type patterns (git, local, web, generated-docs) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
 
 **How skills use patterns:**

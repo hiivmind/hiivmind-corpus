@@ -123,7 +123,7 @@ Present the current structure and ask:
 
 ## Step 4: Explore
 
-**See:** `lib/corpus/patterns/scanning.md` and `lib/corpus/patterns/sources.md`
+**See:** `lib/corpus/patterns/scanning.md` and `lib/corpus/patterns/sources/README.md`
 
 Search for relevant documentation not yet in the index.
 
@@ -479,7 +479,7 @@ User: "The detailed actions sub-index"
 - `lib/corpus/patterns/status.md` - Index status checking
 - `lib/corpus/patterns/paths.md` - Path resolution
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
-- `lib/corpus/patterns/sources.md` - Source operations
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
 
 **Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`

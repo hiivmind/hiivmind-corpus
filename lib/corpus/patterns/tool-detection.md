@@ -282,4 +282,4 @@ for complex configuration files.
 - **config-parsing.md** - Uses tool detection to choose YAML extraction method
 - **discovery.md** - Uses tool detection for YAML parsing
 - **status.md** - Uses tool detection for YAML parsing and git operations
-- **sources.md** - Requires git detection for clone operations
+- **sources/git.md** - Requires git detection for clone operations

@@ -171,6 +171,6 @@ Source Status:
 ## Related
 
 - **Agent definition:** `agents/source-scanner.md`
-- **Source operations:** `lib/corpus/patterns/sources.md`
+- **Source operations:** `lib/corpus/patterns/sources/` (git.md, local.md, web.md, generated-docs.md)
 - **File discovery:** `lib/corpus/patterns/scanning.md`
 - **Status checking:** `lib/corpus/patterns/status.md`

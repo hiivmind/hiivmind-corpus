@@ -129,8 +129,94 @@ Once a corpus is selected, use its navigate skill:
 2. **Find relevant section**: Match question to index headings
 3. **Parse path format**: `{source_id}:{relative_path}`
 4. **Look up source**: Get details from `{corpus_path}/data/config.yaml`
-5. **Fetch content**: Read from `.source/` or fetch via raw.githubusercontent.com
+5. **Fetch content**: Based on source type (see below)
 6. **Answer**: Cite source and file path
+
+#### Fetching by Source Type
+
+**Git sources:**
+- Read from `.source/{source_id}/{path}` if clone exists
+- Fallback: Fetch via raw.githubusercontent.com
+
+**Local sources:**
+- Read from `data/uploads/{source_id}/{path}`
+
+**Web sources:**
+- Read from cached file: `.cache/web/{source_id}/{cached_file}`
+
+**Generated-docs sources:**
+
+**See:** `lib/corpus/patterns/sources/generated-docs.md` for generated-docs operations.
+
+Generated-docs sources fetch content **live** via WebFetch (unless caching is enabled).
+
+1. **Look up source config:**
+   ```yaml
+   sources:
+     - id: "gh-cli-manual"
+       type: "generated-docs"
+       web_output:
+         base_url: "https://cli.github.com/manual"
+   ```
+
+2. **Construct URL from index path:**
+   - Index entry: `gh-cli-manual:/gh_pr_create`
+   - Base URL: `https://cli.github.com/manual`
+   - Full URL: `https://cli.github.com/manual/gh_pr_create`
+
+3. **Fetch content live:**
+   ```
+   WebFetch: {base_url}{path}
+   ```
+
+4. **Optional cache check:**
+   - If `cache.enabled: true`, check `.cache/web/{source_id}/` first
+   - If cached file exists and recent, use it
+   - Otherwise, fetch live and optionally cache
+
+**URL Construction Pattern:**
+
+```
+Index entry:     {source_id}:{path}
+Source config:   web_output.base_url = "https://example.com/docs"
+Full URL:        {base_url}{path}
+                 https://example.com/docs{path}
+```
+
+**Example:**
+- Index: `gh-cli-manual:/gh_pr_create`
+- Config: `base_url: "https://cli.github.com/manual"`
+- URL: `https://cli.github.com/manual/gh_pr_create`
+
+**Worked example with index gap handling:**
+
+When user asks: "How do I create a PR with gh CLI?"
+
+1. Search index for matching entry:
+   ```markdown
+   - **gh pr create** `gh-cli-manual:/gh_pr_create` - Create a new pull request
+   ```
+
+2. Parse path: `gh-cli-manual:/gh_pr_create`
+   - Source ID: `gh-cli-manual`
+   - Path: `/gh_pr_create`
+
+3. Look up source in config.yaml:
+   ```yaml
+   - id: "gh-cli-manual"
+     type: "generated-docs"
+     web_output:
+       base_url: "https://cli.github.com/manual"
+   ```
+
+4. Construct URL: `https://cli.github.com/manual/gh_pr_create`
+
+5. Fetch: `WebFetch: https://cli.github.com/manual/gh_pr_create`
+
+**If index entry not found:**
+- Check `discovered_urls` in config for direct path match
+- Suggest related entries from index
+- Offer to search the docs site directly
 
 ## Multi-Corpus Queries
 

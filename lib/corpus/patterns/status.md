@@ -262,6 +262,87 @@ check_is_stale() {
 
 ---
 
+## Generated-Docs Freshness Checking
+
+Generated-docs sources track a source repository for change detection.
+Unlike git sources (which have docs IN the repo), generated-docs have:
+- Source repo: Code that generates the docs (tracked for freshness)
+- Web output: Rendered docs site (fetched live when needed)
+
+### Source Freshness States (Generated-Docs)
+
+| State | Meaning | Implication |
+|-------|---------|-------------|
+| `current` | Source repo SHA unchanged | Docs likely unchanged |
+| `stale` | Source repo has new commits | Docs may have been regenerated |
+| `unknown` | Cannot check source repo | Network issue or missing config |
+
+**Important:** "Stale" means the *source* changed, not the web output. There may be a lag between source commits and doc site rebuild (CI/CD pipeline time).
+
+---
+
+### Check Generated-Docs Freshness
+
+**Algorithm:**
+1. Read `source_repo.last_commit_sha` from config
+2. Fetch upstream SHA from `source_repo.url`
+3. Compare and return status
+
+**Using bash:**
+```bash
+check_generated_docs_freshness() {
+    local corpus_path="$1"
+    local source_id="$2"
+    local config_file="${corpus_path%/}/data/config.yaml"
+
+    # Get source_repo fields (nested under source_repo)
+    local source_url branch indexed_sha
+    source_url=$(yq ".sources[] | select(.id == \"$source_id\") | .source_repo.url // \"\"" "$config_file")
+    branch=$(yq ".sources[] | select(.id == \"$source_id\") | .source_repo.branch // \"main\"" "$config_file")
+    indexed_sha=$(yq ".sources[] | select(.id == \"$source_id\") | .source_repo.last_commit_sha // \"\"" "$config_file")
+
+    if [ -z "$source_url" ] || [ -z "$indexed_sha" ]; then
+        echo "unknown"
+        return
+    fi
+
+    local upstream_sha
+    upstream_sha=$(git ls-remote "$source_url" "refs/heads/$branch" 2>/dev/null | cut -f1)
+
+    if [ -z "$upstream_sha" ]; then
+        echo "unknown"
+    elif [ "$indexed_sha" = "$upstream_sha" ]; then
+        echo "current"
+    else
+        echo "stale"
+    fi
+}
+```
+
+---
+
+### Generated-Docs Status Report Format
+
+**Sample output:**
+```
+Source: gh-cli-manual (generated-docs)
+  Source repo: https://github.com/cli/cli
+  Branch: trunk
+  Indexed SHA: abc123... (2025-01-10)
+  Upstream SHA: def456...
+  Source status: STALE (15 commits behind)
+  Web output: https://cli.github.com/manual
+  URLs discovered: 165
+  Note: Source changed - docs may have been regenerated
+```
+
+**Key differences from git source report:**
+- Reports "Source status" not "Index status"
+- Shows web output URL
+- Includes note about source → docs relationship
+
+---
+
 ## Timestamp Checking
 
 ### Get Last Indexed Timestamp
@@ -459,4 +540,4 @@ Note: The polars docs index is 15 days old. Run `hiivmind-corpus-refresh` for la
 - **tool-detection.md** - Required for YAML parsing and git
 - **config-parsing.md** - Methods to read source metadata
 - **discovery.md** - Uses status for corpus health reporting
-- **sources.md** - Git operations for freshness checking
+- **sources/git.md** - Git operations for freshness checking

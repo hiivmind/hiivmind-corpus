@@ -297,7 +297,7 @@ Now you have a destination for everything that follows.
 
 ## Phase 3: Clone
 
-**See:** `lib/corpus/patterns/sources.md` for git clone operations.
+**See:** `lib/corpus/patterns/sources/git.md` for git clone operations.
 
 Clone the source repo **inside the skill/plugin directory**, using the source ID as a subdirectory name.
 
@@ -534,7 +534,7 @@ The index building is intentionally a separate step because:
 
 **Pattern documentation:**
 - `lib/corpus/patterns/discovery.md` - Context detection algorithms
-- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/paths.md` - Path resolution
 

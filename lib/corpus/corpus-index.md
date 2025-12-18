@@ -20,7 +20,7 @@ Instead of executable bash scripts (which lock into Linux/macOS), pattern docume
 | [discovery.md](patterns/discovery.md) | Find installed corpora | Discovery and navigation skills |
 | [status.md](patterns/status.md) | Check corpus freshness | Refresh, navigate, gateway operations |
 | [paths.md](patterns/paths.md) | Resolve paths within corpora | All navigation and file operations |
-| [sources.md](patterns/sources.md) | Git/local/web operations | Init, add-source, build, refresh |
+| [sources/](patterns/sources/) | Git/local/web operations | Init, add-source, build, refresh |
 | [scanning.md](patterns/scanning.md) | File discovery and analysis | Build, enhance, add-source |
 | [capability-awareness.md](patterns/capability-awareness.md) | Plugin skill registry & CLAUDE.md templates | Awareness skill, cache format |
 
@@ -65,7 +65,7 @@ From `patterns/tool-detection.md`:
 - **paths.md** - How to resolve source references to actual files
 
 ### Source Management
-- **sources.md** - How to clone, fetch, and update documentation sources
+- **sources/** - How to clone, fetch, and update documentation sources (per-type patterns)
 - **scanning.md** - How to analyze documentation structure and detect large files
 
 ## Migration from Shell Scripts

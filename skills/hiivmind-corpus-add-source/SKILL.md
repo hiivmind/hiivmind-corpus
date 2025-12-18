@@ -45,6 +45,7 @@ Ask the user which type of source to add:
 | **git** | Git repository | Library docs, framework APIs |
 | **local** | User-uploaded files | Team standards, internal docs |
 | **web** | Blog posts, articles | Individual web pages to cache |
+| **generated-docs** | Auto-generated docs site | MkDocs, Sphinx, gh CLI manual |
 
 ---
 
@@ -79,11 +80,24 @@ Ask the user which type of source to add:
 | Description | Ask user | `Testing best practices articles` |
 | URLs | Ask for list | One or more URLs to fetch |
 
+### For Generated-Docs Sources
+
+| Input | Source | Example |
+|-------|--------|---------|
+| Source ID | Ask user or derive | `gh-cli-manual` |
+| Source repo URL | Ask user | `https://github.com/cli/cli` |
+| Branch | Ask or default `main` | `trunk` |
+| Docs root | Ask (path in repo that generates docs) | `cmd/` |
+| Web base URL | Ask user | `https://cli.github.com/manual` |
+| Sitemap URL | Check or ask | `https://cli.github.com/sitemap.xml` |
+
+**Key concept:** The source repo contains the code that *generates* the docs. The web URL is where the *rendered* docs are published.
+
 ---
 
 ## Step 4: Setup Source
 
-**See:** `lib/corpus/patterns/sources.md` for detailed source operations.
+**See:** `lib/corpus/patterns/sources/` for source-specific operations (git.md, local.md, web.md, generated-docs.md).
 
 ### Git Source Setup
 
@@ -166,6 +180,53 @@ Add to config.yaml:
   cache_dir: ".cache/web/{source_id}/"
   last_indexed_at: null
 ```
+
+### Generated-Docs Source Setup
+
+**See:** `lib/corpus/patterns/sources/generated-docs.md` for URL discovery operations.
+
+1. **Clone source repo** (for SHA tracking):
+```bash
+git clone --depth 1 --branch {branch} {source_repo_url} .source/{source_id}
+sha=$(git -C .source/{source_id} rev-parse HEAD)
+```
+
+2. **Discover URLs** from web output:
+   - First, try sitemap: `WebFetch: {sitemap_url}`
+   - If no sitemap, crawl from base URL
+   - Show discovered URLs to user for confirmation
+
+3. **Add to config.yaml:**
+```yaml
+- id: "{source_id}"
+  type: "generated-docs"
+
+  source_repo:
+    url: "{source_repo_url}"
+    branch: "{branch}"
+    docs_root: "{docs_root}"
+    last_commit_sha: "{sha}"
+
+  web_output:
+    base_url: "{web_base_url}"
+    sitemap_url: "{sitemap_url}"  # if available
+    discovered_urls:
+      - path: "/path1"
+        title: "Page Title 1"
+      - path: "/path2"
+        title: "Page Title 2"
+
+  cache:
+    enabled: false
+    dir: ".cache/web/{source_id}/"
+
+  last_indexed_at: null
+```
+
+**Important notes:**
+- Content is fetched live via WebFetch (no pre-caching needed)
+- Source repo clone is shallow and only for SHA tracking
+- `discovered_urls` is populated by sitemap/crawl discovery
 
 ---
 
@@ -283,11 +344,36 @@ Example entries:
 
 ---
 
+### Adding Generated-Docs (Auto-Generated Documentation)
+
+**User**: "Add the GitHub CLI manual - it's generated from the cli/cli repo"
+
+**Step 1**: Read config, list existing sources
+**Step 2**: Source type: **generated-docs**
+**Step 3**: Collect:
+- Source ID: `gh-cli-manual`
+- Source repo: `https://github.com/cli/cli`
+- Branch: `trunk`
+- Docs root: `cmd/` (where command definitions live)
+- Web base URL: `https://cli.github.com/manual`
+- Sitemap URL: `https://cli.github.com/sitemap.xml`
+**Step 4**:
+- Clone source repo (shallow): `git clone --depth 1 https://github.com/cli/cli .source/gh-cli-manual`
+- Get SHA for tracking
+- Fetch sitemap, discover 165 URLs
+- Show discovered URLs to user: "Found 165 command pages. Add all?"
+- Add to config with discovered_urls
+**Step 5**: Offer to index (add entries to index.md pointing to discovered URLs)
+
+**Key difference from web source**: No pre-caching. Content is fetched live when navigating.
+
+---
+
 ## Reference
 
 **Pattern documentation:**
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
 - `lib/corpus/patterns/scanning.md` - File discovery and large file detection
 - `lib/corpus/patterns/paths.md` - Path resolution
 

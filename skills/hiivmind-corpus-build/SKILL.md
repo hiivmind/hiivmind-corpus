@@ -29,7 +29,7 @@ sources:
 
 ## Step 1: Prepare Sources
 
-**See:** `lib/corpus/patterns/sources.md` for detailed source operations.
+**See:** `lib/corpus/patterns/sources/README.md` for source type overview.
 
 ### Detect Available Tools
 
@@ -507,7 +507,7 @@ Found 3 sources:
 **Pattern documentation:**
 - `lib/corpus/patterns/tool-detection.md` - Detect available tools
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources.md` - Git/local/web source operations
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/paths.md` - Path resolution
 

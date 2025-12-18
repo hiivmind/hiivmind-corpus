@@ -31,7 +31,7 @@ corpus:
 
 sources:
   - id: "source-id"
-    type: "git"  # git | local | web
+    type: "git"  # git | local | web | generated-docs
     repo_url: "https://github.com/owner/repo"
     repo_owner: "owner"
     repo_name: "repo"
@@ -40,6 +40,109 @@ sources:
     last_commit_sha: "abc123..."
     last_indexed_at: "2025-01-15T10:00:00Z"
 ```
+
+---
+
+## Source Type Schemas
+
+### Git Source
+
+Standard git repository with docs in the repo:
+
+```yaml
+- id: "polars"
+  type: "git"
+  repo_url: "https://github.com/pola-rs/polars"
+  repo_owner: "pola-rs"
+  repo_name: "polars"
+  branch: "main"
+  docs_root: "docs"
+  last_commit_sha: "abc123..."
+  last_indexed_at: "2025-01-15T10:00:00Z"
+```
+
+### Local Source
+
+User-uploaded files stored in `data/uploads/`:
+
+```yaml
+- id: "team-standards"
+  type: "local"
+  path: "uploads/team-standards/"
+  description: "Internal team documentation"
+  files:
+    - "coding-guidelines.md"
+    - "pr-process.md"
+  last_indexed_at: "2025-01-15T10:00:00Z"
+```
+
+### Web Source
+
+Cached web pages (pre-fetched):
+
+```yaml
+- id: "kent-testing-blog"
+  type: "web"
+  description: "Testing best practices articles"
+  base_url: "https://kentcdodds.com/blog"
+  cache_dir: ".cache/web/kent-testing-blog/"
+  urls:
+    - path: "/testing-implementation-details"
+      title: "Testing Implementation Details"
+      fetched_at: "2025-01-15T10:00:00Z"
+      content_hash: "sha256:abc123..."
+      cached_file: "testing-implementation-details.md"
+  last_indexed_at: "2025-01-15T10:00:00Z"
+```
+
+### Generated-Docs Source (NEW)
+
+Auto-generated documentation sites where content is rendered from a source repository.
+Tracks git for change detection, fetches content live from web.
+
+**Use cases:** MkDocs, Sphinx, ReadTheDocs, gh CLI manual, API docs
+
+```yaml
+- id: "gh-cli-manual"
+  type: "generated-docs"
+
+  # Git tracking (for change detection)
+  source_repo:
+    url: "https://github.com/cli/cli"
+    branch: "trunk"
+    docs_root: "cmd/"                    # Path containing source files
+    last_commit_sha: "abc123..."         # Last checked SHA
+
+  # Web output (for live fetching)
+  web_output:
+    base_url: "https://cli.github.com/manual"
+    sitemap_url: "https://cli.github.com/sitemap.xml"  # Optional
+    discovered_urls:                     # Auto-populated by discovery
+      - path: "/gh_pr_create"
+        title: "gh pr create"
+      - path: "/gh_issue_list"
+        title: "gh issue list"
+
+  # Optional caching (default: live fetch)
+  cache:
+    enabled: false                       # true = cache for offline
+    dir: ".cache/web/gh-cli-manual/"
+
+  last_indexed_at: "2025-01-15T10:00:00Z"
+```
+
+**Key differences from `web` type:**
+- **Change detection**: Tracks `source_repo` git SHA to know when docs may have changed
+- **Content access**: Default is live WebFetch (no mandatory caching)
+- **URL discovery**: Auto-discovers URLs via sitemap or patterns
+- **No pre-caching required**: URLs stored but content fetched on demand
+
+**Validation rules:**
+- `source_repo.url` is required (must be valid git URL)
+- `source_repo.branch` defaults to "main" if not specified
+- `web_output.base_url` is required
+- `cache.enabled` defaults to `false`
+- `discovered_urls` can be empty (populated by discovery)
 
 ## Extraction Patterns
 
@@ -386,4 +489,4 @@ The grep/sed fallback has significant limitations:
 - **tool-detection.md** - Determines which parsing method to use
 - **discovery.md** - Uses config parsing for corpus metadata
 - **status.md** - Uses config parsing for source tracking data
-- **sources.md** - Uses config parsing for source URLs and branches
+- **sources/** - Uses config parsing for source URLs and branches
