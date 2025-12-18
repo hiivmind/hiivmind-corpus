@@ -1,6 +1,11 @@
 ---
 name: hiivmind-corpus-init
-description: Initialize a documentation corpus skill for any open source project. Use when "index documentation", "create corpus", "set up docs", or as the first step when setting up documentation access.
+description: >
+  This skill should be used when the user asks to "create a corpus", "initialize documentation",
+  "set up docs for a library", "index this project's docs", "create documentation corpus",
+  "scaffold corpus skill", or mentions wanting to create a new documentation corpus for any
+  open source project. Also triggers on "new corpus", "corpus for [library name]", or
+  "hiivmind-corpus init".
 ---
 
 # Corpus Skill Generator

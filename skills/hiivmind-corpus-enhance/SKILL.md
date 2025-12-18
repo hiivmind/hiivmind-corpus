@@ -1,6 +1,10 @@
 ---
 name: hiivmind-corpus-enhance
-description: Enhance an existing corpus index by adding depth to specific topics. Use when you need more detail on particular areas.
+description: >
+  This skill should be used when the user asks to "add more detail to corpus", "enhance corpus coverage",
+  "expand section in index", "need more depth on [topic]", "corpus is too shallow", "add entries for [topic]",
+  or wants deeper coverage of specific topics in an existing corpus. Triggers on "enhance [topic] section",
+  "more detail on [feature]", "expand the index", "add depth to corpus", or "hiivmind-corpus enhance".
 ---
 
 # Corpus Index Enhancement

@@ -1,6 +1,11 @@
 ---
 name: hiivmind-corpus-refresh
-description: Refresh corpus index by comparing with upstream changes. Use when "corpus outdated", "sync corpus", "update index", or when sources have changed upstream. Checks each source independently and updates based on diffs.
+description: >
+  This skill should be used when the user asks to "refresh corpus", "sync documentation",
+  "update corpus index", "check for upstream changes", "corpus is stale", "docs are outdated",
+  or mentions that documentation sources have changed. Triggers on "refresh my [corpus name] corpus",
+  "sync corpus with upstream", "check if docs are current", "update from source repo", or
+  "hiivmind-corpus refresh".
 ---
 
 # Corpus Index Refresh

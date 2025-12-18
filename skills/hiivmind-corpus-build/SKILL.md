@@ -1,6 +1,11 @@
 ---
 name: hiivmind-corpus-build
-description: Analyze documentation and build the initial corpus index collaboratively. Use after running hiivmind-corpus-init.
+description: >
+  This skill should be used when the user asks to "build corpus index", "create index from docs",
+  "analyze documentation", "populate corpus index", or needs to build the initial index for a
+  corpus that was just initialized. Triggers on "build my corpus", "index the documentation",
+  "create the index.md", "finish setting up corpus", "hiivmind-corpus build", or when a corpus
+  has placeholder index.md that says "Run hiivmind-corpus-build".
 ---
 
 # Corpus Index Builder

@@ -1,6 +1,11 @@
 ---
 name: hiivmind-corpus-upgrade
-description: Upgrade an existing corpus skill to the latest hiivmind-corpus standards. Use when "migrate corpus", "update corpus format", "upgrade corpus", or when templates or navigate skill features have been updated.
+description: >
+  This skill should be used when the user asks to "upgrade corpus", "migrate corpus to new format",
+  "update corpus structure", "corpus is missing features", "bring corpus up to date", or when
+  hiivmind-corpus templates have been updated and existing corpora need migration. Triggers on
+  "upgrade my [corpus name] corpus", "corpus needs updating", "missing project-awareness.md",
+  "update to latest corpus format", or "hiivmind-corpus upgrade".
 ---
 
 # Corpus Upgrade

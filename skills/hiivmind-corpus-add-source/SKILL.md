@@ -1,6 +1,11 @@
 ---
 name: hiivmind-corpus-add-source
-description: Add a new source to an existing corpus skill. Use to extend a corpus with additional git repos, local documents, or web pages.
+description: >
+  This skill should be used when the user asks to "add another source to corpus", "include blog posts",
+  "add local documents", "add git repo to corpus", "extend corpus with web pages", "add team docs",
+  or wants to extend an existing corpus with additional documentation sources. Triggers on
+  "add [url/repo] to corpus", "include [source] in my docs", "add another documentation source",
+  "combine sources in corpus", or "hiivmind-corpus add-source".
 ---
 
 # Add Source to Corpus
