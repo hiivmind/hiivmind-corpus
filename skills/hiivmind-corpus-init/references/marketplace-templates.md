@@ -20,6 +20,7 @@ The current directory becomes the plugin root:
 ├── .cache/                       # Cached web content (gitignored)
 │   └── web/
 ├── CLAUDE.md                     # From claude.md.template
+├── LICENSE                       # From license.template
 ├── .gitignore                    # From gitignore.template
 └── README.md                     # From readme.md.template
 ```
@@ -30,6 +31,7 @@ The current directory becomes the plugin root:
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `data/project-awareness.md` ← `templates/project-awareness.md.template`
 - `CLAUDE.md` ← `templates/claude.md.template`
+- `LICENSE` ← `templates/license.template`
 - `.gitignore` ← `templates/gitignore.template`
 - `README.md` ← `templates/readme.md.template`
 
@@ -48,6 +50,7 @@ The current directory becomes a marketplace with this corpus as first plugin:
 │   ├── plugin.json               # Marketplace manifest (name, description)
 │   └── marketplace.json          # References child plugins
 ├── CLAUDE.md                     # Marketplace CLAUDE.md (see below)
+├── LICENSE                       # From license.template
 ├── .gitignore                    # From gitignore.template
 ├── README.md                     # Marketplace README
 │
@@ -69,6 +72,7 @@ The current directory becomes a marketplace with this corpus as first plugin:
 - `.claude-plugin/plugin.json` - Marketplace manifest (create manually with marketplace name)
 - `.claude-plugin/marketplace.json` ← `templates/marketplace.json.template`
 - `CLAUDE.md` - Marketplace CLAUDE.md explaining multi-corpus structure
+- `LICENSE` ← `templates/license.template`
 - `.gitignore` ← `templates/gitignore.template`
 - `README.md` - Marketplace README (create manually)
 

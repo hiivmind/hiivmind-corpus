@@ -17,6 +17,7 @@ Fill these from Phase 1 inputs and Phase 4 research:
 | `{{description}}` | Generated (marketplace) | `Documentation corpus for data tools` |
 | `{{plugin_description}}` | Generated (per-plugin) | `Always-current Polars documentation` |
 | `{{author_name}}` | Ask or default | User's name |
+| `{{year}}` | Current year | `2025` |
 | `{{keywords_json}}` | Generated (plugin only) | `"dataframes", "python", "rust"` |
 | `{{additional_keywords}}` | From user (routing keywords) | `dataframe`, `lazy`, `expression` |
 | `{{example_questions}}` | Generated (plugin only) | Example usage questions |

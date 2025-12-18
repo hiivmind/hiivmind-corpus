@@ -388,6 +388,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 | `plugin.json.template` | Plugin manifest | Plugin types only |
 | `readme.md.template` | Plugin documentation | Single-corpus only |
 | `gitignore.template` | Ignore `.source/` | Plugin types only |
+| `license.template` | MIT license | Plugin types only |
 | `claude.md.template` | CLAUDE.md for single corpus plugin | Single-corpus only |
 | `marketplace.json.template` | Marketplace registry | Multi-corpus only |
 | `marketplace-claude.md.template` | CLAUDE.md for multi-corpus marketplace | Multi-corpus only |
