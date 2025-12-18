@@ -18,7 +18,7 @@ Upgrade Report:
   - .gitignore present
 
 ⚠️  MISSING FILES:
-  - data/project-awareness.md
+  - references/project-awareness.md
 
 ⚠️  MISSING CONFIG FIELDS:
   - corpus.keywords (for per-session routing)
@@ -98,11 +98,11 @@ Append this if missing:
 
 If you're working in a project that uses {Project} but doesn't know about this corpus, you can add awareness to the project's CLAUDE.md.
 
-**The `data/project-awareness.md` file** contains a ready-to-use snippet that can be added to any project's CLAUDE.md to make Claude aware of this corpus when working in that project.
+**The `references/project-awareness.md` file** contains a ready-to-use snippet that can be added to any project's CLAUDE.md to make Claude aware of this corpus when working in that project.
 
 ### How to Inject
 
-1. Read `data/project-awareness.md` from this corpus
+1. Read `references/project-awareness.md` from this corpus
 2. Add its contents to the target project's CLAUDE.md (create if needed)
 3. The project will now know to use this corpus for {Project} questions
 
@@ -125,7 +125,7 @@ Upgrade Complete!
 ════════════════
 
 Files added:
-  - data/project-awareness.md
+  - references/project-awareness.md
 
 Files modified:
   - skills/navigate/SKILL.md (+45 lines)

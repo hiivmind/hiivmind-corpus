@@ -47,7 +47,7 @@ Apply upgrades to all 3 corpora? [y/n]
 - No project-awareness.md file
 **Step 4**: Report findings to user
 **Step 5**: User confirms → Apply:
-- Create data/project-awareness.md with Polars-specific content
+- Create references/project-awareness.md with Polars-specific content
 - Append "Making Projects Aware" section to navigate skill
 **Step 6**: Verify and show git status
 

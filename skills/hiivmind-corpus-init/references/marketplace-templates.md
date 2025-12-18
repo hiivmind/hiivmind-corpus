@@ -13,8 +13,9 @@ The current directory becomes the plugin root:
 ├── data/
 │   ├── config.yaml               # From config.yaml.template
 │   ├── index.md                  # Placeholder
-│   ├── project-awareness.md      # CLAUDE.md snippet for projects using this corpus
 │   └── uploads/                  # For local sources (created when needed)
+├── references/
+│   └── project-awareness.md      # CLAUDE.md snippet for projects using this corpus
 ├── .source/                      # Cloned git sources (gitignored)
 │   └── {source_id}/              # Each source in its own directory
 ├── .cache/                       # Cached web content (gitignored)
@@ -29,7 +30,7 @@ The current directory becomes the plugin root:
 - `.claude-plugin/plugin.json` ← `templates/plugin.json.template`
 - `commands/navigate.md` ← `templates/navigate-command.md.template`
 - `data/config.yaml` ← `templates/config.yaml.template`
-- `data/project-awareness.md` ← `templates/project-awareness.md.template`
+- `references/project-awareness.md` ← `templates/project-awareness.md.template`
 - `CLAUDE.md` ← `templates/claude.md.template`
 - `LICENSE` ← `templates/license.template`
 - `.gitignore` ← `templates/gitignore.template`
@@ -62,8 +63,9 @@ The current directory becomes a marketplace with this corpus as first plugin:
     ├── data/
     │   ├── config.yaml           # From config.yaml.template
     │   ├── index.md              # Placeholder
-    │   ├── project-awareness.md  # CLAUDE.md snippet for projects
     │   └── uploads/
+    ├── references/
+    │   └── project-awareness.md  # CLAUDE.md snippet for projects
     ├── .source/                  # Cloned git sources (gitignored)
     └── .cache/                   # Cached web content (gitignored)
 ```
@@ -102,8 +104,9 @@ Add new plugin as a sibling to existing plugins:
     ├── data/
     │   ├── config.yaml           # From config.yaml.template
     │   ├── index.md              # Placeholder
-    │   ├── project-awareness.md  # CLAUDE.md snippet for projects
     │   └── uploads/
+    ├── references/
+    │   └── project-awareness.md  # CLAUDE.md snippet for projects
     ├── .source/                  # Cloned git sources (gitignored)
     └── .cache/                   # Cached web content (gitignored)
 ```

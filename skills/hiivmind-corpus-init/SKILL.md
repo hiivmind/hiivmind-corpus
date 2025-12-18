@@ -405,8 +405,9 @@ Templates are in this plugin's `templates/` directory. To find them:
 ├── data/
 │   ├── config.yaml       # From config.yaml.template
 │   ├── index.md          # Placeholder (see below)
-│   ├── project-awareness.md  # CLAUDE.md snippet for projects
 │   └── uploads/          # For local sources (created when needed)
+├── references/
+│   └── project-awareness.md  # CLAUDE.md snippet for projects
 ├── .source/              # Cloned git sources
 │   └── {source_id}/      # Each source in its own directory
 └── .cache/               # Cached web content
@@ -416,7 +417,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 **Files from templates:**
 - `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
 - `data/config.yaml` ← `templates/config.yaml.template`
-- `data/project-awareness.md` ← `templates/project-awareness.md.template`
+- `references/project-awareness.md` ← `templates/project-awareness.md.template`
 
 **Create manually:**
 - `data/index.md` - Simple placeholder:
@@ -438,8 +439,9 @@ Templates are in this plugin's `templates/` directory. To find them:
         ├── data/
         │   ├── config.yaml       # From config.yaml.template
         │   ├── index.md          # Placeholder
-        │   ├── project-awareness.md  # CLAUDE.md snippet (usually not needed for repo-local)
         │   └── uploads/          # For local sources (created when needed)
+        ├── references/
+        │   └── project-awareness.md  # CLAUDE.md snippet (usually not needed for repo-local)
         ├── .source/              # Cloned git sources (gitignored)
         │   └── {source_id}/      # Each source in its own directory
         └── .cache/               # Cached web content (gitignored)
@@ -449,7 +451,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 **Files from templates:**
 - `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
 - `data/config.yaml` ← `templates/config.yaml.template`
-- `data/project-awareness.md` ← `templates/project-awareness.md.template`
+- `references/project-awareness.md` ← `templates/project-awareness.md.template`
 
 **Create manually:**
 - `data/index.md` - Simple placeholder (same as user-level)

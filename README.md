@@ -169,7 +169,7 @@ The navigate skill uses Grep instead of Read for these.
 
 ### Project Awareness
 
-Each corpus includes `data/project-awareness.md` — a snippet for any project's CLAUDE.md:
+Each corpus includes `references/project-awareness.md` — a snippet for any project's CLAUDE.md:
 
 ```markdown
 # Polars Documentation Corpus

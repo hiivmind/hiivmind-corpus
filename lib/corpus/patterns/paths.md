@@ -109,13 +109,13 @@ get_subindex_path() {
 
 **Algorithm:**
 ```
-{corpus_path}/data/project-awareness.md
+{corpus_path}/references/project-awareness.md
 ```
 
 **Using bash:**
 ```bash
 get_awareness_path() {
-    echo "${1%/}/data/project-awareness.md"
+    echo "${1%/}/references/project-awareness.md"
 }
 ```
 

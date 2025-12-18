@@ -136,7 +136,7 @@ For each missing component, apply the upgrade:
    - `{{project_display_name}}` - capitalize project_name
    - `{{skill_topics}}` - extract from index.md sections
    - `{{example_questions}}` - generate based on topics
-3. Write to `data/project-awareness.md`
+3. Write to `references/project-awareness.md`
 
 ### Adding Missing Sections to Navigate Skill
 
@@ -175,7 +175,7 @@ Upgrade Complete!
 ════════════════
 
 Files added:
-  - data/project-awareness.md
+  - references/project-awareness.md
 
 Files modified:
   - skills/navigate/SKILL.md (+45 lines)

@@ -284,7 +284,7 @@ grep -n "/{path}" openapi.yaml -A 30
 
 If you're working in a project that uses {{project_display_name}} but doesn't know about this corpus, you can add awareness to the project's CLAUDE.md.
 
-**The `data/project-awareness.md` file** contains a ready-to-use snippet that can be added to any project's CLAUDE.md.
+**The `references/project-awareness.md` file** contains a ready-to-use snippet that can be added to any project's CLAUDE.md.
 
 ### When to Suggest Injection
 
