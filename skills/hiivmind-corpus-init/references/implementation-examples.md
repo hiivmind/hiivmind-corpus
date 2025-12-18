@@ -114,7 +114,7 @@ git clone --depth 1 https://github.com/reactjs/react.dev ./.source/react
 **Phase 5 - Generate**
 Create full plugin structure at repo root:
 - `.claude-plugin/plugin.json`
-- `skills/navigate/SKILL.md`
+- `commands/navigate.md`
 - `data/config.yaml`, `data/index.md`
 - `CLAUDE.md`, `README.md`, `.gitignore`
 

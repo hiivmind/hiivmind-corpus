@@ -377,7 +377,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 
 | Template | Purpose | Used By |
 |----------|---------|---------|
-| `navigate-skill.md.template` | The navigate skill | All types |
+| `navigate-command.md.template` | The navigate command (unified entry point) | All types |
 | `config.yaml.template` | Source config + index tracking | All types |
 | `project-awareness.md.template` | CLAUDE.md snippet for projects using this corpus | All types |
 | `plugin.json.template` | Plugin manifest | Plugin types only |
@@ -395,7 +395,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 
 ```
 ~/.claude/skills/{skill-name}/
-├── SKILL.md              # From navigate-skill.md.template
+├── SKILL.md              # From navigate-command.md.template (skill wrapper)
 ├── data/
 │   ├── config.yaml       # From config.yaml.template
 │   ├── index.md          # Placeholder (see below)
@@ -408,7 +408,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 ```
 
 **Files from templates:**
-- `SKILL.md` ← `templates/navigate-skill.md.template`
+- `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `data/project-awareness.md` ← `templates/project-awareness.md.template`
 
@@ -428,7 +428,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 {repo-root}/.claude-plugin/
 └── skills/
     └── {skill-name}/
-        ├── SKILL.md              # From navigate-skill.md.template
+        ├── SKILL.md              # From navigate-command.md.template (skill wrapper)
         ├── data/
         │   ├── config.yaml       # From config.yaml.template
         │   ├── index.md          # Placeholder
@@ -441,7 +441,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 ```
 
 **Files from templates:**
-- `SKILL.md` ← `templates/navigate-skill.md.template`
+- `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `data/project-awareness.md` ← `templates/project-awareness.md.template`
 
@@ -476,7 +476,7 @@ ls -la "${SKILL_ROOT}/data"
 **Single-corpus repo:**
 ```bash
 ls -la "${PLUGIN_ROOT}"
-ls -la "${PLUGIN_ROOT}/skills/navigate"
+ls -la "${PLUGIN_ROOT}/commands"
 ls -la "${PLUGIN_ROOT}/data"
 ```
 
@@ -484,7 +484,7 @@ ls -la "${PLUGIN_ROOT}/data"
 ```bash
 ls -la "${MARKETPLACE_ROOT}"
 ls -la "${PLUGIN_ROOT}"
-ls -la "${PLUGIN_ROOT}/skills/navigate"
+ls -la "${PLUGIN_ROOT}/commands"
 cat "${MARKETPLACE_ROOT}/.claude-plugin/marketplace.json"
 ```
 

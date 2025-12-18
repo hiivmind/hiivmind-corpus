@@ -377,6 +377,6 @@ This skill uses:
 
 **Related skills:**
 - Discovery: `skills/hiivmind-corpus-discover/SKILL.md`
-- Per-corpus navigate: `templates/navigate-skill.md.template`
+- Per-corpus navigate: `templates/navigate-command.md.template`
 - Gateway command: `commands/hiivmind-corpus.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`

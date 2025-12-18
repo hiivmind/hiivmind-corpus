@@ -8,9 +8,8 @@ The current directory becomes the plugin root:
 {current-directory}/                  # e.g., hiivmind-corpus-react/
 ├── .claude-plugin/
 │   └── plugin.json               # From plugin.json.template
-├── skills/
-│   └── navigate/
-│       └── SKILL.md              # From navigate-skill.md.template
+├── commands/
+│   └── navigate.md               # From navigate-command.md.template
 ├── data/
 │   ├── config.yaml               # From config.yaml.template
 │   ├── index.md                  # Placeholder
@@ -27,7 +26,7 @@ The current directory becomes the plugin root:
 
 **Files from templates:**
 - `.claude-plugin/plugin.json` ← `templates/plugin.json.template`
-- `skills/navigate/SKILL.md` ← `templates/navigate-skill.md.template`
+- `commands/navigate.md` ← `templates/navigate-command.md.template`
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `data/project-awareness.md` ← `templates/project-awareness.md.template`
 - `CLAUDE.md` ← `templates/claude.md.template`
@@ -55,9 +54,8 @@ The current directory becomes a marketplace with this corpus as first plugin:
 └── {plugin-name}/                    # e.g., hiivmind-corpus-react/
     ├── .claude-plugin/
     │   └── plugin.json           # From plugin.json.template
-    ├── skills/
-    │   └── navigate/
-    │       └── SKILL.md          # From navigate-skill.md.template
+    ├── commands/
+    │   └── navigate.md           # From navigate-command.md.template
     ├── data/
     │   ├── config.yaml           # From config.yaml.template
     │   ├── index.md              # Placeholder
@@ -95,9 +93,8 @@ Add new plugin as a sibling to existing plugins:
 └── {new-plugin-name}/                # NEW - e.g., hiivmind-corpus-vue/
     ├── .claude-plugin/
     │   └── plugin.json           # From plugin.json.template
-    ├── skills/
-    │   └── navigate/
-    │       └── SKILL.md          # From navigate-skill.md.template
+    ├── commands/
+    │   └── navigate.md           # From navigate-command.md.template
     ├── data/
     │   ├── config.yaml           # From config.yaml.template
     │   ├── index.md              # Placeholder
@@ -127,3 +124,22 @@ When adding a new plugin to an existing marketplace:
   ]
 }
 ```
+
+---
+
+## Command Invocation Pattern
+
+Each corpus plugin exposes a single command: `/{{plugin_name}}:navigate`
+
+The command handles:
+1. **Navigation** (default) - Answer documentation questions directly
+2. **Maintenance** - Delegate to parent hiivmind-corpus skills:
+   - `refresh` → `hiivmind-corpus-refresh`
+   - `enhance {topic}` → `hiivmind-corpus-enhance`
+   - `add source {url}` → `hiivmind-corpus-add-source`
+   - `awareness` → `hiivmind-corpus-awareness`
+
+This pattern:
+- Provides a unified entry point per corpus
+- Avoids duplicating maintenance logic in each corpus
+- Reuses parent skills with corpus context

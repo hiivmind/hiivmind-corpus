@@ -6,7 +6,7 @@
 
 | File | Template | Check |
 |------|----------|-------|
-| Navigate skill | `navigate-skill.md.template` | Compare sections |
+| Navigate command | `navigate-command.md.template` | Compare sections |
 | Config | `config.yaml.template` | Check schema |
 | Project awareness | `project-awareness.md.template` | Exists? |
 

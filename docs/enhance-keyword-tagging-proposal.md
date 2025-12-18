@@ -111,7 +111,7 @@ If user has a routing guide, cross-reference keywords:
 
 ### Per-Corpus Navigate Template Updates
 
-Add to `templates/navigate-skill.md.template` in Step 2 (Search):
+Add to `templates/navigate-command.md.template` in Step 2 (Search):
 
 ```markdown
 ### Searching Entry Keywords
@@ -511,7 +511,7 @@ Add to the "Cross-Cutting Concerns" table:
 
 ### Part 1: Entry-Level Keywords
 - [ ] Update `hiivmind-corpus-enhance/SKILL.md` with keyword tagging pattern
-- [ ] Update `templates/navigate-skill.md.template` with entry keyword search
+- [ ] Update `templates/navigate-command.md.template` with entry keyword search
 - [ ] Update `hiivmind-corpus-refresh/SKILL.md` to preserve keyword lines
 
 ### Part 2: Corpus-Level Routing
