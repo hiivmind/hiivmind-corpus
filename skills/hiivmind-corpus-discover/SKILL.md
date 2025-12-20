@@ -1,6 +1,6 @@
 ---
 name: hiivmind-corpus-discover
-description: This skill should be used when the user asks "what corpora do I have installed?", "list my documentation corpora", "find installed corpus plugins", "what hiivmind-corpus plugins are available?", or needs to discover installed documentation corpus skills before navigating or managing them.
+description: This skill should be used when the user asks "what corpora do I have installed?", "list my documentation corpora", "find installed corpus plugins", "what hiivmind-corpus plugins are available?", "check the docs", "search the documentation", "what do the docs say", "look up in corpus", or needs to discover installed documentation corpus skills. Also use when a generic documentation query doesn't specify which corpus to search.
 ---
 
 # Corpus Discovery
@@ -9,10 +9,24 @@ Find and report all installed hiivmind-corpus documentation corpora across user-
 
 ## When to Use
 
-- Before navigating: Discover available corpora to query
-- Before managing: Find corpora to enhance, refresh, or upgrade
-- Troubleshooting: Verify which corpora are installed and their status
-- Inventory: Report all corpus locations and types
+- **Generic doc queries**: User asks "check the docs" without specifying which documentation
+- **Corpus inventory**: User asks what corpora are installed
+- **Before managing**: Find corpora to enhance, refresh, or upgrade
+- **Troubleshooting**: Verify which corpora are installed and their status
+
+## Handling Generic Documentation Queries
+
+When triggered by a generic query like "check the docs" or "what do the docs say about X":
+
+1. Discover all installed corpora (see Discovery Process below)
+2. List them with their domain keywords
+3. Ask user to pick one or be more specific:
+   > "I found these documentation corpora installed:
+   > - **Polars** - dataframe, lazy, expressions
+   > - **GitHub** - actions, api, graphql, copilot
+   >
+   > Which would you like me to search? Or rephrase your question with a specific domain."
+4. User then invokes the child corpus skill directly
 
 ## Discovery Locations
 
@@ -277,5 +291,6 @@ Skip and note in output:
 **Related skills:**
 - Initialize new corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build corpus index: `skills/hiivmind-corpus-build/SKILL.md`
-- Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`
+
+**Note:** Domain-specific navigation is handled by per-corpus navigate skills in child plugins (e.g., `hiivmind-corpus-github-docs/skills/navigate/SKILL.md`).
