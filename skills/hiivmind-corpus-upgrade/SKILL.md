@@ -53,14 +53,20 @@ Determine what kind of corpus this is:
 # Check structure
 ls -la
 ls data/
-ls skills/
+ls skills/ 2>/dev/null
+ls commands/ 2>/dev/null
+ls .claude-plugin/ 2>/dev/null
 ```
 
-| Indicator | Corpus Type |
-|-----------|-------------|
-| `SKILL.md` at root + `data/` | User-level or repo-local skill |
-| `.claude-plugin/plugin.json` + `skills/navigate/` | Standalone plugin |
-| Parent has `marketplace.json` | Plugin in marketplace |
+| Indicator | Corpus Type | Expected Structure |
+|-----------|-------------|-------------------|
+| `SKILL.md` at root + `data/` | User-level or repo-local skill | `SKILL.md`, `data/`, `references/` |
+| `.claude-plugin/plugin.json` | Standalone plugin | `skills/navigate/SKILL.md`, `commands/navigate.md`, `data/`, `references/` |
+| Parent has `marketplace.json` | Plugin in marketplace | Same as standalone plugin |
+
+**Plugin types (ADR-005):** Must have BOTH:
+- `skills/navigate/SKILL.md` - Auto-triggers based on domain keywords
+- `commands/navigate.md` - Explicit entry point for users
 
 Record the corpus type - it affects which templates apply.
 
@@ -151,6 +157,66 @@ Ensure these entries exist:
 ```
 .source/
 .cache/
+```
+
+### ADR-005: Navigate Skill/Command Structure (Plugins Only)
+
+**Applies to:** Standalone plugins and marketplace plugins (NOT user-level/repo-local skills)
+
+**Detection:**
+```bash
+# Check for old structure (command only, no skill)
+ls commands/navigate.md 2>/dev/null && echo "HAS_COMMAND=true"
+ls skills/navigate/SKILL.md 2>/dev/null && echo "HAS_SKILL=true"
+
+# Check for routing table in command (old pattern)
+grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null && echo "HAS_ROUTING=true"
+```
+
+**Upgrade scenarios:**
+
+| Current State | Action |
+|---------------|--------|
+| Has command, no skill | Create `skills/navigate/SKILL.md` |
+| Has skill, no command | Create `commands/navigate.md` |
+| Command has routing table | Simplify command (remove routing) |
+| Both exist, no routing | Already compliant |
+
+**Creating missing navigate skill:**
+
+1. Create directory: `mkdir -p skills/navigate`
+2. Read `data/config.yaml` for keywords
+3. Generate from `navigate-skill.md.template`:
+   - Set `name: {plugin_name}-navigate`
+   - Set `description:` with domain keywords for auto-triggering
+   - Copy navigation process from existing command (if present)
+4. Write to `skills/navigate/SKILL.md`
+
+**Simplifying old command (removing routing):**
+
+Old commands may contain routing tables like:
+```markdown
+| Action | Skill |
+|--------|-------|
+| refresh | hiivmind-corpus-refresh |
+| enhance | hiivmind-corpus-enhance |
+```
+
+Remove these sections:
+- "Routing table" or "Parent skill routing" sections
+- "How to invoke parent skills" sections
+
+Replace with simple maintenance reference:
+```markdown
+## Corpus Maintenance
+
+For corpus maintenance, use the parent plugin:
+
+```
+/hiivmind-corpus refresh {name}     - Update index from upstream
+/hiivmind-corpus enhance {name} X   - Add depth to topic X
+/hiivmind-corpus status {name}      - Check corpus freshness
+```
 ```
 
 ---
