@@ -382,12 +382,13 @@ Templates are in this plugin's `templates/` directory. To find them:
 
 | Template | Purpose | Used By |
 |----------|---------|---------|
-| `navigate-command.md.template` | The navigate command (unified entry point) | All types |
+| `navigate-skill.md.template` | Navigate skill for auto-triggering | All types |
+| `navigate-command.md.template` | Navigate command (explicit entry point) | Plugin types only |
 | `config.yaml.template` | Source config + index tracking | All types |
 | `project-awareness.md.template` | CLAUDE.md snippet for projects using this corpus | All types |
 | `plugin.json.template` | Plugin manifest | Plugin types only |
 | `readme.md.template` | Plugin documentation | Single-corpus only |
-| `gitignore.template` | Ignore `.source/` | Plugin types only |
+| `gitignore.template` | Ignore `.source/` and `.cache/` | Plugin types only |
 | `license.template` | MIT license | Plugin types only |
 | `claude.md.template` | CLAUDE.md for single corpus plugin | Single-corpus only |
 | `marketplace.json.template` | Marketplace registry | Multi-corpus only |
@@ -401,7 +402,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 
 ```
 ~/.claude/skills/{skill-name}/
-├── SKILL.md              # From navigate-command.md.template (skill wrapper)
+├── SKILL.md              # From navigate-skill.md.template
 ├── data/
 │   ├── config.yaml       # From config.yaml.template
 │   ├── index.md          # Placeholder (see below)
@@ -415,7 +416,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 ```
 
 **Files from templates:**
-- `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
+- `SKILL.md` ← `templates/navigate-skill.md.template`
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `references/project-awareness.md` ← `templates/project-awareness.md.template`
 
@@ -435,7 +436,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 {repo-root}/.claude-plugin/
 └── skills/
     └── {skill-name}/
-        ├── SKILL.md              # From navigate-command.md.template (skill wrapper)
+        ├── SKILL.md              # From navigate-skill.md.template
         ├── data/
         │   ├── config.yaml       # From config.yaml.template
         │   ├── index.md          # Placeholder
@@ -449,7 +450,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 ```
 
 **Files from templates:**
-- `SKILL.md` ← `templates/navigate-command.md.template` (adapted for skill format)
+- `SKILL.md` ← `templates/navigate-skill.md.template`
 - `data/config.yaml` ← `templates/config.yaml.template`
 - `references/project-awareness.md` ← `templates/project-awareness.md.template`
 
