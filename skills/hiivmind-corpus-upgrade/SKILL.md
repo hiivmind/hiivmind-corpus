@@ -104,6 +104,10 @@ Present a clear report showing:
 - ⚠️ MISSING FILES
 - ⚠️ MISSING CONFIG FIELDS (with suggestions)
 - ⚠️ MISSING SECTIONS in navigate skill
+- ⚠️ INCORRECT ROUTING (ADR-005 violations)
+  - Old routing tables
+  - Child command routing (`:navigate enhance`)
+  - Direct parent routing (`/hiivmind-corpus` instead of `/hiivmind-corpus:hiivmind-corpus`)
 
 Ask user: "Would you like to apply these upgrades?"
 
@@ -169,8 +173,10 @@ Ensure these entries exist:
 ls commands/navigate.md 2>/dev/null && echo "HAS_COMMAND=true"
 ls skills/navigate/SKILL.md 2>/dev/null && echo "HAS_SKILL=true"
 
-# Check for routing table in command (old pattern)
-grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null && echo "HAS_ROUTING=true"
+# Check for routing issues in command (ADR-005 violations)
+grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null && echo "HAS_OLD_ROUTING_TABLE=true"
+grep -q ":navigate enhance\|:navigate add source\|:navigate refresh" commands/navigate.md 2>/dev/null && echo "HAS_CHILD_ROUTING=true"
+grep -q "/hiivmind-corpus enhance\|/hiivmind-corpus refresh" commands/navigate.md 2>/dev/null | grep -v "hiivmind-corpus:hiivmind-corpus" && echo "HAS_DIRECT_PARENT_ROUTING=true"
 ```
 
 **Upgrade scenarios:**
@@ -179,8 +185,10 @@ grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null && echo "HAS_
 |---------------|--------|
 | Has command, no skill | Create `skills/navigate/SKILL.md` |
 | Has skill, no command | Create `commands/navigate.md` |
-| Command has routing table | Simplify command (remove routing) |
-| Both exist, no routing | Already compliant |
+| Has old routing table | Remove routing table section |
+| Has child routing (`:navigate enhance`) | Fix to use gateway (`/hiivmind-corpus:hiivmind-corpus`) |
+| Has direct parent routing (`/hiivmind-corpus`) | Fix to use gateway (`/hiivmind-corpus:hiivmind-corpus`) |
+| Both exist, correct routing | Already compliant |
 
 **Creating missing navigate skill:**
 
@@ -192,8 +200,11 @@ grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null && echo "HAS_
    - Copy navigation process from existing command (if present)
 4. Write to `skills/navigate/SKILL.md`
 
-**Simplifying old command (removing routing):**
+**Fixing routing issues (ADR-005 compliance):**
 
+Per ADR-005, child navigate commands should have **NO maintenance routing**. All maintenance operations must route through the parent gateway: `/hiivmind-corpus:hiivmind-corpus`
+
+**Issue 1: Old routing tables**
 Old commands may contain routing tables like:
 ```markdown
 | Action | Skill |
@@ -201,21 +212,45 @@ Old commands may contain routing tables like:
 | refresh | hiivmind-corpus-refresh |
 | enhance | hiivmind-corpus-enhance |
 ```
+**Fix:** Remove entire routing table section.
 
-Remove these sections:
-- "Routing table" or "Parent skill routing" sections
-- "How to invoke parent skills" sections
+**Issue 2: Child command routing (`:navigate enhance`)**
+Commands may incorrectly route through the child navigate command:
+```markdown
+- `/{{plugin_name}}:navigate enhance {topic}`
+- `/{{plugin_name}}:navigate add source {url}`
+- `/{{plugin_name}}:navigate refresh`
+```
+**Fix:** Replace with gateway routing:
+```markdown
+- `/hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} {topic}`
+- `/hiivmind-corpus:hiivmind-corpus add-source {{corpus_short_name}}`
+- `/hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}`
+```
 
-Replace with simple maintenance reference:
+**Issue 3: Direct parent routing (`/hiivmind-corpus`)**
+Commands may use direct parent skill invocation instead of gateway:
+```markdown
+/hiivmind-corpus refresh {name}
+/hiivmind-corpus enhance {name} X
+```
+**Fix:** Replace with gateway routing:
+```markdown
+/hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}
+/hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} X
+/hiivmind-corpus:hiivmind-corpus status {{corpus_short_name}}
+```
+
+**Correct maintenance section template:**
 ```markdown
 ## Corpus Maintenance
 
-For corpus maintenance, use the parent plugin:
+For corpus maintenance, use the corpus gateway:
 
 ```
-/hiivmind-corpus refresh {name}     - Update index from upstream
-/hiivmind-corpus enhance {name} X   - Add depth to topic X
-/hiivmind-corpus status {name}      - Check corpus freshness
+/hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}     - Update index from upstream
+/hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} X   - Add depth to topic X
+/hiivmind-corpus:hiivmind-corpus status {{corpus_short_name}}      - Check corpus freshness
 ```
 ```
 

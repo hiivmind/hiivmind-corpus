@@ -25,9 +25,9 @@ Examples:
   /{{plugin_name}}:navigate how does X work?
   /{{plugin_name}}:navigate API reference for Y
 
-For maintenance, use the parent plugin:
-  /hiivmind-corpus refresh {{corpus_short_name}}
-  /hiivmind-corpus enhance {{corpus_short_name}} [topic]
+For maintenance, use the corpus gateway:
+  /hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}
+  /hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} [topic]
 ```
 
 ---
@@ -111,9 +111,9 @@ Don't start exploring, guessing paths, or searching the source files. Instead, *
 3. **Identify an index gap** - If the user confirms their request was valid
    - "This topic isn't covered in the current index."
    - Offer next steps:
-     - `/{{plugin_name}}:navigate enhance {topic}` - Add depth to a specific topic area
-     - `/{{plugin_name}}:navigate add source {url}` - Add another documentation source
-     - `/{{plugin_name}}:navigate refresh` - Check if upstream docs have new content
+     - `/hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} {topic}` - Add depth to a specific topic area
+     - `/hiivmind-corpus:hiivmind-corpus add-source {{corpus_short_name}}` - Add another documentation source
+     - `/hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}` - Check if upstream docs have new content
 
 ---
 
@@ -285,10 +285,10 @@ Suggest adding project awareness when:
 
 ## Corpus Maintenance
 
-For corpus maintenance, use the parent plugin:
+For corpus maintenance, use the corpus gateway:
 
 ```
-/hiivmind-corpus refresh {{corpus_short_name}}     - Update index from upstream
-/hiivmind-corpus enhance {{corpus_short_name}} X   - Add depth to topic X
-/hiivmind-corpus status {{corpus_short_name}}      - Check corpus freshness
+/hiivmind-corpus:hiivmind-corpus refresh {{corpus_short_name}}     - Update index from upstream
+/hiivmind-corpus:hiivmind-corpus enhance {{corpus_short_name}} X   - Add depth to topic X
+/hiivmind-corpus:hiivmind-corpus status {{corpus_short_name}}      - Check corpus freshness
 ```
