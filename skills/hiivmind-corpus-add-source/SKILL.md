@@ -361,6 +361,50 @@ mkdir -p .cache/llms-txt/{source_id}
 
 ---
 
+## Step 4b: Update Navigate Skill Examples (First Source Only)
+
+**Similar to upgrade skill's content quality checks and regeneration.**
+
+When adding the **first source** to a corpus (sources array was empty), update the navigate skill with project-specific examples.
+
+### Detection
+
+```bash
+# Check for generic examples in navigate skill
+grep -q "{source-name}" skills/navigate/SKILL.md 2>/dev/null && echo "HAS_GENERIC_EXAMPLES"
+grep -q "{source-name}" commands/navigate.md 2>/dev/null && echo "HAS_GENERIC_COMMAND_EXAMPLES"
+
+# Also check for the "Worked Example" with placeholder values
+grep -q "repo_owner: example" skills/navigate/SKILL.md 2>/dev/null && echo "HAS_GENERIC_WORKED_EXAMPLE"
+```
+
+### If Generic Examples Found
+
+Replace generic placeholders with actual source info:
+
+| Generic | Replace With | Example |
+|---------|--------------|---------|
+| `{source-name}` | Actual source_id | `polars`, `claude-code` |
+| `{source-name}:path/to/file.md` | Real example from source | `polars:reference/expressions.md` |
+| `repo_owner: example` | Actual repo owner | `repo_owner: pola-rs` |
+| `repo_name: docs` | Actual repo name | `repo_name: polars` |
+
+**For git sources:**
+1. Use the source's `repo_owner`, `repo_name`, `branch`, `docs_root` from config
+2. Find a real example file from the cloned source: `ls .source/{source_id}/{docs_root}/ | head -1`
+3. Update the "Worked Example" section with actual values
+
+**For llms-txt sources:**
+1. Use the manifest URL and base_url from config
+2. Find a real section from the manifest structure
+3. Update examples to show llms-txt path format
+
+**Skip this step if:**
+- Sources array already had entries (not the first source)
+- No `{source-name}` placeholders found (already customized)
+
+---
+
 ## Step 5: Index Prompt
 
 Ask user:

@@ -143,7 +143,7 @@ data/
 Index entries use the format: `{source_id}:{relative_path}`
 
 Examples:
-- `{{source_id}}:reference/api.md` - Git source
+- `{source-name}:reference/api.md` - Git source
 - `local:team-standards/guidelines.md` - Local uploads
 - `web:blog-posts/article.md` - Cached web content
 
@@ -277,8 +277,8 @@ Suggest adding project awareness when:
 **User:** `/{{plugin_name}}:navigate how do I use feature X?`
 
 1. Grep `data/` for "feature X"
-2. Find entry like `{{source_id}}:guides/feature-x.md`
-3. Read from `.source/{{source_id}}/{docs_root}/guides/feature-x.md`
+2. Find entry like `{source-name}:guides/feature-x.md`
+3. Read from `.source/{source-name}/{docs_root}/guides/feature-x.md`
 4. Answer with code examples and link to source
 
 ---
