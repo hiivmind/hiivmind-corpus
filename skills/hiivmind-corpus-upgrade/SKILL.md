@@ -139,11 +139,19 @@ grep "^name:" skills/navigate/SKILL.md | grep -q "hiivmind-corpus-${PROJECT_SHOR
 
 # Check for Triggers keyword
 grep -qi "triggers:" skills/navigate/SKILL.md || echo "MISSING_TRIGGERS"
+
+# Check for fork context (ADR-007)
+grep -q "^context: fork" skills/navigate/SKILL.md || echo "MISSING_FORK_CONTEXT"
+grep -q "^agent: Explore" skills/navigate/SKILL.md || echo "MISSING_AGENT_EXPLORE"
+grep -q "^allowed-tools:" skills/navigate/SKILL.md || echo "MISSING_ALLOWED_TOOLS"
 ```
 
 **Expected formats:**
 - `name: hiivmind-corpus-{project}-navigate` (e.g., `hiivmind-corpus-htmx-navigate`)
 - `description:` must include "Triggers:" with comma-separated keywords
+- `context: fork` - runs skill in isolated sub-agent (ADR-007)
+- `agent: Explore` - uses Explore agent for read-only operations (ADR-007)
+- `allowed-tools: Read, Grep, Glob, WebFetch` - prevents permission prompts (ADR-007)
 
 ---
 
@@ -299,6 +307,24 @@ description: This skill answers questions about {Project} documentation. Use whe
 
 **MISSING_TRIGGERS:**
 Add or update the description to include `Triggers:` with comma-separated domain keywords.
+
+### Fixing Fork Context Issues (ADR-007)
+
+**See:** `references/upgrade-templates.md` → "Fork Context Migration (ADR-007)" section.
+
+**MISSING_FORK_CONTEXT / MISSING_AGENT_EXPLORE / MISSING_ALLOWED_TOOLS:**
+Add the missing fields to the frontmatter after the `description:` line:
+```yaml
+---
+name: hiivmind-corpus-{project}-navigate
+description: This skill answers questions about {Project} documentation. Triggers: {keywords}.
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, WebFetch
+---
+```
+
+This runs the navigate skill in an isolated sub-agent context, keeping the main conversation clean.
 
 ### Regenerating Navigate Skill (ADR-006 Content Quality)
 

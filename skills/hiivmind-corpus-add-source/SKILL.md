@@ -43,7 +43,27 @@ Verify:
 
 ## Step 2: Source Type
 
-Ask the user which type of source to add:
+### Step 2a: Detect llms.txt Manifest (Automatic)
+
+Before asking the user for source type, check if the URL provides an llms.txt manifest:
+
+**Using Claude tools:**
+```
+WebFetch: {base_url}/llms.txt
+If 404: WebFetch: {base_url}/docs/llms.txt
+```
+
+If manifest found:
+> Found llms.txt manifest at {url}:
+> - Title: {title}
+> - {N} pages in {M} sections
+>
+> This site provides structured documentation for LLMs.
+> Would you like to use the **llms-txt** source type for automatic discovery?
+
+### Step 2b: Ask for Source Type
+
+If no llms.txt found or user declines, ask which type to add:
 
 | Type | Description | Example Use Case |
 |------|-------------|------------------|
@@ -51,6 +71,7 @@ Ask the user which type of source to add:
 | **local** | User-uploaded files | Team standards, internal docs |
 | **web** | Blog posts, articles | Individual web pages to cache |
 | **generated-docs** | Auto-generated docs site | MkDocs, Sphinx, gh CLI manual |
+| **llms-txt** | Site with llms.txt manifest | Anthropic docs, Vercel docs |
 
 ---
 
@@ -97,6 +118,18 @@ Ask the user which type of source to add:
 | Sitemap URL | Check or ask | `https://cli.github.com/sitemap.xml` |
 
 **Key concept:** The source repo contains the code that *generates* the docs. The web URL is where the *rendered* docs are published.
+
+### For llms-txt Sources
+
+| Input | Source | Example |
+|-------|--------|---------|
+| Source ID | Derive from title or ask | `claude-code-docs` |
+| Manifest URL | Auto-detected or ask | `https://code.claude.com/docs/llms.txt` |
+| Base URL | Derive from manifest URL or ask | `https://code.claude.com/docs/en` |
+| Caching strategy | Ask user | `selective`, `full`, or `on-demand` |
+| Sections to cache | Ask if selective | `["skills", "agents"]` |
+
+**Key concept:** The llms.txt manifest provides structured discovery with links to raw markdown. Content is much smaller (10-30x) than HTML pages.
 
 ---
 
@@ -232,6 +265,69 @@ sha=$(git -C .source/{source_id} rev-parse HEAD)
 - Content is fetched live via WebFetch (no pre-caching needed)
 - Source repo clone is shallow and only for SHA tracking
 - `discovered_urls` is populated by sitemap/crawl discovery
+
+### llms-txt Source Setup
+
+**See:** `lib/corpus/patterns/sources/llms-txt.md` for manifest parsing and caching operations.
+
+1. **Fetch and parse manifest:**
+```
+WebFetch: {manifest_url}
+Parse: Extract title, summary, sections, URLs
+```
+
+2. **Hash manifest for change detection:**
+```python
+import hashlib
+manifest_hash = hashlib.sha256(manifest_content.encode()).hexdigest()
+```
+
+3. **Setup cache directory:**
+```bash
+mkdir -p .cache/llms-txt/{source_id}
+```
+
+4. **Cache pages based on strategy:**
+   - **full**: Fetch and cache all pages from manifest
+   - **selective**: Fetch only specified sections
+   - **on-demand**: Skip caching, fetch live when navigating
+
+5. **Add to config.yaml:**
+```yaml
+- id: "{source_id}"
+  type: "llms-txt"
+
+  manifest:
+    url: "{manifest_url}"
+    last_hash: "sha256:{hash}"
+    last_fetched_at: "{timestamp}"
+
+  urls:
+    base_url: "{base_url}"
+    suffix: ".md"
+
+  cache:
+    enabled: true
+    dir: ".cache/llms-txt/{source_id}/"
+    strategy: "{strategy}"
+    sections: ["{section1}", "{section2}"]  # if selective
+
+  structure:
+    title: "{title}"
+    summary: "{summary}"
+    sections:
+      - name: "{section_name}"
+        urls:
+          - path: "{path}"
+            title: "{page_title}"
+
+  last_indexed_at: null
+```
+
+**Important notes:**
+- Raw markdown content requires no HTML extraction
+- Manifest hash enables lightweight change detection
+- Section structure can inform index organization
 
 ---
 
@@ -374,11 +470,36 @@ Example entries:
 
 ---
 
+### Adding llms.txt Source
+
+**User**: "Add the Claude Code documentation"
+
+**Step 1**: Read config, list existing sources
+**Step 2**: Detect llms.txt at `https://code.claude.com/docs/llms.txt`
+- Parse manifest: "Claude Code", 47 pages, 8 sections
+- User confirms llms-txt source type
+**Step 3**: Collect:
+- Source ID: `claude-code-docs`
+- Manifest URL: `https://code.claude.com/docs/llms.txt`
+- Base URL: `https://code.claude.com/docs/en`
+- Caching strategy: `selective`
+- Sections to cache: `["skills", "agents"]`
+**Step 4**:
+- Hash manifest for change detection
+- Setup cache directory
+- Fetch and cache selected sections (raw markdown)
+- Add to config with structure
+**Step 5**: Offer to index
+
+**Key difference from web source**: Structured discovery via manifest, raw markdown access (10-30x smaller), hash-based change detection.
+
+---
+
 ## Reference
 
 **Pattern documentation:**
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
 - `lib/corpus/patterns/scanning.md` - File discovery and large file detection
 - `lib/corpus/patterns/paths.md` - Path resolution
 

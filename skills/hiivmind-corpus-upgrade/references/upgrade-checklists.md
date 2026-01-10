@@ -99,6 +99,9 @@ Read the frontmatter from the navigate skill and verify:
 |-------|-----------------|---------|
 | `name` | `hiivmind-corpus-{project}-navigate` | `hiivmind-corpus-htmx-navigate` |
 | `description` | Contains "Triggers:" with keyword list | `Triggers: htmx, ajax, hx-get` |
+| `context` | `fork` | Runs skill in isolated sub-agent (ADR-007) |
+| `agent` | `Explore` | Agent type for forked execution (ADR-007) |
+| `allowed-tools` | `Read, Grep, Glob, WebFetch` | Tools available without prompts (ADR-007) |
 
 **Detection (using Claude tools):**
 ```
@@ -106,6 +109,9 @@ Read: skills/navigate/SKILL.md
 Parse YAML frontmatter between --- markers
 Check name field matches pattern: hiivmind-corpus-{project}-navigate
 Check description contains "Triggers:" or "Trigger:"
+Check for "context: fork" in frontmatter
+Check for "agent: Explore" in frontmatter
+Check for "allowed-tools:" in frontmatter
 ```
 
 **Detection (using bash):**
@@ -118,6 +124,15 @@ echo "$NAME" | grep -qE "^hiivmind-corpus-.*-navigate$" || echo "WRONG_NAME_FORM
 
 # Check for Triggers keyword
 grep -qi "triggers:" skills/navigate/SKILL.md || echo "MISSING_TRIGGERS"
+
+# Check for context: fork (ADR-007)
+grep -q "^context: fork" skills/navigate/SKILL.md || echo "MISSING_FORK_CONTEXT"
+
+# Check for agent: Explore (ADR-007)
+grep -q "^agent: Explore" skills/navigate/SKILL.md || echo "MISSING_AGENT_EXPLORE"
+
+# Check for allowed-tools (ADR-007)
+grep -q "^allowed-tools:" skills/navigate/SKILL.md || echo "MISSING_ALLOWED_TOOLS"
 ```
 
 ---

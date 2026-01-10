@@ -1,6 +1,9 @@
 ---
 name: {{plugin_name}}-navigate
 description: This skill answers questions about {{project_display_name}} documentation. Use when user asks about {{keywords_sentence}}. Triggers: {{keyword_list}}.
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, WebFetch
 ---
 
 # {{project_display_name}} Documentation Navigator
@@ -193,6 +196,23 @@ Read from cache: `.cache/web/{source_id}/{cached_file}`
 
 If cache miss, look up the URL in `data/config.yaml` and fetch fresh content.
 
+### For llms-txt sources
+
+**Step 1 - Check cache:**
+Cache path: `.cache/llms-txt/{source_id}/{path}`
+
+**Step 2 - If cache miss:**
+- Look up source in config.yaml to get `urls.base_url`
+- Construct URL: `{base_url}/{path}`
+- If path doesn't end in `.md`, append `.md` suffix
+- Fetch with WebFetch
+
+**Step 3 - Use content:**
+- Content is already markdown (no HTML extraction needed)
+- Cite source and path
+
+**Advantage:** Raw markdown is 10-30x smaller than HTML, no extraction needed.
+
 ---
 
 ## Large Structured Files (schemas, specs, configs)
@@ -221,6 +241,7 @@ grep -n "/{path}" openapi.yaml -A 30
 - **Git sources**: `.source/{source_id}/` (cloned repos, gitignored)
 - **Local sources**: `data/uploads/{source_id}/` (user-uploaded files)
 - **Web cache**: `.cache/web/{source_id}/` (fetched web content, gitignored)
+- **llms-txt cache**: `.cache/llms-txt/{source_id}/` (raw markdown, gitignored)
 
 ---
 

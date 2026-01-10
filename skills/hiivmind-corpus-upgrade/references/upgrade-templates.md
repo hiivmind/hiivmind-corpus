@@ -251,6 +251,62 @@ Regenerate the entire SKILL.md when:
 
 ---
 
+## Fork Context Migration (ADR-007)
+
+Navigate skills should run in an isolated sub-agent context to keep the main conversation clean. See ADR-007 for full rationale.
+
+### When to Migrate
+
+Migrate when any of these are missing from frontmatter:
+- `context: fork`
+- `agent: Explore`
+- `allowed-tools: Read, Grep, Glob, WebFetch`
+
+### Migration Process
+
+**Read current frontmatter:**
+```bash
+# Extract lines between first and second ---
+sed -n '2,/^---$/p' skills/navigate/SKILL.md | head -n -1
+```
+
+**Add missing fields:**
+The frontmatter should include:
+```yaml
+---
+name: hiivmind-corpus-{project}-navigate
+description: This skill answers questions about {Project} documentation. Use when user asks about {keywords}. Triggers: {keyword_list}.
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, WebFetch
+---
+```
+
+**For partial upgrades** (frontmatter exists but missing fields):
+1. Read the existing frontmatter
+2. Add missing fields after `description:`
+3. Preserve existing name and description
+
+**Example edit:**
+```
+old_string:
+---
+name: hiivmind-corpus-polars-navigate
+description: This skill answers questions about Polars documentation. Triggers: polars, dataframe.
+---
+
+new_string:
+---
+name: hiivmind-corpus-polars-navigate
+description: This skill answers questions about Polars documentation. Triggers: polars, dataframe.
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, WebFetch
+---
+```
+
+---
+
 ## Enhanced Report Template
 
 Present a clear report with all validation categories:
@@ -274,6 +330,9 @@ Upgrade Report:
 ⚠️  FRONTMATTER ISSUES:
   - name: "navigate" → should be "hiivmind-corpus-airtable-navigate"
   - description: Missing "Triggers:" keyword list
+  - Missing context: fork (ADR-007)
+  - Missing agent: Explore (ADR-007)
+  - Missing allowed-tools (ADR-007)
 
 ⚠️  CONTENT QUALITY:
   - Navigate skill uses old format (59 lines vs expected ~270)

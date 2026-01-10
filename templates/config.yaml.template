@@ -23,6 +23,25 @@ sources:
     last_commit_sha: null
     last_indexed_at: null
 
+# Example llms-txt source (sites with llms.txt manifests)
+# - id: "claude-code"
+#   type: "llms-txt"
+#   manifest:
+#     url: "https://code.claude.com/docs/llms.txt"
+#     last_hash: null
+#     last_fetched_at: null
+#   urls:
+#     base_url: "https://code.claude.com/docs/en"
+#     suffix: ".md"
+#   cache:
+#     enabled: true
+#     strategy: "selective"  # full | selective | on-demand
+#     sections: ["skills"]
+#   structure:
+#     title: null
+#     sections: []
+#   last_indexed_at: null
+
 index:
   format: "markdown"
   last_updated_at: null

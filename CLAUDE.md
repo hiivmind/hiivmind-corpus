@@ -40,6 +40,7 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │       │   ├── local.md              # Local file uploads
 │       │   ├── web.md                # Web content caching
 │       │   ├── generated-docs.md     # Hybrid git+web operations
+│       │   ├── llms-txt.md           # llms.txt manifest sources
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
@@ -155,7 +156,7 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `discovery.md` | Find installed corpora | Location types, scanning algorithms |
 | `status.md` | Check corpus freshness | Index status, SHA comparison |
 | `paths.md` | Resolve paths | Source reference parsing, path resolution |
-| `sources/` | Git/local/web operations | Per-type patterns (git, local, web, generated-docs) |
+| `sources/` | Git/local/web/llms-txt operations | Per-type patterns (git, local, web, generated-docs, llms-txt) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
 
 **How skills use patterns:**
@@ -191,6 +192,8 @@ Using bash with yq:
 - **Global navigation**: `hiivmind-corpus-navigate` routes queries across all installed corpora
 - **Tool-agnostic patterns**: `lib/corpus/patterns/` documents algorithms, not executable scripts
 - **Cross-platform**: Works on Linux, macOS, and Windows with appropriate tool fallbacks
+- **Forked context execution**: Navigate skills run in isolated sub-agent (`context: fork`) to keep main conversation clean (ADR-007)
+- **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
 
 ## Index Format
 
@@ -229,7 +232,7 @@ These features span multiple skills and must stay synchronized:
 |---------|-----------------|---------------|
 | Destination types | init, enhance, refresh, upgrade, discover | Prerequisites table lists all 4 types |
 | Tiered indexes | build, enhance, refresh, upgrade | Detection logic, update handling |
-| Source types (git/local/web) | add-source, build, enhance, refresh | Path formats, fetch methods |
+| Source types (git/local/web/generated-docs/llms-txt) | add-source, build, enhance, refresh | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
 | Project awareness | init, upgrade | Template exists, navigate skill section |
 | Config schema | all skills | Schema fields, validation |
@@ -240,6 +243,7 @@ These features span multiple skills and must stay synchronized:
 | Corpus keywords | discover, navigate (global), init, upgrade | config.yaml schema, per-session discovery |
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
+| Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
 
 ### When Adding New Features
 

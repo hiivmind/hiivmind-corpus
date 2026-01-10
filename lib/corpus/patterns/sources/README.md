@@ -25,6 +25,7 @@ Manage documentation sources: git repositories, local uploads, web content, and 
 | `local` | `data/uploads/{id}/` | Timestamp | Local files | User-uploaded docs |
 | `web` | `.cache/web/{id}/` | Manual refresh | Cached files | Blog posts, articles |
 | `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs |
+| `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt |
 
 ## When to Use Each Type
 
@@ -34,7 +35,9 @@ Is the documentation in a git repository?
 │       ├─ Yes → git source
 │       └─ No (code generates docs) → generated-docs source
 └─ No: Is it a web page/article?
-        ├─ Yes → web source
+        ├─ Yes: Does the site provide llms.txt manifest?
+        │       ├─ Yes → llms-txt source
+        │       └─ No → web source
         └─ No (local files) → local source
 ```
 
@@ -46,6 +49,7 @@ Is the documentation in a git repository?
 | `local.md` | Upload directory setup, file listing | ~60 |
 | `web.md` | Cache setup, URL slugification, cache age | ~90 |
 | `generated-docs.md` | Hybrid git+web, URL discovery, live fetch | ~220 |
+| `llms-txt.md` | Manifest parsing, hash detection, raw markdown caching | ~280 |
 | `shared.md` | URL parsing, existence checks, errors | ~160 |
 
 *Approximate line counts
@@ -63,6 +67,9 @@ Is the documentation in a git repository?
 | Setup local uploads | `local.md` | `setup_local_source()` |
 | Setup web cache | `web.md` | `setup_web_source()` |
 | Discover URLs from sitemap | `generated-docs.md` | `discover_urls_from_sitemap()` |
+| Fetch llms.txt manifest | `llms-txt.md` | `fetch_manifest()` |
+| Parse manifest structure | `llms-txt.md` | `parse_manifest()` |
+| Check manifest freshness | `llms-txt.md` | `check_freshness()` |
 | Check if source exists | `shared.md` | `exists_git_source()`, etc. |
 
 ---
@@ -111,6 +118,28 @@ Run refresh to update the index.
 3. Save to cache with slugified filename (see `web.md#generate-cache-filename-from-url`)
 4. Add source entry to config.yaml
 5. Add entry to index.md
+
+### Example 4: Adding llms.txt Source
+
+**User request:** "Add Claude Code documentation"
+
+**Process:**
+1. Detect llms.txt at `https://code.claude.com/docs/llms.txt`
+2. Parse manifest to discover 47 pages in structured sections
+3. Setup cache directory (see `llms-txt.md#setup-cache-directory`)
+4. Hash manifest for change detection (see `llms-txt.md#hash-manifest`)
+5. Add source entry to config.yaml with structure
+6. Cache pages based on selected strategy (full/selective/on-demand)
+
+**Sample output:**
+```
+Found llms.txt manifest:
+- Title: Claude Code
+- 47 pages in 8 sections
+- Sections: Getting Started, Core Features, Skills, Agents, ...
+
+Using llms-txt source type with selective caching.
+```
 
 ---
 

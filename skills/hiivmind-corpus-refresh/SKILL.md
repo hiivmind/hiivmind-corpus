@@ -136,6 +136,27 @@ Report:
 
 **Important:** "Stale" for generated-docs means the *source repo* changed, not the web output. There may be a lag between source commits and doc site rebuild (CI/CD pipeline time).
 
+**For llms-txt sources:**
+
+**See:** `lib/corpus/patterns/sources/llms-txt.md` for hash-based freshness checking.
+
+```bash
+# Fetch current manifest
+WebFetch: {manifest.url}
+
+# Hash and compare
+import hashlib
+current_hash = hashlib.sha256(manifest_content.encode()).hexdigest()
+# Compare to manifest.last_hash in config
+```
+
+Report:
+- Manifest hash comparison (current vs stored)
+- If changed: parse new structure and diff sections/URLs
+- Report added/removed pages if manifest changed
+
+**Important:** "Stale" for llms-txt means the manifest has changed. Individual pages may have changed even if manifest hasn't (e.g., page content updated without new pages added).
+
 ### Step 4: Report status
 
 Present per-source status:
@@ -174,6 +195,15 @@ Source Status:
    - Web output: https://cli.github.com/manual
    - URLs discovered: 165
    - Note: Source changed - docs may have been regenerated
+
+6. claude-code-docs (llms-txt)
+   - Manifest: https://code.claude.com/docs/llms.txt
+   - Indexed hash: sha256:abc123 (2025-12-01)
+   - Current hash: sha256:def456
+   - Manifest status: CHANGED
+   - Pages: 47 → 49 (+2 new pages)
+   - New sections: None
+   - Status: UPDATES AVAILABLE
 ```
 
 For tiered indexes, also show which sub-indexes may need updates based on changed file paths.
@@ -301,6 +331,58 @@ If `cache.enabled: false` (default):
 1. `source_repo.last_commit_sha` - Track upstream changes
 2. `web_output.discovered_urls` - URL directory updates
 
+#### llms-txt Sources
+
+**See:** `lib/corpus/patterns/sources/llms-txt.md` for manifest operations.
+
+llms-txt sources use hash-based change detection on the manifest file.
+
+**Step 1: Fetch and compare manifest**
+```
+WebFetch: {manifest.url}
+Hash current content and compare to manifest.last_hash
+```
+
+**Step 2: If manifest changed, parse new structure**
+- Extract sections and URLs from new manifest
+- Compare to stored `structure.sections` in config
+- Report: new pages, removed pages, new sections
+
+**Step 3: Diff changes**
+Show user:
+- New pages discovered (not in current structure)
+- Pages no longer in manifest (may have been removed)
+- New sections (if any)
+- Removed sections (if any)
+
+**Step 4: Update cache based on strategy**
+
+If `cache.strategy: full`:
+- Fetch all new/changed pages
+- Remove cached pages no longer in manifest
+
+If `cache.strategy: selective`:
+- Fetch new pages in selected sections only
+- Update cache for selected sections
+
+If `cache.strategy: on-demand`:
+- No pre-caching needed
+- Content fetched live during navigation
+
+**Step 5: Update config**
+```yaml
+manifest:
+  last_hash: "{new_hash}"
+  last_fetched_at: "{timestamp}"
+structure:
+  # Updated from new manifest
+  sections:
+    - name: "Skills"
+      urls: [...]
+```
+
+**Note:** llms-txt refresh is lightweight - just fetch the small manifest file to detect changes. Only cache updates require fetching individual pages.
+
 ### Step 3: Update index collaboratively
 
 For changes detected in each source:
@@ -425,6 +507,26 @@ For each updated source:
   last_indexed_at: "{timestamp}"
 ```
 
+**llms-txt sources:**
+```yaml
+- id: "claude-code-docs"
+  type: "llms-txt"
+  manifest:
+    url: "https://code.claude.com/docs/llms.txt"
+    last_hash: "{new_hash}"           # Updated from current manifest
+    last_fetched_at: "{timestamp}"
+  urls:
+    base_url: "https://code.claude.com/docs/en"
+  structure:                          # Updated from new manifest
+    title: "Claude Code"
+    sections:
+      - name: "Skills"
+        urls:
+          - path: "skills.md"
+            title: "Skills"
+  last_indexed_at: "{timestamp}"
+```
+
 ### Step 5: Commit reminder
 
 **For single index:**
@@ -450,6 +552,7 @@ git commit -m "Refresh docs index ({sources_updated})"
 - **Git sources**: `.source/{source_id}/` (gitignored)
 - **Local sources**: `data/uploads/{source_id}/`
 - **Web cache**: `.cache/web/{source_id}/` (gitignored)
+- **llms-txt cache**: `.cache/llms-txt/{source_id}/` (gitignored)
 
 ---
 
@@ -690,6 +793,61 @@ Updated index.md:
 
 ---
 
+### Refreshing llms-txt Sources
+
+**User**: "refresh status claude-code-docs"
+
+```
+claude-code-docs (llms-txt):
+- Manifest: https://code.claude.com/docs/llms.txt
+- Indexed hash: sha256:abc123 (2025-12-01)
+- Current hash: sha256:def456
+- Manifest status: CHANGED
+- Pages: 47 → 49 (+2 new pages)
+- Status: UPDATES AVAILABLE
+```
+
+**User**: "refresh update"
+
+```
+Updating claude-code-docs (llms-txt)...
+
+Manifest has changed since last check.
+Parsing new structure...
+
+Changes detected:
++ new-feature.md (new page in "Core Features" section)
++ troubleshooting.md (new page in "Getting Started" section)
+- deprecated-api.md (removed from "Reference" section)
+
+Update structure in config? [y/n]
+```
+
+User: "y"
+
+```
+Updated config:
+- manifest.last_hash: sha256:def456
+- structure.sections: Updated with new pages
+- last_indexed_at: 2025-12-18T10:00:00Z
+
+Cache strategy: selective (sections: skills, agents)
+New pages not in cached sections - skipping cache update.
+
+Add new pages to index? [y/n]
+```
+
+User: "Yes"
+
+```
+Updated index.md:
+- Added: **New Feature** `llms-txt:claude-code-docs/new-feature.md`
+- Added: **Troubleshooting** `llms-txt:claude-code-docs/troubleshooting.md`
+- Removed: `llms-txt:claude-code-docs/deprecated-api.md`
+```
+
+---
+
 ### Blocked: No Index Built
 
 **User**: "refresh status"
@@ -711,7 +869,7 @@ Updated index.md:
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
 - `lib/corpus/patterns/status.md` - Index status and freshness checking
 - `lib/corpus/patterns/paths.md` - Path resolution
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
 
 **Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`

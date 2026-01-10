@@ -70,6 +70,11 @@ git -C .source/{source_id} rev-parse HEAD
 - Check `.cache/web/{source_id}/` exists
 - If missing, notify user to run `hiivmind-corpus-add-source` to fetch content
 
+**llms-txt sources:**
+- Check `.cache/llms-txt/{source_id}/` exists
+- Read manifest structure from config.yaml
+- If cache empty and strategy is not `on-demand`, fetch pages based on caching strategy
+
 ---
 
 ## Step 2: Scan All Sources
@@ -117,6 +122,26 @@ ls .cache/web/{source_id}/*.md | wc -l
 # List cached files
 ls -la .cache/web/{source_id}
 ```
+
+**llms-txt sources:**
+Use the manifest structure from config.yaml:
+```
+# Read from config.yaml
+structure:
+  title: "Claude Code"
+  sections:
+    - name: "Getting Started"
+      urls: [...] (count)
+    - name: "Skills"
+      urls: [...] (count)
+```
+
+Report:
+- Title from manifest
+- Number of sections
+- Total page count
+- Caching strategy in use
+- Sections suggest natural index organization
 
 ### Present Combined Summary
 
@@ -263,6 +288,13 @@ All file paths use the format: `{source_id}:{relative_path}`
 | git | `{source_id}:{relative_path}` | `react:reference/hooks.md` |
 | local | `local:{source_id}/{filename}` | `local:team-standards/guidelines.md` |
 | web | `web:{source_id}/{cached_file}` | `web:kent-blog/article.md` |
+| llms-txt | `llms-txt:{source_id}/{path}` | `llms-txt:claude-code/skills.md` |
+
+**llms-txt index building tips:**
+- Use manifest sections as natural index sections
+- Page titles from manifest can become entry titles
+- The structured discovery makes index building faster
+- Example: If manifest has "Skills" section with 5 pages, create "## Skills" section with those 5 entries
 
 ### Tiered Index Format (for large corpora)
 
@@ -512,7 +544,7 @@ Found 3 sources:
 **Pattern documentation:**
 - `lib/corpus/patterns/tool-detection.md` - Detect available tools
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/paths.md` - Path resolution
 
