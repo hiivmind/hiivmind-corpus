@@ -135,7 +135,7 @@ If no llms.txt found or user declines, ask which type to add:
 
 ## Step 4: Setup Source
 
-**See:** `lib/corpus/patterns/sources/` for source-specific operations (git.md, local.md, web.md, generated-docs.md).
+**See:** `lib/corpus/patterns/sources/` for source-specific operations (git.md, local.md, web.md, generated-docs.md, llms-txt.md).
 
 ### Git Source Setup
 
@@ -146,6 +146,36 @@ git clone --depth 1 {repo_url} .source/{source_id}
 # Get current commit SHA
 cd .source/{source_id} && git rev-parse HEAD
 ```
+
+#### Research the Source
+
+After cloning, analyze the documentation structure:
+
+```bash
+# Framework detection
+ls .source/{source_id}/
+
+# Find doc framework config
+find .source/{source_id} -maxdepth 2 -name "docusaurus.config.js" -o -name "mkdocs.yml" -o -name "conf.py" 2>/dev/null
+
+# Find nav structure
+find .source/{source_id} -maxdepth 2 -name "sidebars*" -o -name "_toc.yml" 2>/dev/null
+
+# Count doc files
+find .source/{source_id}/{docs_root} -name "*.md" -o -name "*.mdx" 2>/dev/null | wc -l
+
+# Check for i18n
+ls .source/{source_id}/i18n/ .source/{source_id}/docs/en/ 2>/dev/null
+```
+
+| Finding | Implication |
+|---------|-------------|
+| `docusaurus.config.js` | Docusaurus site - check `sidebars.js` for structure |
+| `mkdocs.yml` | MkDocs site - nav structure in yml file |
+| `conf.py` | Sphinx docs - check `toctree` directives |
+| `i18n/` or `/en/` dirs | Multilingual - may need language selection |
+
+This research helps inform the build phase but doesn't block source addition.
 
 Add to config.yaml `sources:` array:
 ```yaml

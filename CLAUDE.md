@@ -267,16 +267,16 @@ These features span multiple skills and must stay synchronized:
          └── awareness ◄──── edits CLAUDE.md with skill awareness
                     │
 init ──────────► templates/
-                    │
-add-source ◄───────┤
-                    │
-build ◄────────────┤ ──► source-scanner agent (parallel multi-source)
-                    │
-enhance ◄──────────┤ (must know all features to validate)
-                    │
-refresh ◄──────────┤ ──► source-scanner agent (parallel multi-source)
-                    │
-upgrade ◄──────────┘ (must know all features to retrofit)
+    │                │
+    └──► add-source ◄┤ (init delegates source setup to add-source)
+                     │
+build ◄─────────────┤ ──► source-scanner agent (parallel multi-source)
+                     │
+enhance ◄───────────┤ (must know all features to validate)
+                     │
+refresh ◄───────────┤ ──► source-scanner agent (parallel multi-source)
+                     │
+upgrade ◄───────────┘ (must know all features to retrofit)
 ```
 
 ### Reference Sections

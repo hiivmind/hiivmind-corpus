@@ -14,25 +14,25 @@ Generate a documentation corpus skill structure for any open source project.
 
 ## Scope Boundary
 
-**This skill ONLY creates the directory structure and placeholder files.**
+**This skill ONLY creates the directory structure and placeholder files, then delegates to add-source.**
 
 | This Skill Does | This Skill Does NOT Do |
 |-----------------|------------------------|
-| Create directories | Build the index |
-| Clone source repos | Analyze documentation content |
-| Generate config.yaml | Populate index.md with entries |
-| Create placeholder index.md | Read/summarize doc files |
-| Generate SKILL.md, README.md | Answer questions about the docs |
+| Create directories | Clone source repos (delegated to add-source) |
+| Generate config.yaml (empty sources) | Analyze documentation content |
+| Create placeholder index.md | Populate index.md with entries |
+| Generate SKILL.md, README.md | Read/summarize doc files |
+| Delegate to `/hiivmind-corpus-add-source` | Build the index |
 
-**STOP after Phase 6 (Verify).** Do not attempt to build the index - that is `hiivmind-corpus-build`'s job.
+**After Phase 4 (Verify), run `/hiivmind-corpus-add-source`** to add the initial source.
 
 ## Process
 
 ```
-1. INPUT      →  2. SCAFFOLD    →  3. CLONE       →  4. RESEARCH  →  5. GENERATE  →  6. VERIFY  →  STOP
-   (gather)       (create dir)      (into scaffold)   (analyze)      (files)         (confirm)      ↓
-                                                                                              recommend
-                                                                                            corpus-build
+1. INPUT      →  2. SCAFFOLD    →  3. GENERATE  →  4. VERIFY  →  5. ADD SOURCE
+   (gather)       (create dir)      (files)         (confirm)      (delegate)
+                                                                        ↓
+                                                              run /hiivmind-corpus-add-source
 ```
 
 ## Phase 1: Input Gathering
@@ -143,38 +143,27 @@ Based on these checks, determine which **Context** applies:
 
 ---
 
-### Then: Initial source type
+### Then: Collect Source URL (for naming)
 
-Ask the user what type of initial source:
+Ask the user what documentation they want to index:
 
-| Type | Description | Best For |
-|------|-------------|----------|
-| **Git repository** | Clone a docs repo | Most open source projects (default) |
-| **Start empty** | No initial source | Will add sources later via `hiivmind-corpus-add-source` |
+> "What documentation would you like to index? Provide a URL (GitHub repo, docs site, or llms.txt manifest)."
 
-Note: Local documents and web pages can be added after init using `hiivmind-corpus-add-source`.
+| URL Pattern | Extract Name From |
+|-------------|-------------------|
+| `github.com/org/repo` | repo name → `hiivmind-corpus-{repo}` |
+| `site.com/docs/llms.txt` | site name → `hiivmind-corpus-{site}` |
+| `docs.project.io/` | project name → `hiivmind-corpus-{project}` |
+| No URL provided | Ask user for corpus name |
 
-### Then: Collect remaining inputs (for git source)
+**Examples:**
+- `https://github.com/pola-rs/polars` → `hiivmind-corpus-polars`
+- `https://code.claude.com/docs/llms.txt` → `hiivmind-corpus-claude-code`
+- `https://docs.ibis-project.org/` → `hiivmind-corpus-ibis`
 
-| Input | Source | Example |
-|-------|--------|---------|
-| **Repo URL** | User provides | `https://github.com/pola-rs/polars` |
-| **Skill name** | Derive from repo or ask user | `hiivmind-corpus-polars` |
-| **Source ID** | Derive from repo name (lowercase) | `polars` |
-| **Docs path** | Usually `docs/`, verify from URL or ask | `docs/` |
+**If user says "start empty":** Skip source addition, just create scaffold.
 
-### Deriving Skill Name and Source ID
-
-Extract from repo URL:
-- **Skill name**: Prefix with `hiivmind-corpus-`
-- **Source ID**: Lowercase repo name (used for `.source/{source_id}/` directory)
-
-Examples:
-- `https://github.com/pola-rs/polars` → skill: `hiivmind-corpus-polars`, source_id: `polars`
-- `https://github.com/prisma/docs` → skill: `hiivmind-corpus-prisma`, source_id: `prisma`
-- `https://github.com/ClickHouse/ClickHouse` → skill: `hiivmind-corpus-clickhouse`, source_id: `clickhouse`
-
-**If ambiguous, ask the user.**
+**Store the URL** - it will be passed to `/hiivmind-corpus-add-source` in Phase 5.
 
 ### Then: Collect Corpus Keywords
 
@@ -268,7 +257,7 @@ mkdir -p "${SKILL_ROOT}"
 PLUGIN_ROOT="${PWD}"
 
 # Directory already exists (we're in it)
-# Just create subdirectories as needed in Phase 5
+# Just create subdirectories as needed in Phase 3 (Generate)
 ```
 
 ### Multi-corpus Repo Scaffold (New Marketplace)
@@ -295,77 +284,12 @@ PLUGIN_ROOT="${MARKETPLACE_ROOT}/${PLUGIN_NAME}"
 # Create plugin subdirectory
 mkdir -p "${PLUGIN_ROOT}"
 
-# marketplace.json already exists - will update in Phase 5
+# marketplace.json already exists - will update in Phase 3 (Generate)
 ```
 
 Now you have a destination for everything that follows.
 
-## Phase 3: Clone
-
-**See:** `lib/corpus/patterns/sources/git.md` for git clone operations.
-
-Clone the source repo **inside the skill/plugin directory**, using the source ID as a subdirectory name.
-
-**Skip this phase if user chose "Start empty".**
-
-### User-level or Repo-local Skill Clone
-
-```bash
-git clone --depth 1 {repo_url} "${SKILL_ROOT}/.source/{source_id}"
-```
-
-### Plugin Clone (Single-corpus, Multi-corpus, or Add to Marketplace)
-
-```bash
-git clone --depth 1 {repo_url} "${PLUGIN_ROOT}/.source/{source_id}"
-```
-
-This ensures:
-- Clone is relative to the skill/plugin being created
-- Multiple sources can coexist in `.source/` directory
-- Source ID matches config.yaml entry
-- Easy cleanup later
-
-## Phase 4: Research
-
-**See:** `lib/corpus/patterns/scanning.md` for documentation analysis patterns.
-
-Analyze the cloned documentation. **Do not assume** - investigate.
-
-### Questions to Answer
-
-| Question | How to Find |
-|----------|-------------|
-| Doc framework? | Look for `docusaurus.config.js`, `mkdocs.yml`, `conf.py` |
-| Existing nav structure? | Check `sidebars.js`, `mkdocs.yml` nav, toctree |
-| Frontmatter schema? | Sample 5-10 files, check YAML frontmatter |
-| Multiple languages? | Look for `i18n/`, `/en/`, `/zh/` directories |
-| External doc sources? | Check build scripts for git clones |
-
-### Research Commands
-
-**Skip if user chose "Start empty".**
-
-All commands run from `${PLUGIN_ROOT}` (or `${SKILL_ROOT}` for project-local):
-
-```bash
-# Framework detection
-ls .source/{source_id}/
-
-# Find nav structure
-find .source/{source_id} -name "sidebars*" -o -name "mkdocs.yml" -o -name "conf.py"
-
-# Count doc files
-find .source/{source_id}/{docs_path} -name "*.md" -o -name "*.mdx" | wc -l
-
-# Sample frontmatter
-head -30 .source/{source_id}/{docs_path}/some-file.md
-
-# Check for external sources
-grep -r "git clone" .source/{source_id}/scripts/ .source/{source_id}/package.json 2>/dev/null
-```
-
-## Phase 5: Generate
+## Phase 3: Generate
 
 Create files by reading templates and filling placeholders.
 
@@ -472,7 +396,7 @@ Templates are in this plugin's `templates/` directory. To find them:
 - Multi-corpus repo structure (new marketplace)
 - Add to marketplace structure (existing marketplace)
 
-## Phase 6: Verify
+## Phase 4: Verify
 
 Confirm the structure is complete:
 
@@ -497,38 +421,40 @@ ls -la "${PLUGIN_ROOT}/commands"
 cat "${MARKETPLACE_ROOT}/.claude-plugin/marketplace.json"
 ```
 
-**Keep `.source/`** - it will be reused by `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, and `hiivmind-corpus-refresh`.
+## Phase 5: Add Initial Source
 
-## Next Step: STOP HERE and Offer Options
+**If user provided a source URL in Phase 1**, run `/hiivmind-corpus-add-source` to add it.
 
-**Your work is done.** Do NOT proceed to build the index. Instead:
+The add-source skill handles:
+- Source type detection (git, llms-txt, web, local, generated-docs)
+- Cloning git repos
+- Fetching llms.txt manifests
+- Framework research (docusaurus, mkdocs, sphinx detection)
+- Updating config.yaml with source entry
 
-1. **Confirm completion** to the user:
-   > "The corpus structure has been created at `{path}`. The `data/index.md` is a placeholder."
+**Pass context to add-source:**
+```
+Source URL: {url_from_phase_1}
+Working directory: {SKILL_ROOT or PLUGIN_ROOT}
+```
 
-2. **Offer next step options**:
+**If user chose "start empty"**, skip this phase and inform:
+> "The corpus scaffold has been created at `{path}` with no sources.
+> Run `/hiivmind-corpus-add-source` to add documentation sources."
 
-   | Option | Skill | When to Recommend |
-   |--------|-------|-------------------|
-   | **Add more sources** | `hiivmind-corpus-add-source` | User mentioned multiple sources, or corpus would benefit from additional docs |
-   | **Build the index** | `hiivmind-corpus-build` | Single source is sufficient, user ready to proceed |
+## Next Step: Build the Index
 
-   Example recommendation:
-   > "What would you like to do next?
-   > - **Add more sources** - Run `hiivmind-corpus-add-source` to add web pages, additional git repos, or local documents
-   > - **Build the index** - Run `hiivmind-corpus-build` to analyze the documentation and create the index collaboratively"
+After add-source completes, offer next steps:
 
-3. **Do NOT**:
-   - Read documentation files to summarize them
-   - Populate `data/index.md` with entries
-   - Analyze the cloned repo's content beyond basic framework detection (Phase 4)
-   - Offer to "continue" or "also build the index"
-   - Automatically proceed to either next step without user confirmation
+| Option | Skill | When to Recommend |
+|--------|-------|-------------------|
+| **Build the index** | `/hiivmind-corpus-build` | Ready to analyze docs and create index |
+| **Add another source** | `/hiivmind-corpus-add-source` | User mentioned multiple sources |
 
-The index building is intentionally a separate step because:
-- It requires user collaboration to prioritize topics
-- It can take significant time and context
-- The user may want to add more sources first (web docs, examples repo, blog posts, etc.)
+**Do NOT**:
+- Read documentation files to summarize them
+- Populate `data/index.md` with entries
+- Automatically proceed without user confirmation
 
 ## Example Walkthroughs
 
@@ -543,7 +469,7 @@ The index building is intentionally a separate step because:
 
 **Pattern documentation:**
 - `lib/corpus/patterns/discovery.md` - Context detection algorithms
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/paths.md` - Path resolution
 

@@ -11,19 +11,24 @@ corpus:
 {{/additional_keywords}}
   created_at: null
 
-# Multiple sources - each with its own type and tracking
-sources:
-  - id: "{{source_id}}"
-    type: "git"
-    repo_url: "{{repo_url}}"
-    repo_owner: "{{repo_owner}}"
-    repo_name: "{{repo_name}}"
-    branch: "{{branch}}"
-    docs_root: "{{docs_root}}"
-    last_commit_sha: null
-    last_indexed_at: null
+# Sources are added via hiivmind-corpus-add-source
+# Each source has its own type and tracking
+sources: []
 
-# Example llms-txt source (sites with llms.txt manifests)
+# Example source configurations (for reference):
+#
+# Git repository:
+# - id: "polars"
+#   type: "git"
+#   repo_url: "https://github.com/pola-rs/polars"
+#   repo_owner: "pola-rs"
+#   repo_name: "polars"
+#   branch: "main"
+#   docs_root: "docs/"
+#   last_commit_sha: null
+#   last_indexed_at: null
+#
+# llms.txt manifest (sites with structured LLM documentation):
 # - id: "claude-code"
 #   type: "llms-txt"
 #   manifest:
@@ -36,7 +41,7 @@ sources:
 #   cache:
 #     enabled: true
 #     strategy: "selective"  # full | selective | on-demand
-#     sections: ["skills"]
+#     sections: []
 #   structure:
 #     title: null
 #     sections: []
