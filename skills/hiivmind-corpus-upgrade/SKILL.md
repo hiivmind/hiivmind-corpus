@@ -90,17 +90,116 @@ The templates are in the hiivmind-corpus plugin. Locate via:
 **See:** `references/upgrade-checklists.md` for complete checklists:
 - Required files for all corpus types
 - Additional files for plugins
+- **Naming convention checks** (ADR-006)
+- **Frontmatter validation** (ADR-006)
+- **Content quality checks** (ADR-006)
 - Config schema field requirements
 - Navigate skill section requirements
 
 ---
 
+### Step 3b: Naming Convention Checks (Plugins Only)
+
+**See:** `references/upgrade-checklists.md` → "Naming Convention Checks" section.
+
+For plugins (has `.claude-plugin/plugin.json`), verify correct naming:
+
+| Component | Expected | Violation Pattern |
+|-----------|----------|-------------------|
+| Navigate command | `commands/navigate.md` | `commands/hiivmind-corpus-*.md` |
+| Navigate skill dir | `skills/navigate/` | `skills/hiivmind-corpus-*/` |
+| Navigate skill file | `skills/navigate/SKILL.md` | `skills/navigate.md` (flat) |
+
+**Detection:**
+```bash
+# Check for wrong command name
+ls commands/hiivmind-corpus-*.md 2>/dev/null && echo "WRONG_COMMAND_NAME"
+
+# Check for wrong skill directory
+ls -d skills/hiivmind-corpus-*/ 2>/dev/null && echo "WRONG_SKILL_DIR"
+
+# Check for flat skill file
+[ -f skills/navigate.md ] && [ ! -d skills/navigate ] && echo "WRONG_SKILL_FILE"
+```
+
+---
+
+### Step 3c: Frontmatter Validation
+
+**See:** `references/upgrade-checklists.md` → "Navigate Skill Frontmatter Checks" section.
+
+Read the navigate skill frontmatter and verify:
+
+```bash
+# Extract project short name
+PROJECT_SHORT=$(basename "$PWD" | sed 's/hiivmind-corpus-//')
+
+# Check name format
+grep "^name:" skills/navigate/SKILL.md | grep -q "hiivmind-corpus-${PROJECT_SHORT}-navigate" || echo "WRONG_NAME_FORMAT"
+
+# Check for Triggers keyword
+grep -qi "triggers:" skills/navigate/SKILL.md || echo "MISSING_TRIGGERS"
+```
+
+**Expected formats:**
+- `name: hiivmind-corpus-{project}-navigate` (e.g., `hiivmind-corpus-htmx-navigate`)
+- `description:` must include "Triggers:" with comma-separated keywords
+
+---
+
+### Step 3d: Content Quality Checks
+
+**See:** `references/upgrade-checklists.md` → "Navigate Skill Content Quality Checks" section.
+
+Check for template placeholders and old format:
+
+```bash
+# Generic worked example
+grep -q "repo_owner: example" skills/navigate/SKILL.md && echo "GENERIC_WORKED_EXAMPLE"
+
+# Generic path examples
+grep -q "local:team-standards" skills/navigate/SKILL.md && echo "GENERIC_PATH_EXAMPLES"
+
+# Unfilled template variables
+grep -q "{{" skills/navigate/SKILL.md && echo "UNFILLED_PLACEHOLDERS"
+
+# Old format check (< 200 lines)
+[ $(wc -l < skills/navigate/SKILL.md) -lt 200 ] && echo "OLD_FORMAT_SKILL"
+```
+
+**Note:** Skills with OLD_FORMAT_SKILL or GENERIC_WORKED_EXAMPLE require full regeneration, not section patching. See `references/upgrade-templates.md` → "Navigate Skill Regeneration".
+
+---
+
+### Step 3e: Config Schema Migration Detection
+
+**See:** `references/upgrade-checklists.md` → "Config Schema Migration Checks" section.
+
+Check for deprecated config fields:
+
+```bash
+# Old corpus.version field (should be top-level schema_version)
+grep -q "corpus:" data/config.yaml && grep -qE "^\s+version:" data/config.yaml && echo "OLD_CORPUS_VERSION"
+
+# Missing schema_version
+grep -q "^schema_version:" data/config.yaml || echo "MISSING_SCHEMA_VERSION"
+
+# Missing display_name
+grep -qE "^\s+display_name:" data/config.yaml || echo "MISSING_DISPLAY_NAME"
+```
+
+---
+
 ## Step 4: Report Findings
 
-**See:** `references/upgrade-templates.md` for report format templates.
+**See:** `references/upgrade-templates.md` for report format templates (including Enhanced Report Template).
 
 Present a clear report showing:
 - ✅ UP TO DATE items
+- ⚠️ NAMING VIOLATIONS (wrong command/skill paths)
+- ⚠️ FRONTMATTER ISSUES (wrong name format, missing triggers)
+- ⚠️ CONTENT QUALITY (generic examples, old format, unfilled placeholders)
+- ⚠️ CONFIG SCHEMA (deprecated fields, missing fields)
 - ⚠️ MISSING FILES
 - ⚠️ MISSING CONFIG FIELDS (with suggestions)
 - ⚠️ MISSING SECTIONS in navigate skill
@@ -161,6 +260,99 @@ Ensure these entries exist:
 ```
 .source/
 .cache/
+```
+
+### Fixing Naming Violations (ADR-006)
+
+**See:** `references/upgrade-templates.md` → "Naming Convention Fixes" section.
+
+For each naming violation detected, apply the fix:
+
+**WRONG_COMMAND_NAME:**
+```bash
+OLD_CMD=$(ls commands/hiivmind-corpus-*.md | head -1)
+git mv "$OLD_CMD" commands/navigate.md
+```
+
+**WRONG_SKILL_DIR:**
+```bash
+OLD_DIR=$(ls -d skills/hiivmind-corpus-*/ | head -1)
+git mv "$OLD_DIR" skills/navigate/
+```
+
+**WRONG_SKILL_FILE:**
+```bash
+mkdir -p skills/navigate
+git mv skills/navigate.md skills/navigate/SKILL.md
+```
+
+### Fixing Frontmatter Issues (ADR-006)
+
+**WRONG_NAME_FORMAT:**
+Edit the frontmatter `name:` field to match pattern `hiivmind-corpus-{project}-navigate`:
+```yaml
+---
+name: hiivmind-corpus-{project}-navigate
+description: This skill answers questions about {Project} documentation. Use when user asks about {topics}. Triggers: {keyword1}, {keyword2}, {keyword3}.
+---
+```
+
+**MISSING_TRIGGERS:**
+Add or update the description to include `Triggers:` with comma-separated domain keywords.
+
+### Regenerating Navigate Skill (ADR-006 Content Quality)
+
+**See:** `references/upgrade-templates.md` → "Navigate Skill Regeneration" section.
+
+When OLD_FORMAT_SKILL, GENERIC_WORKED_EXAMPLE, or UNFILLED_PLACEHOLDERS are detected, the skill needs **full regeneration** rather than patching:
+
+1. Read `data/config.yaml` for project metadata:
+   - `corpus.name`, `corpus.display_name`
+   - `sources[0].id`, `sources[0].type`
+   - For git sources: `repo_owner`, `repo_name`, `branch`, `docs_root`
+   - For web sources: `urls` array or `base_url`
+
+2. Load the navigate skill template from hiivmind-corpus
+
+3. Generate project-specific content for:
+   - **Path Format examples** (use actual source IDs from config)
+   - **Worked Example section** (use actual repo/web source details)
+   - **Example Sessions** (use domain-relevant questions)
+
+4. Write the regenerated SKILL.md to `skills/navigate/SKILL.md`
+
+**Note:** This is a full replacement. The existing skill structure is preserved but content is project-specific.
+
+### Migrating Config Schema (ADR-006)
+
+**OLD_CORPUS_VERSION / MISSING_SCHEMA_VERSION:**
+Add at top level of config.yaml:
+```yaml
+schema_version: 2
+
+corpus:
+  name: "{project}"
+  ...
+```
+
+**MISSING_DISPLAY_NAME:**
+Add under corpus section:
+```yaml
+corpus:
+  name: "{project}"
+  display_name: "{Project Display Name}"
+  keywords:
+    - keyword1
+    - keyword2
+```
+
+**OLD_SOURCE_NAME_FIELD:**
+Rename `name:` to `id:` in sources array:
+```yaml
+sources:
+  - id: source-name        # was: name: source-name
+    type: git
+    ...
 ```
 
 ### ADR-005: Navigate Skill/Command Structure (Plugins Only)

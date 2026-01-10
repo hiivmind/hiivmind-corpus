@@ -34,6 +34,7 @@ Analyze intent using these patterns:
 | expand, deepen, more detail, enhance, elaborate | `enhance` | - |
 | update, refresh, sync, check, upstream, stale | `refresh` | May trigger `enhance` |
 | upgrade, migrate, latest, standards, template | `upgrade` | - |
+| validate, audit, check structure, verify, lint | `upgrade` (report-only) | - |
 | status, info, up to date, current | `refresh` (status mode) | - |
 | navigate, find, search, look up, what does, how do | `navigate` | - |
 | list, show, available, installed, discover | Discovery mode | - |
