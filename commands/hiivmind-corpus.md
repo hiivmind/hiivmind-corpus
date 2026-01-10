@@ -83,36 +83,53 @@ Based on detected intent, route appropriately:
 
 ### Single Skill Dispatch
 
-Load the appropriate skill with context:
+**Run the appropriate skill.** Do NOT attempt to execute the skill's logic yourself.
 
-```markdown
+| Intent | Skill to Run |
+|--------|--------------|
+| init, create, new | `/hiivmind-corpus-init` |
+| add-source, add, include | `/hiivmind-corpus-add-source` |
+| build, scan, index | `/hiivmind-corpus-build` |
+| enhance, expand, deepen | `/hiivmind-corpus-enhance` |
+| refresh, update, sync | `/hiivmind-corpus-refresh` |
+| upgrade, migrate | `/hiivmind-corpus-upgrade` |
+| navigate, find, search | `/hiivmind-corpus-navigate` |
+| awareness, configure | `/hiivmind-corpus-awareness` |
+
+**Example:** For "init" intent, run `/hiivmind-corpus-init`.
+
+Before running the skill, briefly state the context:
+```
 **Context**: {detected context}
 **Intent**: {detected intent}
 **Target corpus**: {corpus name if identified}
-**Location**: {corpus path if known}
-
-Loading {skill-name} skill...
 ```
+
+**CRITICAL:** The skill contains all the instructions. Do NOT:
+- Create directories with mkdir
+- Copy patterns from existing corpora
+- Generate files without reading templates
+- Skip running the skill
 
 ### Multi-Skill Orchestration
 
-For compound intents, create a workflow with TodoWrite:
+For compound intents, run skills in sequence. **Each skill must be explicitly run.**
 
-```markdown
-## Workflow: {Goal Description}
+**Pattern:** After each skill completes, immediately run the next skill. Do NOT improvise between skills.
 
-1. [ ] {First skill action}
-2. [ ] {Second skill action}
-3. [ ] {Third skill action}
-4. [ ] Verify and suggest next steps
-```
+| Workflow | Skill Sequence |
+|----------|----------------|
+| "index {project} docs" | `init` → `build` |
+| "add {source} and include in index" | `add-source` → `build` |
+| "refresh and expand {section}" | `refresh` → `enhance` |
+| "create corpus with multiple sources" | `init` → `add-source` → `build` |
 
-Then execute skills sequentially:
-1. **Complete current skill's workflow** - Don't interrupt mid-skill
-2. **Summarize what was done** - "Corpus structure created at X"
-3. **Transition naturally** - "Now let's build the index"
-4. **Load next skill** - Use Skill tool to load next skill
-5. **Continue with context** - Pass relevant info to next skill
+**Execution:**
+1. Run `/hiivmind-corpus-init`
+2. When it completes → Run `/hiivmind-corpus-add-source`
+3. When it completes → Run `/hiivmind-corpus-build`
+
+Use TodoWrite to track progress, but **always run each skill** - don't try to execute skill logic yourself.
 
 ### Ambiguity Resolution
 
@@ -156,27 +173,28 @@ What would you like to do?
 1. Now discover installed corpora (see Discovery Commands below)
 2. Present list of built corpora
 3. Ask which corpus to query
-4. Load `hiivmind-corpus-navigate` skill
+4. Run `/hiivmind-corpus-navigate`
 
 **If "Create a new corpus"**:
-1. Load `hiivmind-corpus-init` skill directly
+1. Run `/hiivmind-corpus-init` directly
 2. No discovery needed
 
 **If "Manage existing corpus"**:
 1. Now discover installed corpora
 2. Present list with status indicators
-3. Ask which corpus and what action (refresh, enhance, upgrade)
+3. Ask which corpus and what action
+4. Run the appropriate skill (`/hiivmind-corpus-refresh`, `/hiivmind-corpus-enhance`, or `/hiivmind-corpus-upgrade`)
 
 **If "List installed corpora"**:
 1. Now discover and display all corpora with status
 
 **If "Configure CLAUDE.md awareness"**:
-1. Load `hiivmind-corpus-awareness` skill directly
+1. Run `/hiivmind-corpus-awareness` directly
 2. Skill guides through injection target choice and CLAUDE.md editing
 
 ### Discovery Commands (only run when needed)
 
-**Preferred:** Use the `hiivmind-corpus-discover` skill directly - it handles all discovery logic and cache updates.
+**Preferred:** Run `/hiivmind-corpus-discover` - it handles all discovery logic and cache updates.
 
 **Using Claude tools:**
 ```
@@ -275,13 +293,13 @@ This looks like a {detected type} project. Would you like to:
 ```
 I'll help you create a Polars documentation corpus.
 
-## Workflow: Index Polars Documentation
-
-1. [ ] Initialize corpus structure
-2. [ ] Build documentation index
-
-Loading hiivmind-corpus-init skill...
+**Context**: Fresh directory
+**Intent**: init → build
 ```
+
+**Skill chain:**
+1. Run `/hiivmind-corpus-init` → Creates structure, clones Polars docs
+2. When it completes → Run `/hiivmind-corpus-build` → Builds the index
 
 ### Natural Language: Enhancement
 
@@ -289,12 +307,14 @@ Loading hiivmind-corpus-init skill...
 
 **Response:**
 ```
-You're in the Polars corpus. I'll help enhance the lazy API coverage.
+You're in the Polars corpus. I'll enhance the lazy API coverage.
 
-Loading hiivmind-corpus-enhance skill...
-
-Target: lazy API section
+**Context**: In corpus directory
+**Intent**: enhance
+**Target**: lazy API section
 ```
+
+Then run `/hiivmind-corpus-enhance`.
 
 ### Natural Language: Status Check
 
@@ -302,10 +322,13 @@ Target: lazy API section
 
 **Response:**
 ```
-Checking status of your Polars corpus...
+I'll check your Polars corpus status.
 
-Loading hiivmind-corpus-refresh skill (status mode)...
+**Context**: Has installed corpora
+**Intent**: refresh (status mode)
 ```
+
+Then run `/hiivmind-corpus-refresh`.
 
 ### Natural Language: Multi-Source Setup
 
@@ -315,15 +338,14 @@ Loading hiivmind-corpus-refresh skill (status mode)...
 ```
 I'll create a React corpus with both the official docs and Kent's blog.
 
-## Workflow: Create React Corpus with Multiple Sources
-
-1. [ ] Initialize corpus structure
-2. [ ] Clone React docs repo
-3. [ ] Add Kent's testing blog (web source)
-4. [ ] Build combined index
-
-Loading hiivmind-corpus-init skill...
+**Context**: Fresh directory
+**Intent**: init → add-source → build
 ```
+
+**Skill chain:**
+1. Run `/hiivmind-corpus-init` → Creates structure with React docs repo
+2. When it completes → Run `/hiivmind-corpus-add-source` → Adds Kent's blog as web source
+3. When it completes → Run `/hiivmind-corpus-build` → Builds combined index
 
 ### No Arguments: Interactive Menu
 
