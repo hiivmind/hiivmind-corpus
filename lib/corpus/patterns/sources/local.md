@@ -57,8 +57,24 @@ count_local_files() {
 
 - Local sources have no version control - changes are tracked by file modification time
 - Files must be manually placed in the uploads directory
-- Supported formats: `.md`, `.mdx`
+- Supported formats: `.md`, `.mdx`, `.pdf`
 - Use `hiivmind-corpus-add-source` to set up a local source
+
+## PDF Document Handling
+
+For large PDF files with chapters, see `pdf.md` for splitting into smaller files before adding as a local source.
+
+**When to split:**
+- PDFs with 50+ pages
+- Documents with TOC/bookmarks (books, manuals)
+- Content that benefits from chapter-level indexing
+
+**Workflow:**
+1. Detect chapters: `python -m lib.corpus.tools.split_pdf detect book.pdf`
+2. Split with confirmation: `python -m lib.corpus.tools.split_pdf split book.pdf -o data/uploads/{source_id}`
+3. Add as local source using files from `manifest.json`
+
+Split chapters are stored in `data/uploads/{source_id}/` just like other local files.
 
 ## Related Patterns
 

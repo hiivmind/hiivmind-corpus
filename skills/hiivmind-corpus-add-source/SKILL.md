@@ -3,9 +3,10 @@ name: hiivmind-corpus-add-source
 description: >
   This skill should be used when the user asks to "add another source to corpus", "include blog posts",
   "add local documents", "add git repo to corpus", "extend corpus with web pages", "add team docs",
-  or wants to extend an existing corpus with additional documentation sources. Triggers on
-  "add [url/repo] to corpus", "include [source] in my docs", "add another documentation source",
-  "combine sources in corpus", or "hiivmind-corpus add-source".
+  "add PDF to corpus", "import PDF book", "split PDF into chapters", or wants to extend an existing
+  corpus with additional documentation sources. Triggers on "add [url/repo] to corpus",
+  "include [source] in my docs", "add another documentation source", "combine sources in corpus",
+  "add [book].pdf", or "hiivmind-corpus add-source".
 ---
 
 # Add Source to Corpus
@@ -15,7 +16,9 @@ Add a new documentation source to an existing corpus skill.
 ## Process
 
 ```
-1. LOCATE  →  2. TYPE  →  3. COLLECT  →  4. SETUP  →  5. INDEX?
+1. LOCATE  →  2. TYPE  →  2c. PDF?  →  3. COLLECT  →  4. SETUP  →  5. INDEX?
+                              ↓
+                         (split if large)
 ```
 
 ## Prerequisites
@@ -72,6 +75,65 @@ If no llms.txt found or user declines, ask which type to add:
 | **web** | Blog posts, articles | Individual web pages to cache |
 | **generated-docs** | Auto-generated docs site | MkDocs, Sphinx, gh CLI manual |
 | **llms-txt** | Site with llms.txt manifest | Anthropic docs, Vercel docs |
+
+---
+
+### Step 2c: PDF Splitting (Large PDFs)
+
+**See:** `lib/corpus/patterns/sources/pdf.md`
+
+When user provides a `.pdf` file, check if it should be split into chapters.
+
+**Detection trigger:**
+- File extension is `.pdf`
+- User mentions "book", "manual", "PDF", or provides a file path ending in `.pdf`
+
+**Workflow:**
+
+1. **Check if splitting tool is available:**
+```bash
+python -c "import pymupdf" 2>/dev/null && echo "AVAILABLE" || echo "MISSING"
+```
+
+If missing, inform user:
+> PDF splitting requires pymupdf. Install with: `pip install pymupdf`
+>
+> Alternatively, add the PDF directly as a local source (single file).
+
+2. **Detect chapters:**
+```bash
+python -m lib.corpus.tools.split_pdf detect /path/to/book.pdf
+```
+
+Show proposed splits to user:
+> Found 12 chapters in book.pdf:
+>
+> | # | Title | Pages |
+> |---|-------|-------|
+> | 1 | Introduction | 1-15 |
+> | 2 | Getting Started | 16-42 |
+> | ... | ... | ... |
+>
+> Split into chapters for better indexing? (Recommended for large PDFs)
+
+3. **If user confirms, execute split:**
+```bash
+python -m lib.corpus.tools.split_pdf split /path/to/book.pdf -o data/uploads/{source_id} --yes
+```
+
+4. **Read manifest for file list:**
+```
+Read: data/uploads/{source_id}/manifest.json
+```
+
+5. **Continue to Step 4 as local source** with files from manifest
+
+**If no chapters detected:**
+- Offer to add as single local file
+- Suggest user add bookmarks to PDF externally
+
+**If user declines splitting:**
+- Add as single local file (copy PDF to `data/uploads/{source_id}/`)
 
 ---
 
@@ -569,11 +631,50 @@ Example entries:
 
 ---
 
+### Adding a Large PDF Book
+
+**User**: "Add this programming book PDF to my corpus"
+
+**Step 1**: Read config, list existing sources
+**Step 2**: User provides path to `rust-book.pdf` (350 pages)
+**Step 2c**: PDF Splitting workflow:
+- Check pymupdf is available
+- Run detect: `python -m lib.corpus.tools.split_pdf detect rust-book.pdf`
+- Display: "Found 21 chapters via TOC. Split for better indexing?"
+- User confirms
+- Run split: `python -m lib.corpus.tools.split_pdf split rust-book.pdf -o data/uploads/rust-book --yes`
+- Read `manifest.json` for file list
+**Step 3**: Source ID: `rust-book`, derived from filename
+**Step 4**: Add as local source:
+```yaml
+- id: "rust-book"
+  type: "local"
+  path: "uploads/rust-book/"
+  description: "The Rust Programming Language (21 chapters from rust-book.pdf)"
+  files:
+    - "01_Getting_Started.pdf"
+    - "02_Programming_a_Guessing_Game.pdf"
+    # ... from manifest.json
+  last_indexed_at: null
+```
+**Step 5**: Offer to index - use manifest to suggest entries:
+```markdown
+## The Rust Programming Language (from rust-book)
+
+- **Getting Started** `rust-book:01_Getting_Started.pdf` - Installation and Hello World (pages 1-18)
+- **Guessing Game** `rust-book:02_Programming_a_Guessing_Game.pdf` - First project (pages 19-42)
+```
+
+**Key point**: PDF is NOT a source type - it's pre-processed into a local source. Chapters stored in `data/uploads/` like any other local files.
+
+---
+
 ## Reference
 
 **Pattern documentation:**
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt, pdf)
+- `lib/corpus/patterns/sources/pdf.md` - PDF chapter splitting pre-processing
 - `lib/corpus/patterns/scanning.md` - File discovery and large file detection
 - `lib/corpus/patterns/paths.md` - Path resolution
 

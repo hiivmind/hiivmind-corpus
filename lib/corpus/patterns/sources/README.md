@@ -38,18 +38,32 @@ Is the documentation in a git repository?
         ├─ Yes: Does the site provide llms.txt manifest?
         │       ├─ Yes → llms-txt source
         │       └─ No → web source
-        └─ No (local files) → local source
+        └─ No (local files):
+                Is it a large PDF (50+ pages)?
+                ├─ Yes → pre-process with pdf.md, then local source
+                └─ No → local source
 ```
+
+## Pre-Processing
+
+Some file formats require pre-processing before becoming sources:
+
+| Format | Pre-Processing | Result | Pattern |
+|--------|----------------|--------|---------|
+| PDF (large, with chapters) | Chapter splitting | Multiple chapter PDFs | `pdf.md` |
+
+Pre-processing converts files into formats suitable for local sources. The split files are then added as a standard `local` source.
 
 ## File Organization
 
 | File | Content | Lines* |
 |------|---------|--------|
 | `git.md` | Clone, fetch, SHA tracking, change comparison | ~260 |
-| `local.md` | Upload directory setup, file listing | ~60 |
+| `local.md` | Upload directory setup, file listing | ~80 |
 | `web.md` | Cache setup, URL slugification, cache age | ~90 |
 | `generated-docs.md` | Hybrid git+web, URL discovery, live fetch | ~220 |
 | `llms-txt.md` | Manifest parsing, hash detection, raw markdown caching | ~280 |
+| `pdf.md` | PDF pre-processing, chapter detection, splitting | ~180 |
 | `shared.md` | URL parsing, existence checks, errors | ~160 |
 
 *Approximate line counts
