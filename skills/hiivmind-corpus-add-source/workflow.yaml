@@ -1,0 +1,1213 @@
+name: add-source
+version: "1.0.0"
+description: >
+  Add documentation source to corpus. Triggers: "add source", "add git repo",
+  "include blog posts", "add local documents", "extend corpus with web pages",
+  "add team docs", "add PDF to corpus", "import PDF book".
+
+entry_preconditions:
+  - type: config_exists
+    error_message: "No config.yaml found. Run hiivmind-corpus-init first."
+
+initial_state:
+  phase: "locate"
+  source_type: null
+  source_url: null
+  source_id: null
+  flags:
+    config_found: false
+    manifest_detected: false
+    is_first_source: false
+    is_pdf: false
+    pdf_splitter_available: false
+    clone_succeeded: false
+    user_wants_indexing: false
+
+start_node: locate_corpus
+
+nodes:
+  # ===========================================================================
+  # PHASE 1: LOCATE CORPUS
+  # ===========================================================================
+
+  locate_corpus:
+    type: action
+    description: "Find and read corpus configuration"
+    actions:
+      - type: read_config
+        store_as: config
+      - type: set_flag
+        flag: config_found
+        value: true
+      - type: evaluate
+        expression: "len(config.sources) == 0"
+        set_flag: is_first_source
+      - type: display_message
+        message: |
+          Found corpus: ${config.corpus.name}
+          Existing sources: ${len(config.sources)}
+    on_success: check_url_provided
+    on_failure: error_no_config
+
+  check_url_provided:
+    type: conditional
+    description: "Check if source URL was provided in invocation"
+    condition:
+      type: state_not_null
+      field: source_url
+    branches:
+      true: detect_pdf
+      false: ask_source_input
+
+  # ===========================================================================
+  # PHASE 2: SOURCE TYPE DETECTION
+  # ===========================================================================
+
+  ask_source_input:
+    type: user_prompt
+    prompt:
+      question: "What documentation would you like to add?"
+      header: "Source"
+      options:
+        - id: git
+          label: "Git repository"
+          description: "Clone repo with docs folder"
+        - id: local
+          label: "Local files"
+          description: "Files on your machine"
+        - id: web
+          label: "Web pages"
+          description: "Cache blog posts/articles"
+        - id: llms_txt
+          label: "llms.txt site"
+          description: "Site with structured manifest"
+    on_response:
+      git:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: git
+        next_node: collect_git_url
+      local:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: local
+        next_node: collect_local_info
+      web:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: web
+        next_node: collect_web_info
+      llms_txt:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: llms-txt
+        next_node: collect_llms_txt_url
+      other:
+        next_node: handle_url_input
+
+  handle_url_input:
+    type: action
+    description: "Parse user-provided URL to determine type"
+    actions:
+      - type: set_state
+        field: source_url
+        value: "${user_responses.ask_source_input.raw.text}"
+    on_success: detect_pdf
+    on_failure: ask_source_input
+
+  detect_pdf:
+    type: conditional
+    description: "Check if input is a PDF file"
+    condition:
+      type: evaluate_expression
+      expression: "source_url != null && (endswith(source_url, '.pdf') || endswith(source_url, '.PDF'))"
+    branches:
+      true: check_pdf_splitter
+      false: try_llms_txt_detection
+
+  check_pdf_splitter:
+    type: action
+    description: "Check if PDF splitting tool is available"
+    actions:
+      - type: set_flag
+        flag: is_pdf
+        value: true
+    on_success: check_pymupdf
+    on_failure: check_pymupdf
+
+  check_pymupdf:
+    type: conditional
+    description: "Check if pymupdf is installed for PDF splitting"
+    condition:
+      type: python_module_available
+      module: pymupdf
+    branches:
+      true: pdf_splitter_available
+      false: pdf_splitter_missing
+
+  pdf_splitter_available:
+    type: action
+    actions:
+      - type: set_flag
+        flag: pdf_splitter_available
+        value: true
+    on_success: ask_pdf_split
+    on_failure: ask_pdf_split
+
+  pdf_splitter_missing:
+    type: user_prompt
+    prompt:
+      question: |
+        PDF splitting requires pymupdf. Install with: `pip install pymupdf`
+
+        How would you like to proceed?
+      header: "PDF Tool"
+      options:
+        - id: single
+          label: "Add as single file"
+          description: "Skip splitting, add PDF directly"
+        - id: cancel
+          label: "Cancel"
+          description: "I'll install pymupdf first"
+    on_response:
+      single:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: local
+        next_node: setup_pdf_as_local
+      cancel:
+        next_node: cancelled
+
+  ask_pdf_split:
+    type: action
+    description: "Detect chapters in PDF"
+    actions:
+      - type: invoke_pattern
+        path: "lib/corpus/patterns/sources/pdf.md"
+        section: "Detect Chapters"
+        context:
+          pdf_path: "${source_url}"
+    on_success: present_pdf_chapters
+    on_failure: pdf_no_chapters
+
+  present_pdf_chapters:
+    type: user_prompt
+    prompt:
+      question: |
+        Found chapters in PDF. Split into separate files for better indexing?
+
+        Splitting is recommended for large PDFs (> 50 pages).
+      header: "Split PDF"
+      options:
+        - id: split
+          label: "Yes, split chapters"
+          description: "Create separate files per chapter"
+        - id: single
+          label: "No, keep as single file"
+          description: "Add PDF as one document"
+    on_response:
+      split:
+        next_node: execute_pdf_split
+      single:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: local
+        next_node: setup_pdf_as_local
+
+  pdf_no_chapters:
+    type: action
+    description: "PDF has no detectable chapters"
+    actions:
+      - type: display_message
+        message: "No chapters detected in PDF. Adding as single local file."
+      - type: set_state
+        field: source_type
+        value: local
+    on_success: setup_pdf_as_local
+    on_failure: setup_pdf_as_local
+
+  execute_pdf_split:
+    type: reference
+    doc: "lib/corpus/patterns/sources/pdf.md"
+    section: "Split PDF"
+    context:
+      pdf_path: "${source_url}"
+      output_dir: "data/uploads/${computed.source_id}"
+    next_node: setup_pdf_as_local
+
+  setup_pdf_as_local:
+    type: action
+    description: "Configure PDF as local source"
+    actions:
+      - type: compute
+        expression: "source_url.split('/').pop().replace('.pdf', '').replace('.PDF', '').toLowerCase().replace(/[^a-z0-9]/g, '-')"
+        store_as: computed.source_id
+      - type: set_state
+        field: source_type
+        value: local
+    on_success: collect_local_description
+    on_failure: error_generic
+
+  # ===========================================================================
+  # LLMS.TXT DETECTION
+  # ===========================================================================
+
+  try_llms_txt_detection:
+    type: action
+    description: "Check if URL has llms.txt manifest"
+    actions:
+      - type: compute
+        expression: "source_url.replace(/\\/$/, '')"
+        store_as: computed.base_url
+      - type: web_fetch
+        url: "${computed.base_url}/llms.txt"
+        store_as: computed.manifest_check
+        allow_failure: true
+    on_success: evaluate_manifest
+    on_failure: ask_source_type_for_url
+
+  evaluate_manifest:
+    type: conditional
+    description: "Check if llms.txt was found"
+    condition:
+      type: fetch_succeeded
+      from: computed.manifest_check
+    branches:
+      true: parse_manifest
+      false: try_docs_llms_txt
+
+  try_docs_llms_txt:
+    type: action
+    description: "Try /docs/llms.txt path"
+    actions:
+      - type: web_fetch
+        url: "${computed.base_url}/docs/llms.txt"
+        store_as: computed.manifest_check
+        allow_failure: true
+    on_success: evaluate_docs_manifest
+    on_failure: ask_source_type_for_url
+
+  evaluate_docs_manifest:
+    type: conditional
+    condition:
+      type: fetch_succeeded
+      from: computed.manifest_check
+    branches:
+      true: parse_manifest
+      false: ask_source_type_for_url
+
+  parse_manifest:
+    type: action
+    description: "Parse llms.txt manifest content"
+    actions:
+      - type: set_flag
+        flag: manifest_detected
+        value: true
+      - type: compute
+        expression: "computed.manifest_check.content.split('\\n').filter(l => l.startsWith('#')).length"
+        store_as: computed.manifest_sections
+      - type: compute
+        expression: "computed.manifest_check.content.split('\\n').filter(l => l.startsWith('- ')).length"
+        store_as: computed.manifest_pages
+    on_success: present_manifest_option
+    on_failure: ask_source_type_for_url
+
+  present_manifest_option:
+    type: user_prompt
+    prompt:
+      question: |
+        Found llms.txt manifest at ${computed.manifest_check.url}!
+
+        This site provides structured documentation for LLMs.
+        Use llms-txt source type for automatic discovery?
+      header: "Manifest"
+      options:
+        - id: use_llms
+          label: "Yes, use llms-txt (Recommended)"
+          description: "Structured discovery, smaller content"
+        - id: other
+          label: "Choose different type"
+          description: "Select source type manually"
+    on_response:
+      use_llms:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: llms-txt
+          - type: set_state
+            field: computed.manifest_url
+            value: "${computed.manifest_check.url}"
+        next_node: collect_llms_txt_details
+      other:
+        next_node: ask_source_type_for_url
+
+  ask_source_type_for_url:
+    type: user_prompt
+    prompt:
+      question: "What type of source is ${source_url}?"
+      header: "Source type"
+      options:
+        - id: git
+          label: "Git repository"
+          description: "GitHub/GitLab repo with docs"
+        - id: web
+          label: "Web page"
+          description: "Article or documentation page"
+        - id: generated
+          label: "Generated docs"
+          description: "MkDocs, Sphinx, ReadTheDocs site"
+    on_response:
+      git:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: git
+        next_node: parse_git_url
+      web:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: web
+        next_node: collect_web_info_with_url
+      generated:
+        consequence:
+          - type: set_state
+            field: source_type
+            value: generated-docs
+        next_node: collect_generated_docs_info
+
+  # ===========================================================================
+  # GIT SOURCE COLLECTION
+  # ===========================================================================
+
+  collect_git_url:
+    type: user_prompt
+    prompt:
+      question: "What's the git repository URL?"
+      header: "Repo URL"
+      options:
+        - id: github
+          label: "GitHub repo"
+          description: "e.g., https://github.com/org/repo"
+        - id: gitlab
+          label: "GitLab repo"
+          description: "e.g., https://gitlab.com/org/repo"
+    on_response:
+      github:
+        next_node: collect_github_url_input
+      gitlab:
+        next_node: collect_gitlab_url_input
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_git_url.raw.text}"
+        next_node: parse_git_url
+
+  collect_github_url_input:
+    type: user_prompt
+    prompt:
+      question: "Enter the GitHub repository URL:"
+      header: "GitHub URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://github.com/owner/repo"
+    on_response:
+      example:
+        next_node: collect_github_url_input
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_github_url_input.raw.text}"
+        next_node: parse_git_url
+
+  collect_gitlab_url_input:
+    type: user_prompt
+    prompt:
+      question: "Enter the GitLab repository URL:"
+      header: "GitLab URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://gitlab.com/owner/repo"
+    on_response:
+      example:
+        next_node: collect_gitlab_url_input
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_gitlab_url_input.raw.text}"
+        next_node: parse_git_url
+
+  parse_git_url:
+    type: action
+    description: "Extract owner/repo from git URL"
+    actions:
+      - type: compute
+        expression: "source_url.replace(/\\.git$/, '').split('/').slice(-2).join('/')"
+        store_as: computed.owner_repo
+      - type: compute
+        expression: "computed.owner_repo.split('/')[0]"
+        store_as: computed.owner
+      - type: compute
+        expression: "computed.owner_repo.split('/')[1]"
+        store_as: computed.repo_name
+      - type: compute
+        expression: "computed.repo_name.toLowerCase()"
+        store_as: computed.source_id
+    on_success: collect_git_branch
+    on_failure: error_invalid_url
+
+  collect_git_branch:
+    type: user_prompt
+    prompt:
+      question: "What branch should be used? (default: main)"
+      header: "Branch"
+      options:
+        - id: main
+          label: "main"
+          description: "Default branch"
+        - id: master
+          label: "master"
+          description: "Legacy default branch"
+    on_response:
+      main:
+        consequence:
+          - type: set_state
+            field: computed.branch
+            value: "main"
+        next_node: collect_docs_root
+      master:
+        consequence:
+          - type: set_state
+            field: computed.branch
+            value: "master"
+        next_node: collect_docs_root
+      other:
+        consequence:
+          - type: set_state
+            field: computed.branch
+            value: "${user_responses.collect_git_branch.raw.text}"
+        next_node: collect_docs_root
+
+  collect_docs_root:
+    type: user_prompt
+    prompt:
+      question: "Where are the docs located in the repo? (default: docs)"
+      header: "Docs path"
+      options:
+        - id: docs
+          label: "docs/"
+          description: "Standard docs directory"
+        - id: root
+          label: "Repository root"
+          description: "Docs at top level"
+        - id: doc
+          label: "doc/"
+          description: "Alternative docs directory"
+    on_response:
+      docs:
+        consequence:
+          - type: set_state
+            field: computed.docs_root
+            value: "docs"
+        next_node: validate_git_source
+      root:
+        consequence:
+          - type: set_state
+            field: computed.docs_root
+            value: "."
+        next_node: validate_git_source
+      doc:
+        consequence:
+          - type: set_state
+            field: computed.docs_root
+            value: "doc"
+        next_node: validate_git_source
+      other:
+        consequence:
+          - type: set_state
+            field: computed.docs_root
+            value: "${user_responses.collect_docs_root.raw.text}"
+        next_node: validate_git_source
+
+  validate_git_source:
+    type: validation_gate
+    description: "Validate git source configuration"
+    validations:
+      - type: state_not_null
+        field: source_url
+        error_message: "Repository URL is required"
+      - type: state_not_null
+        field: computed.source_id
+        error_message: "Could not derive source ID"
+      - type: none_of
+        conditions:
+          - type: source_exists
+            id: "${computed.source_id}"
+        error_message: "Source ID '${computed.source_id}' already exists"
+    on_valid: create_checkpoint_before_clone
+    on_invalid: show_validation_errors
+
+  create_checkpoint_before_clone:
+    type: action
+    actions:
+      - type: create_checkpoint
+        name: "before_clone"
+    on_success: execute_git_clone
+    on_failure: execute_git_clone
+
+  execute_git_clone:
+    type: action
+    description: "Clone the git repository"
+    actions:
+      - type: display_message
+        message: "Cloning ${source_url} to .source/${computed.source_id}..."
+      - type: clone_repo
+        url: "${source_url}"
+        dest: ".source/${computed.source_id}"
+        branch: "${computed.branch}"
+        depth: 1
+      - type: get_sha
+        repo_path: ".source/${computed.source_id}"
+        store_as: computed.sha
+      - type: set_flag
+        flag: clone_succeeded
+        value: true
+    on_success: research_git_source
+    on_failure: error_clone_failed
+
+  research_git_source:
+    type: reference
+    doc: "lib/corpus/patterns/sources/git.md"
+    section: "Research Source"
+    context:
+      source_path: ".source/${computed.source_id}"
+      docs_root: "${computed.docs_root}"
+    next_node: add_git_source_to_config
+
+  add_git_source_to_config:
+    type: action
+    description: "Add git source to config.yaml"
+    actions:
+      - type: add_source
+        spec:
+          id: "${computed.source_id}"
+          type: "git"
+          repo_url: "${source_url}"
+          repo_owner: "${computed.owner}"
+          repo_name: "${computed.repo_name}"
+          branch: "${computed.branch}"
+          docs_root: "${computed.docs_root}"
+          last_commit_sha: "${computed.sha}"
+          last_indexed_at: null
+      - type: display_message
+        message: "Added git source '${computed.source_id}' to config.yaml"
+    on_success: check_first_source_navigate
+    on_failure: error_config_update
+
+  # ===========================================================================
+  # LOCAL SOURCE COLLECTION
+  # ===========================================================================
+
+  collect_local_info:
+    type: user_prompt
+    prompt:
+      question: "What should this local source be called? (used as ID)"
+      header: "Source ID"
+      options:
+        - id: team
+          label: "team-docs"
+          description: "Internal team documentation"
+        - id: standards
+          label: "standards"
+          description: "Coding standards and guidelines"
+    on_response:
+      team:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "team-docs"
+        next_node: collect_local_description
+      standards:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "standards"
+        next_node: collect_local_description
+      other:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "${user_responses.collect_local_info.raw.text}"
+        next_node: collect_local_description
+
+  collect_local_description:
+    type: user_prompt
+    prompt:
+      question: "Brief description of this source:"
+      header: "Description"
+      options:
+        - id: internal
+          label: "Internal documentation"
+          description: "Team-specific docs"
+        - id: api
+          label: "API documentation"
+          description: "API reference and guides"
+    on_response:
+      internal:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "Internal documentation"
+        next_node: setup_local_source
+      api:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "API documentation"
+        next_node: setup_local_source
+      other:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "${user_responses.collect_local_description.raw.text}"
+        next_node: setup_local_source
+
+  setup_local_source:
+    type: action
+    description: "Create directory for local source"
+    actions:
+      - type: create_directory
+        path: "data/uploads/${computed.source_id}"
+      - type: add_source
+        spec:
+          id: "${computed.source_id}"
+          type: "local"
+          path: "uploads/${computed.source_id}/"
+          description: "${computed.description}"
+          files: []
+          last_indexed_at: null
+      - type: display_message
+        message: |
+          Created directory: data/uploads/${computed.source_id}/
+
+          Place your documents in this directory.
+          Supported formats: .md, .mdx, .pdf
+
+          Let me know when files are in place.
+    on_success: check_first_source_navigate
+    on_failure: error_config_update
+
+  # ===========================================================================
+  # WEB SOURCE COLLECTION
+  # ===========================================================================
+
+  collect_web_info:
+    type: user_prompt
+    prompt:
+      question: "What should this web source be called? (used as ID)"
+      header: "Source ID"
+      options:
+        - id: blog
+          label: "blog-posts"
+          description: "Collection of blog articles"
+        - id: articles
+          label: "articles"
+          description: "Reference articles"
+    on_response:
+      blog:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "blog-posts"
+        next_node: collect_web_description
+      articles:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "articles"
+        next_node: collect_web_description
+      other:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "${user_responses.collect_web_info.raw.text}"
+        next_node: collect_web_description
+
+  collect_web_info_with_url:
+    type: action
+    description: "Derive source ID from URL"
+    actions:
+      - type: compute
+        expression: "source_url.split('/').filter(p => p && !p.includes('.')).pop() || 'web-source'"
+        store_as: computed.source_id
+    on_success: collect_web_description
+    on_failure: collect_web_info
+
+  collect_web_description:
+    type: user_prompt
+    prompt:
+      question: "Brief description of this web source:"
+      header: "Description"
+      options:
+        - id: best_practices
+          label: "Best practices articles"
+          description: "Industry best practices"
+        - id: tutorials
+          label: "Tutorial collection"
+          description: "How-to guides and tutorials"
+    on_response:
+      best_practices:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "Best practices articles"
+        next_node: collect_web_urls
+      tutorials:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "Tutorial collection"
+        next_node: collect_web_urls
+      other:
+        consequence:
+          - type: set_state
+            field: computed.description
+            value: "${user_responses.collect_web_description.raw.text}"
+        next_node: collect_web_urls
+
+  collect_web_urls:
+    type: user_prompt
+    prompt:
+      question: "Enter the first URL to cache (you can add more later):"
+      header: "URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://blog.example.com/article"
+    on_response:
+      example:
+        next_node: collect_web_urls
+      other:
+        consequence:
+          - type: append_state
+            field: computed.urls_to_fetch
+            value: "${user_responses.collect_web_urls.raw.text}"
+        next_node: setup_web_source
+
+  setup_web_source:
+    type: action
+    description: "Create cache directory and config entry"
+    actions:
+      - type: create_directory
+        path: ".cache/web/${computed.source_id}"
+      - type: add_source
+        spec:
+          id: "${computed.source_id}"
+          type: "web"
+          description: "${computed.description}"
+          cache_dir: ".cache/web/${computed.source_id}/"
+          urls: []
+          last_indexed_at: null
+    on_success: fetch_first_web_url
+    on_failure: error_config_update
+
+  fetch_first_web_url:
+    type: action
+    description: "Fetch first URL for user approval"
+    actions:
+      - type: web_fetch
+        url: "${computed.urls_to_fetch[0]}"
+        store_as: computed.fetched_content
+        prompt: "Extract the main article content as markdown"
+    on_success: present_fetched_content
+    on_failure: error_fetch_failed
+
+  present_fetched_content:
+    type: user_prompt
+    prompt:
+      question: |
+        Fetched content from ${computed.urls_to_fetch[0]}:
+
+        ${computed.fetched_content.content.substring(0, 500)}...
+
+        Save this content to cache?
+      header: "Approve"
+      options:
+        - id: save
+          label: "Yes, save to cache"
+          description: "Cache for corpus"
+        - id: skip
+          label: "No, skip this URL"
+          description: "Don't include in corpus"
+    on_response:
+      save:
+        next_node: cache_web_content
+      skip:
+        next_node: check_first_source_navigate
+
+  cache_web_content:
+    type: action
+    description: "Save fetched content to cache"
+    actions:
+      - type: compute
+        expression: "computed.urls_to_fetch[0].split('/').pop().replace(/[^a-zA-Z0-9]/g, '-') + '.md'"
+        store_as: computed.cached_filename
+      - type: cache_web_content
+        from: computed.fetched_content
+        dest: ".cache/web/${computed.source_id}/${computed.cached_filename}"
+      - type: set_timestamp
+        store_as: computed.fetched_at
+      - type: update_source
+        id: "${computed.source_id}"
+        fields:
+          urls:
+            - url: "${computed.urls_to_fetch[0]}"
+              title: "Fetched article"
+              cached_file: "${computed.cached_filename}"
+              fetched_at: "${computed.fetched_at}"
+    on_success: check_first_source_navigate
+    on_failure: error_cache_failed
+
+  # ===========================================================================
+  # LLMS-TXT SOURCE COLLECTION
+  # ===========================================================================
+
+  collect_llms_txt_url:
+    type: user_prompt
+    prompt:
+      question: "Enter the base URL for the llms.txt site:"
+      header: "Site URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://docs.example.com"
+    on_response:
+      example:
+        next_node: collect_llms_txt_url
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_llms_txt_url.raw.text}"
+        next_node: try_llms_txt_detection
+
+  collect_llms_txt_details:
+    type: action
+    description: "Parse manifest and derive source ID"
+    actions:
+      - type: compute
+        expression: "computed.manifest_check.content.split('\\n').find(l => l.startsWith('# ')).replace('# ', '').toLowerCase().replace(/[^a-z0-9]/g, '-')"
+        store_as: computed.source_id
+      - type: compute
+        expression: "source_url.replace(/\\/llms\\.txt$/, '').replace(/\\/docs$/, '')"
+        store_as: computed.base_url
+    on_success: collect_cache_strategy
+    on_failure: collect_llms_txt_source_id
+
+  collect_llms_txt_source_id:
+    type: user_prompt
+    prompt:
+      question: "What should this source be called? (used as ID)"
+      header: "Source ID"
+      options:
+        - id: derive
+          label: "Derive from URL"
+          description: "Auto-generate from site name"
+    on_response:
+      derive:
+        next_node: derive_llms_source_id
+      other:
+        consequence:
+          - type: set_state
+            field: computed.source_id
+            value: "${user_responses.collect_llms_txt_source_id.raw.text}"
+        next_node: collect_cache_strategy
+
+  derive_llms_source_id:
+    type: action
+    actions:
+      - type: compute
+        expression: "source_url.split('/').filter(p => p && !p.includes('.')).pop() || 'docs'"
+        store_as: computed.source_id
+    on_success: collect_cache_strategy
+    on_failure: collect_llms_txt_source_id
+
+  collect_cache_strategy:
+    type: user_prompt
+    prompt:
+      question: "How should content be cached?"
+      header: "Caching"
+      options:
+        - id: selective
+          label: "Selective (Recommended)"
+          description: "Cache specific sections"
+        - id: full
+          label: "Full"
+          description: "Cache all pages"
+        - id: on_demand
+          label: "On-demand"
+          description: "Fetch live when navigating"
+    on_response:
+      selective:
+        consequence:
+          - type: set_state
+            field: computed.cache_strategy
+            value: "selective"
+        next_node: setup_llms_txt_source
+      full:
+        consequence:
+          - type: set_state
+            field: computed.cache_strategy
+            value: "full"
+        next_node: setup_llms_txt_source
+      on_demand:
+        consequence:
+          - type: set_state
+            field: computed.cache_strategy
+            value: "on-demand"
+        next_node: setup_llms_txt_source
+
+  setup_llms_txt_source:
+    type: action
+    description: "Configure llms-txt source"
+    actions:
+      - type: create_directory
+        path: ".cache/llms-txt/${computed.source_id}"
+      - type: compute_hash
+        from: computed.manifest_check.content
+        store_as: computed.manifest_hash
+      - type: set_timestamp
+        store_as: computed.fetched_at
+      - type: add_source
+        spec:
+          id: "${computed.source_id}"
+          type: "llms-txt"
+          manifest:
+            url: "${computed.manifest_url}"
+            last_hash: "${computed.manifest_hash}"
+            last_fetched_at: "${computed.fetched_at}"
+          urls:
+            base_url: "${computed.base_url}"
+            suffix: ".md"
+          cache:
+            enabled: true
+            dir: ".cache/llms-txt/${computed.source_id}/"
+            strategy: "${computed.cache_strategy}"
+          last_indexed_at: null
+      - type: display_message
+        message: "Added llms-txt source '${computed.source_id}' to config.yaml"
+    on_success: check_first_source_navigate
+    on_failure: error_config_update
+
+  # ===========================================================================
+  # GENERATED-DOCS SOURCE COLLECTION
+  # ===========================================================================
+
+  collect_generated_docs_info:
+    type: user_prompt
+    prompt:
+      question: "What's the source repository URL (where docs are generated from)?"
+      header: "Source repo"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://github.com/org/repo"
+    on_response:
+      example:
+        next_node: collect_generated_docs_info
+      other:
+        consequence:
+          - type: set_state
+            field: computed.source_repo_url
+            value: "${user_responses.collect_generated_docs_info.raw.text}"
+        next_node: collect_generated_docs_web_url
+
+  collect_generated_docs_web_url:
+    type: user_prompt
+    prompt:
+      question: "What's the published docs URL?"
+      header: "Docs URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://docs.example.com"
+    on_response:
+      example:
+        next_node: collect_generated_docs_web_url
+      other:
+        consequence:
+          - type: set_state
+            field: computed.web_base_url
+            value: "${user_responses.collect_generated_docs_web_url.raw.text}"
+        next_node: setup_generated_docs_source
+
+  setup_generated_docs_source:
+    type: action
+    description: "Configure generated-docs source"
+    actions:
+      - type: compute
+        expression: "computed.source_repo_url.replace(/\\.git$/, '').split('/').pop().toLowerCase()"
+        store_as: computed.source_id
+      - type: clone_repo
+        url: "${computed.source_repo_url}"
+        dest: ".source/${computed.source_id}"
+        depth: 1
+      - type: get_sha
+        repo_path: ".source/${computed.source_id}"
+        store_as: computed.sha
+      - type: add_source
+        spec:
+          id: "${computed.source_id}"
+          type: "generated-docs"
+          source_repo:
+            url: "${computed.source_repo_url}"
+            branch: "main"
+            docs_root: "docs"
+            last_commit_sha: "${computed.sha}"
+          web_output:
+            base_url: "${computed.web_base_url}"
+            discovered_urls: []
+          cache:
+            enabled: false
+            dir: ".cache/web/${computed.source_id}/"
+          last_indexed_at: null
+    on_success: check_first_source_navigate
+    on_failure: error_config_update
+
+  # ===========================================================================
+  # FIRST SOURCE HANDLING
+  # ===========================================================================
+
+  check_first_source_navigate:
+    type: conditional
+    description: "Check if this is the first source (needs navigate update)"
+    condition:
+      type: flag_set
+      flag: is_first_source
+    branches:
+      true: update_navigate_examples
+      false: ask_index_now
+
+  update_navigate_examples:
+    type: reference
+    doc: "lib/corpus/patterns/sources/shared.md"
+    section: "Update Navigate Skill Examples"
+    context:
+      source_id: "${computed.source_id}"
+      source_type: "${source_type}"
+    next_node: ask_index_now
+
+  # ===========================================================================
+  # INDEXING PROMPT
+  # ===========================================================================
+
+  ask_index_now:
+    type: user_prompt
+    prompt:
+      question: "Would you like to add entries from this source to the index now?"
+      header: "Index"
+      options:
+        - id: yes
+          label: "Yes, index now"
+          description: "Add entries to data/index.md"
+        - id: no
+          label: "No, later"
+          description: "I'll run hiivmind-corpus-build later"
+    on_response:
+      yes:
+        consequence:
+          - type: set_flag
+            flag: user_wants_indexing
+            value: true
+        next_node: suggest_build_skill
+      no:
+        next_node: success
+
+  suggest_build_skill:
+    type: action
+    actions:
+      - type: display_message
+        message: |
+          Source '${computed.source_id}' is ready for indexing.
+
+          Run `/hiivmind-corpus-build` to analyze the source and create index entries.
+    on_success: success
+    on_failure: success
+
+  # ===========================================================================
+  # ERROR HANDLING
+  # ===========================================================================
+
+  show_validation_errors:
+    type: action
+    actions:
+      - type: display_message
+        message: |
+          Validation failed:
+          ${computed.validation_errors.join('\n- ')}
+    on_success: ask_source_input
+    on_failure: error_generic
+
+  # ===========================================================================
+  # ENDINGS
+  # ===========================================================================
+
+endings:
+  success:
+    type: success
+    message: "Source '${computed.source_id}' added successfully"
+    summary:
+      source_id: "${computed.source_id}"
+      source_type: "${source_type}"
+      location: "${source_type == 'git' ? '.source/' : source_type == 'local' ? 'data/uploads/' : '.cache/'}${computed.source_id}"
+
+  error_no_config:
+    type: error
+    message: "No config.yaml found in current directory"
+    recovery: "hiivmind-corpus-init"
+    details: "This skill must run from a corpus directory containing data/config.yaml"
+
+  error_invalid_url:
+    type: error
+    message: "Could not parse repository URL"
+    details: "Expected format: https://github.com/owner/repo or https://gitlab.com/owner/repo"
+
+  error_clone_failed:
+    type: error
+    message: "Failed to clone repository"
+    details: "Check that the URL is correct and you have access to the repository"
+
+  error_config_update:
+    type: error
+    message: "Failed to update config.yaml"
+    details: "The configuration file may be corrupted or read-only"
+
+  error_fetch_failed:
+    type: error
+    message: "Failed to fetch URL content"
+    details: "The URL may be inaccessible or require authentication"
+
+  error_cache_failed:
+    type: error
+    message: "Failed to cache content"
+    details: "Check write permissions for the .cache directory"
+
+  error_generic:
+    type: error
+    message: "An unexpected error occurred"
+    details: "Please try again or report this issue"
+
+  cancelled:
+    type: error
+    message: "Operation cancelled"

@@ -1,689 +1,276 @@
 ---
 name: hiivmind-corpus-add-source
 description: >
-  This skill should be used when the user asks to "add another source to corpus", "include blog posts",
-  "add local documents", "add git repo to corpus", "extend corpus with web pages", "add team docs",
-  "add PDF to corpus", "import PDF book", "split PDF into chapters", or wants to extend an existing
-  corpus with additional documentation sources. Triggers on "add [url/repo] to corpus",
-  "include [source] in my docs", "add another documentation source", "combine sources in corpus",
-  "add [book].pdf", or "hiivmind-corpus add-source".
+  Add documentation source to corpus. Triggers: "add source", "add git repo",
+  "include blog posts", "add local documents", "extend corpus with web pages",
+  "add team docs", "add PDF to corpus", "import PDF book", "split PDF into chapters".
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
 ---
 
-# Add Source to Corpus
+# Add Source Workflow
 
-Add a new documentation source to an existing corpus skill.
+Execute this workflow deterministically. State persists in conversation context across turns.
 
-## Process
-
-```
-1. LOCATE  →  2. TYPE  →  2c. PDF?  →  3. COLLECT  →  4. SETUP  →  5. INDEX?
-                              ↓
-                         (split if large)
-```
-
-## Prerequisites
-
-Run from within a corpus skill directory containing `data/config.yaml`.
+> **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/workflow.yaml`
 
 ---
 
-## Step 1: Locate Corpus
+## Execution Instructions
 
-**See:** `lib/corpus/patterns/config-parsing.md` for YAML extraction methods.
+### Phase 1: Initialize
 
-Find and read `data/config.yaml`:
+1. **Load workflow.yaml** from this skill directory:
+   Read: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/workflow.yaml`
 
-Using Claude tools:
-```
-Read: data/config.yaml
-```
+2. **Check entry preconditions** (see `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`):
+   - `config_exists`: Verify `data/config.yaml` exists
+   - If ANY fails: display error message, suggest recovery skill, STOP
 
-Verify:
-- File exists
-- List existing sources to user
-
----
-
-## Step 2: Source Type
-
-### Step 2a: Detect llms.txt Manifest (Automatic)
-
-Before asking the user for source type, check if the URL provides an llms.txt manifest:
-
-**Using Claude tools:**
-```
-WebFetch: {base_url}/llms.txt
-If 404: WebFetch: {base_url}/docs/llms.txt
-```
-
-If manifest found:
-> Found llms.txt manifest at {url}:
-> - Title: {title}
-> - {N} pages in {M} sections
->
-> This site provides structured documentation for LLMs.
-> Would you like to use the **llms-txt** source type for automatic discovery?
-
-### Step 2b: Ask for Source Type
-
-If no llms.txt found or user declines, ask which type to add:
-
-| Type | Description | Example Use Case |
-|------|-------------|------------------|
-| **git** | Git repository | Library docs, framework APIs |
-| **local** | User-uploaded files | Team standards, internal docs |
-| **web** | Blog posts, articles | Individual web pages to cache |
-| **generated-docs** | Auto-generated docs site | MkDocs, Sphinx, gh CLI manual |
-| **llms-txt** | Site with llms.txt manifest | Anthropic docs, Vercel docs |
+3. **Initialize runtime state**:
+   ```yaml
+   workflow_name: add-source
+   workflow_version: "1.0.0"
+   current_node: locate_corpus
+   previous_node: null
+   history: []
+   user_responses: {}
+   computed: {}
+   flags:
+     config_found: false
+     manifest_detected: false
+     is_first_source: false
+     is_pdf: false
+     pdf_splitter_available: false
+     clone_succeeded: false
+     user_wants_indexing: false
+   checkpoints: {}
+   phase: "locate"
+   source_type: null
+   source_url: null
+   source_id: null
+   ```
 
 ---
 
-### Step 2c: PDF Splitting (Large PDFs)
+### Phase 2: Execution Loop
 
-**See:** `lib/corpus/patterns/sources/pdf.md`
+Execute nodes until an ending is reached:
 
-When user provides a `.pdf` file, check if it should be split into chapters.
-
-**Detection trigger:**
-- File extension is `.pdf`
-- User mentions "book", "manual", "PDF", or provides a file path ending in `.pdf`
-
-**Workflow:**
-
-1. **Check if splitting tool is available:**
-```bash
-python -c "import pymupdf" 2>/dev/null && echo "AVAILABLE" || echo "MISSING"
 ```
+LOOP:
+  1. Get current node from workflow.nodes[current_node]
 
-If missing, inform user:
-> PDF splitting requires pymupdf. Install with: `pip install pymupdf`
->
-> Alternatively, add the PDF directly as a local source (single file).
+  2. Check for ending:
+     - IF current_node is in workflow.endings:
+       - Display ending.message with ${} interpolation
+       - IF ending.type == "error" AND ending.recovery:
+         - Suggest: "Try running: /{recovery}"
+       - IF ending.type == "success" AND ending.summary:
+         - Display summary fields
+       - STOP
 
-2. **Detect chapters:**
-```bash
-python -m lib.corpus.tools.split_pdf detect /path/to/book.pdf
+  3. Execute based on node.type:
+
+     ACTION NODE:
+     - FOR each action IN node.actions:
+       - Execute action per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md
+       - Store results in state.computed if store_as specified
+     - IF all actions succeed:
+       - Set current_node = node.on_success
+     - ELSE:
+       - Set current_node = node.on_failure
+     - CONTINUE
+
+     CONDITIONAL NODE:
+     - Evaluate node.condition per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md
+     - IF result == true:
+       - Set current_node = node.branches.true
+     - ELSE:
+       - Set current_node = node.branches.false
+     - CONTINUE
+
+     USER_PROMPT NODE:
+     - Build AskUserQuestion from node.prompt:
+       '```json
+       {
+         "questions": [{
+           "question": "[interpolated node.prompt.question]",
+           "header": "[node.prompt.header]",
+           "multiSelect": false,
+           "options": [map node.prompt.options to {label, description}]
+         }]
+       }
+       ```'
+     - Present via AskUserQuestion tool
+     - Wait for user response
+     - Find matching handler in node.on_response:
+       - If user selected an option: use that option's id
+       - If user typed custom text: use "other"
+     - Store response in state.user_responses[current_node]
+     - Apply handler.consequence if present (execute each consequence)
+     - Set current_node = handler.next_node
+     - CONTINUE
+
+     VALIDATION_GATE NODE:
+     - FOR each validation IN node.validations:
+       - Evaluate validation (precondition with error_message)
+       - IF fails: collect validation.error_message
+     - IF any validations failed:
+       - Store errors in state.computed.validation_errors
+       - Set current_node = node.on_invalid
+     - ELSE:
+       - Set current_node = node.on_valid
+     - CONTINUE
+
+     REFERENCE NODE:
+     - Load document: Read ${CLAUDE_PLUGIN_ROOT}/{node.doc}
+     - IF node.section: extract only that section
+     - Build context object from node.context with ${} interpolation
+     - Execute the document section with context available
+     - Set current_node = node.next_node
+     - CONTINUE
+
+  4. Record in history:
+     '```yaml
+     history.append({
+       node: previous_node_name,
+       outcome: { success: true/false, branch: "true"/"false", response: "id" },
+       timestamp: now()
+     })
+     ```'
+
+  5. Update position:
+     - previous_node = current_node (before update)
+     - current_node = next_node (from step 3)
+
+UNTIL ending reached
 ```
-
-Show proposed splits to user:
-> Found 12 chapters in book.pdf:
->
-> | # | Title | Pages |
-> |---|-------|-------|
-> | 1 | Introduction | 1-15 |
-> | 2 | Getting Started | 16-42 |
-> | ... | ... | ... |
->
-> Split into chapters for better indexing? (Recommended for large PDFs)
-
-3. **If user confirms, execute split:**
-```bash
-python -m lib.corpus.tools.split_pdf split /path/to/book.pdf -o data/uploads/{source_id} --yes
-```
-
-4. **Read manifest for file list:**
-```
-Read: data/uploads/{source_id}/manifest.json
-```
-
-5. **Continue to Step 4 as local source** with files from manifest
-
-**If no chapters detected:**
-- Offer to add as single local file
-- Suggest user add bookmarks to PDF externally
-
-**If user declines splitting:**
-- Add as single local file (copy PDF to `data/uploads/{source_id}/`)
 
 ---
 
-## Step 3: Collect Source Information
+## Variable Interpolation
 
-### For Git Sources
+Replace `${...}` patterns in strings:
 
-| Input | Source | Example |
-|-------|--------|---------|
-| Repo URL | Ask user | `https://github.com/TanStack/query` |
-| Source ID | Derive from repo name | `tanstack-query` |
-| Branch | Ask or default `main` | `main` |
-| Docs root | Investigate or ask | `docs/` |
+| Pattern | Resolution |
+|---------|------------|
+| `${source_type}` | `state.source_type` |
+| `${computed.source_id}` | `state.computed.source_id` |
+| `${flags.config_found}` | `state.flags.config_found` |
+| `${user_responses.node_name.id}` | Selected option id |
+| `${user_responses.node_name.raw.text}` | Custom text input |
 
-**Generate unique source ID:**
-- Derive from repo name (lowercase, hyphenated)
-- Check for conflicts with existing sources
-- Ask user if ambiguous
-
-### For Local Sources
-
-| Input | Source | Example |
-|-------|--------|---------|
-| Source ID | Ask user | `team-standards` |
-| Description | Ask user | `Internal team documentation` |
-
-### For Web Sources
-
-| Input | Source | Example |
-|-------|--------|---------|
-| Source ID | Ask user | `kent-testing-blog` |
-| Description | Ask user | `Testing best practices articles` |
-| URLs | Ask for list | One or more URLs to fetch |
-
-### For Generated-Docs Sources
-
-| Input | Source | Example |
-|-------|--------|---------|
-| Source ID | Ask user or derive | `gh-cli-manual` |
-| Source repo URL | Ask user | `https://github.com/cli/cli` |
-| Branch | Ask or default `main` | `trunk` |
-| Docs root | Ask (path in repo that generates docs) | `cmd/` |
-| Web base URL | Ask user | `https://cli.github.com/manual` |
-| Sitemap URL | Check or ask | `https://cli.github.com/sitemap.xml` |
-
-**Key concept:** The source repo contains the code that *generates* the docs. The web URL is where the *rendered* docs are published.
-
-### For llms-txt Sources
-
-| Input | Source | Example |
-|-------|--------|---------|
-| Source ID | Derive from title or ask | `claude-code-docs` |
-| Manifest URL | Auto-detected or ask | `https://code.claude.com/docs/llms.txt` |
-| Base URL | Derive from manifest URL or ask | `https://code.claude.com/docs/en` |
-| Caching strategy | Ask user | `selective`, `full`, or `on-demand` |
-| Sections to cache | Ask if selective | `["skills", "agents"]` |
-
-**Key concept:** The llms.txt manifest provides structured discovery with links to raw markdown. Content is much smaller (10-30x) than HTML pages.
+**Resolution order:**
+1. `state.computed.{path}`
+2. `state.flags.{path}`
+3. `state.user_responses.{path}`
+4. `state.{path}`
 
 ---
 
-## Step 4: Setup Source
+## Workflow Graph Overview
 
-**See:** `lib/corpus/patterns/sources/` for source-specific operations (git.md, local.md, web.md, generated-docs.md, llms-txt.md).
-
-### Git Source Setup
-
-```bash
-# Clone to source-specific directory
-git clone --depth 1 {repo_url} .source/{source_id}
-
-# Get current commit SHA
-cd .source/{source_id} && git rev-parse HEAD
 ```
-
-#### Research the Source
-
-After cloning, analyze the documentation structure:
-
-```bash
-# Framework detection
-ls .source/{source_id}/
-
-# Find doc framework config
-find .source/{source_id} -maxdepth 2 -name "docusaurus.config.js" -o -name "mkdocs.yml" -o -name "conf.py" 2>/dev/null
-
-# Find nav structure
-find .source/{source_id} -maxdepth 2 -name "sidebars*" -o -name "_toc.yml" 2>/dev/null
-
-# Count doc files
-find .source/{source_id}/{docs_root} -name "*.md" -o -name "*.mdx" 2>/dev/null | wc -l
-
-# Check for i18n
-ls .source/{source_id}/i18n/ .source/{source_id}/docs/en/ 2>/dev/null
+locate_corpus
+    │
+    ▼
+check_url_provided ──── source_url provided? ────┐
+    │ no                                         │ yes
+    ▼                                            ▼
+ask_source_input                           detect_pdf
+    │                                            │
+    ├─► git ──────► collect_git_url             │
+    ├─► local ────► collect_local_info          │
+    ├─► web ──────► collect_web_info            │
+    ├─► llms_txt ─► collect_llms_txt_url        │
+    └─► other ────► handle_url_input ───────────┘
+                                                 │
+                          ┌──────────────────────┴─────────────────────┐
+                          │                                            │
+                     is_pdf?                                try_llms_txt_detection
+                          │                                            │
+                    ┌─────┴─────┐                            ┌─────────┴─────────┐
+                    │           │                            │                   │
+              check_pymupdf  continue                  manifest found?       not found
+                    │                                        │                   │
+               ┌────┴────┐                         present_manifest_option  ask_source_type_for_url
+               │         │                                   │                   │
+         available   missing                        ┌────────┴────────┐          │
+               │         │                          │                 │          │
+        ask_pdf_split  offer                   use_llms           other          │
+               │      single                        │                 │          │
+               │         │                collect_llms_txt_details    └──────────┤
+               ▼         │                          │                            │
+      (split or single)  │                          │                            │
+               │         │                          │                            │
+               └─────────┴──────────────────────────┴────────────────────────────┤
+                                                                                 │
+                                                                    ┌────────────┴────────────┐
+                                                                    │                         │
+                                                              git branch/docs           web/llms/generated
+                                                                    │                         │
+                                                            validate_git_source               │
+                                                                    │                         │
+                                                            execute_git_clone                 │
+                                                                    │                         │
+                                                            research_git_source               │
+                                                                    │                         │
+                                                            add_source_to_config              │
+                                                                    │                         │
+                                                                    └─────────┬───────────────┘
+                                                                              │
+                                                                    check_first_source_navigate
+                                                                              │
+                                                                    ┌─────────┴─────────┐
+                                                                    │                   │
+                                                              is_first?            not first
+                                                                    │                   │
+                                                        update_navigate_examples        │
+                                                                    │                   │
+                                                                    └─────────┬─────────┘
+                                                                              │
+                                                                        ask_index_now
+                                                                              │
+                                                                    ┌─────────┴─────────┐
+                                                                    │                   │
+                                                                   yes                 no
+                                                                    │                   │
+                                                            suggest_build_skill         │
+                                                                    │                   │
+                                                                    └─────────┬─────────┘
+                                                                              │
+                                                                           success
 ```
-
-| Finding | Implication |
-|---------|-------------|
-| `docusaurus.config.js` | Docusaurus site - check `sidebars.js` for structure |
-| `mkdocs.yml` | MkDocs site - nav structure in yml file |
-| `conf.py` | Sphinx docs - check `toctree` directives |
-| `i18n/` or `/en/` dirs | Multilingual - may need language selection |
-
-This research helps inform the build phase but doesn't block source addition.
-
-Add to config.yaml `sources:` array:
-```yaml
-- id: "{source_id}"
-  type: "git"
-  repo_url: "{repo_url}"
-  repo_owner: "{owner}"
-  repo_name: "{name}"
-  branch: "{branch}"
-  docs_root: "{docs_root}"
-  last_commit_sha: "{sha}"
-  last_indexed_at: null
-```
-
-### Local Source Setup
-
-```bash
-# Create uploads directory
-mkdir -p data/uploads/{source_id}
-```
-
-Instruct user:
-> Place your documents in `data/uploads/{source_id}/`
-> Supported formats: .md, .mdx
-> Let me know when files are in place.
-
-After user confirms, scan directory:
-```bash
-find data/uploads/{source_id} -name "*.md" -o -name "*.mdx"
-```
-
-Add to config.yaml:
-```yaml
-- id: "{source_id}"
-  type: "local"
-  path: "uploads/{source_id}/"
-  description: "{description}"
-  files: []
-  last_indexed_at: null
-```
-
-### Web Source Setup
-
-```bash
-# Create cache directory
-mkdir -p .cache/web/{source_id}
-```
-
-For each URL provided:
-
-1. **Fetch content** using WebFetch tool
-2. **Show user the fetched content** for approval
-3. **If approved**, save as markdown to `.cache/web/{source_id}/{slug}.md`
-4. **Generate filename** from URL path (e.g., `testing-implementation-details.md`)
-5. **Calculate content hash** (SHA-256 of content)
-
-**Important:** Never auto-save web content. User must approve each fetched article before caching.
-
-Add to config.yaml:
-```yaml
-- id: "{source_id}"
-  type: "web"
-  description: "{description}"
-  urls:
-    - url: "{url}"
-      title: "{title}"
-      cached_file: "{filename}.md"
-      fetched_at: "{timestamp}"
-      content_hash: "sha256:{hash}"
-  cache_dir: ".cache/web/{source_id}/"
-  last_indexed_at: null
-```
-
-### Generated-Docs Source Setup
-
-**See:** `lib/corpus/patterns/sources/generated-docs.md` for URL discovery operations.
-
-1. **Clone source repo** (for SHA tracking):
-```bash
-git clone --depth 1 --branch {branch} {source_repo_url} .source/{source_id}
-sha=$(git -C .source/{source_id} rev-parse HEAD)
-```
-
-2. **Discover URLs** from web output:
-   - First, try sitemap: `WebFetch: {sitemap_url}`
-   - If no sitemap, crawl from base URL
-   - Show discovered URLs to user for confirmation
-
-3. **Add to config.yaml:**
-```yaml
-- id: "{source_id}"
-  type: "generated-docs"
-
-  source_repo:
-    url: "{source_repo_url}"
-    branch: "{branch}"
-    docs_root: "{docs_root}"
-    last_commit_sha: "{sha}"
-
-  web_output:
-    base_url: "{web_base_url}"
-    sitemap_url: "{sitemap_url}"  # if available
-    discovered_urls:
-      - path: "/path1"
-        title: "Page Title 1"
-      - path: "/path2"
-        title: "Page Title 2"
-
-  cache:
-    enabled: false
-    dir: ".cache/web/{source_id}/"
-
-  last_indexed_at: null
-```
-
-**Important notes:**
-- Content is fetched live via WebFetch (no pre-caching needed)
-- Source repo clone is shallow and only for SHA tracking
-- `discovered_urls` is populated by sitemap/crawl discovery
-
-### llms-txt Source Setup
-
-**See:** `lib/corpus/patterns/sources/llms-txt.md` for manifest parsing and caching operations.
-
-1. **Fetch and parse manifest:**
-```
-WebFetch: {manifest_url}
-Parse: Extract title, summary, sections, URLs
-```
-
-2. **Hash manifest for change detection:**
-```python
-import hashlib
-manifest_hash = hashlib.sha256(manifest_content.encode()).hexdigest()
-```
-
-3. **Setup cache directory:**
-```bash
-mkdir -p .cache/llms-txt/{source_id}
-```
-
-4. **Cache pages based on strategy:**
-   - **full**: Fetch and cache all pages from manifest
-   - **selective**: Fetch only specified sections
-   - **on-demand**: Skip caching, fetch live when navigating
-
-5. **Add to config.yaml:**
-```yaml
-- id: "{source_id}"
-  type: "llms-txt"
-
-  manifest:
-    url: "{manifest_url}"
-    last_hash: "sha256:{hash}"
-    last_fetched_at: "{timestamp}"
-
-  urls:
-    base_url: "{base_url}"
-    suffix: ".md"
-
-  cache:
-    enabled: true
-    dir: ".cache/llms-txt/{source_id}/"
-    strategy: "{strategy}"
-    sections: ["{section1}", "{section2}"]  # if selective
-
-  structure:
-    title: "{title}"
-    summary: "{summary}"
-    sections:
-      - name: "{section_name}"
-        urls:
-          - path: "{path}"
-            title: "{page_title}"
-
-  last_indexed_at: null
-```
-
-**Important notes:**
-- Raw markdown content requires no HTML extraction
-- Manifest hash enables lightweight change detection
-- Section structure can inform index organization
 
 ---
 
-## Step 4b: Update Navigate Skill Examples (First Source Only)
+## Reference Documentation
 
-**Similar to upgrade skill's content quality checks and regeneration.**
-
-When adding the **first source** to a corpus (sources array was empty), update the navigate skill with project-specific examples.
-
-### Detection
-
-```bash
-# Check for generic examples in navigate skill
-grep -q "{source-name}" skills/navigate/SKILL.md 2>/dev/null && echo "HAS_GENERIC_EXAMPLES"
-grep -q "{source-name}" commands/navigate.md 2>/dev/null && echo "HAS_GENERIC_COMMAND_EXAMPLES"
-
-# Also check for the "Worked Example" with placeholder values
-grep -q "repo_owner: example" skills/navigate/SKILL.md 2>/dev/null && echo "HAS_GENERIC_WORKED_EXAMPLE"
-```
-
-### If Generic Examples Found
-
-Replace generic placeholders with actual source info:
-
-| Generic | Replace With | Example |
-|---------|--------------|---------|
-| `{source-name}` | Actual source_id | `polars`, `claude-code` |
-| `{source-name}:path/to/file.md` | Real example from source | `polars:reference/expressions.md` |
-| `repo_owner: example` | Actual repo owner | `repo_owner: pola-rs` |
-| `repo_name: docs` | Actual repo name | `repo_name: polars` |
-
-**For git sources:**
-1. Use the source's `repo_owner`, `repo_name`, `branch`, `docs_root` from config
-2. Find a real example file from the cloned source: `ls .source/{source_id}/{docs_root}/ | head -1`
-3. Update the "Worked Example" section with actual values
-
-**For llms-txt sources:**
-1. Use the manifest URL and base_url from config
-2. Find a real section from the manifest structure
-3. Update examples to show llms-txt path format
-
-**Skip this step if:**
-- Sources array already had entries (not the first source)
-- No `{source-name}` placeholders found (already customized)
+- **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
+- **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
+- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
+- **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
+- **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
 
 ---
 
-## Step 5: Index Prompt
+## Pattern Documentation
 
-Ask user:
-> Would you like to add entries from this source to the index now?
+Source-specific operations referenced by this workflow:
 
-### If yes:
-
-1. Scan the new source for available documents
-2. **Detect large structured files** (see below)
-3. Show document list to user
-4. Ask which documents to include
-5. Collaboratively add entries to `data/index.md`
-6. Use `{source_id}:{path}` format for all entries
-7. Update `last_indexed_at` for the source in config
-
-### Detecting Large Structured Files
-
-**See:** `lib/corpus/patterns/scanning.md` for large file detection patterns.
-
-Check for files that are too large to read directly:
-
-Using Claude tools:
-```
-Read: {source_path}/{file} (check line count)
-If > 1000 lines, mark with ⚡ GREP
-```
-
-Using bash:
-```bash
-# Find files over 1000 lines
-wc -l {source_path}/*.graphql {source_path}/*.json {source_path}/*.yaml 2>/dev/null | awk '$1 > 1000'
-```
-
-**File types to check:**
-- GraphQL schemas (`.graphql`, `.gql`)
-- OpenAPI/Swagger specs (`.yaml`, `.json`)
-- JSON Schema files
-- Any file > 1000 lines
-
-**Mark these in the index with `⚡ GREP`:**
-
-```markdown
-- **GraphQL Schema** `source-id:schema.graphql` ⚡ GREP - API schema (15k lines). Search with: `grep -n "^type {Name}" ... -A 30`
-```
-
-The `⚡ GREP` marker tells the navigator to use Grep instead of Read.
-
-Example entries:
-```markdown
-## New Section (from {source_id})
-
-- **Document Title** `{source_id}:path/to/file.md` - Brief description
-```
-
-### If no:
-
-- Note that source is configured but not yet indexed
-- User can run `hiivmind-corpus-build` or `hiivmind-corpus-enhance` later
+- **Git sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/git.md`
+- **Local sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/local.md`
+- **Web sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/web.md`
+- **llms-txt sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/llms-txt.md`
+- **Generated docs:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/generated-docs.md`
+- **PDF processing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/pdf.md`
+- **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
 
 ---
 
-## Example Sessions
+## Related Skills
 
-### Adding a Git Repository
-
-**User**: "Add TanStack Query docs to this corpus"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: Source type: **git**
-**Step 3**: Collect:
-- Repo: `https://github.com/TanStack/query`
-- Source ID: `tanstack-query`
-- Branch: `main`
-- Docs root: `docs/`
-**Step 4**: Clone to `.source/tanstack-query/`, add to config
-**Step 5**: Ask about indexing
-
----
-
-### Adding Local Documents
-
-**User**: "I want to add our team's API documentation"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: Source type: **local**
-**Step 3**: Collect:
-- Source ID: `team-api-docs`
-- Description: `Internal API documentation`
-**Step 4**: Create `data/uploads/team-api-docs/`, wait for files
-**Step 5**: Offer to index
-
----
-
-### Adding Web Articles
-
-**User**: "Add these testing blog posts to my corpus"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: Source type: **web**
-**Step 3**: Collect:
-- Source ID: `kent-testing-blog`
-- Description: `Testing best practices from Kent C. Dodds`
-- URLs:
-  - `https://kentcdodds.com/blog/testing-implementation-details`
-  - `https://kentcdodds.com/blog/common-mistakes-with-react-testing-library`
-**Step 4**:
-- Fetch first URL, show content to user
-- User approves → save to `.cache/web/kent-testing-blog/testing-implementation-details.md`
-- Repeat for each URL
-- Add to config
-**Step 5**: Offer to index
-
----
-
-### Adding Generated-Docs (Auto-Generated Documentation)
-
-**User**: "Add the GitHub CLI manual - it's generated from the cli/cli repo"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: Source type: **generated-docs**
-**Step 3**: Collect:
-- Source ID: `gh-cli-manual`
-- Source repo: `https://github.com/cli/cli`
-- Branch: `trunk`
-- Docs root: `cmd/` (where command definitions live)
-- Web base URL: `https://cli.github.com/manual`
-- Sitemap URL: `https://cli.github.com/sitemap.xml`
-**Step 4**:
-- Clone source repo (shallow): `git clone --depth 1 https://github.com/cli/cli .source/gh-cli-manual`
-- Get SHA for tracking
-- Fetch sitemap, discover 165 URLs
-- Show discovered URLs to user: "Found 165 command pages. Add all?"
-- Add to config with discovered_urls
-**Step 5**: Offer to index (add entries to index.md pointing to discovered URLs)
-
-**Key difference from web source**: No pre-caching. Content is fetched live when navigating.
-
----
-
-### Adding llms.txt Source
-
-**User**: "Add the Claude Code documentation"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: Detect llms.txt at `https://code.claude.com/docs/llms.txt`
-- Parse manifest: "Claude Code", 47 pages, 8 sections
-- User confirms llms-txt source type
-**Step 3**: Collect:
-- Source ID: `claude-code-docs`
-- Manifest URL: `https://code.claude.com/docs/llms.txt`
-- Base URL: `https://code.claude.com/docs/en`
-- Caching strategy: `selective`
-- Sections to cache: `["skills", "agents"]`
-**Step 4**:
-- Hash manifest for change detection
-- Setup cache directory
-- Fetch and cache selected sections (raw markdown)
-- Add to config with structure
-**Step 5**: Offer to index
-
-**Key difference from web source**: Structured discovery via manifest, raw markdown access (10-30x smaller), hash-based change detection.
-
----
-
-### Adding a Large PDF Book
-
-**User**: "Add this programming book PDF to my corpus"
-
-**Step 1**: Read config, list existing sources
-**Step 2**: User provides path to `rust-book.pdf` (350 pages)
-**Step 2c**: PDF Splitting workflow:
-- Check pymupdf is available
-- Run detect: `python -m lib.corpus.tools.split_pdf detect rust-book.pdf`
-- Display: "Found 21 chapters via TOC. Split for better indexing?"
-- User confirms
-- Run split: `python -m lib.corpus.tools.split_pdf split rust-book.pdf -o data/uploads/rust-book --yes`
-- Read `manifest.json` for file list
-**Step 3**: Source ID: `rust-book`, derived from filename
-**Step 4**: Add as local source:
-```yaml
-- id: "rust-book"
-  type: "local"
-  path: "uploads/rust-book/"
-  description: "The Rust Programming Language (21 chapters from rust-book.pdf)"
-  files:
-    - "01_Getting_Started.pdf"
-    - "02_Programming_a_Guessing_Game.pdf"
-    # ... from manifest.json
-  last_indexed_at: null
-```
-**Step 5**: Offer to index - use manifest to suggest entries:
-```markdown
-## The Rust Programming Language (from rust-book)
-
-- **Getting Started** `rust-book:01_Getting_Started.pdf` - Installation and Hello World (pages 1-18)
-- **Guessing Game** `rust-book:02_Programming_a_Guessing_Game.pdf` - First project (pages 19-42)
-```
-
-**Key point**: PDF is NOT a source type - it's pre-processed into a local source. Chapters stored in `data/uploads/` like any other local files.
-
----
-
-## Reference
-
-**Pattern documentation:**
-- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt, pdf)
-- `lib/corpus/patterns/sources/pdf.md` - PDF chapter splitting pre-processing
-- `lib/corpus/patterns/scanning.md` - File discovery and large file detection
-- `lib/corpus/patterns/paths.md` - Path resolution
-
-**Related skills:**
-- Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
-- Build full index: `skills/hiivmind-corpus-build/SKILL.md`
-- Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
-- Refresh sources: `skills/hiivmind-corpus-refresh/SKILL.md`
-- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`
-- Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
-- Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
-- Gateway command: `commands/hiivmind-corpus.md`
+- Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
+- Build full index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
+- Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`
+- Refresh sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
