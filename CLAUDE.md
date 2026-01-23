@@ -44,6 +44,26 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
+├── lib/workflow/                     # Workflow framework documentation
+│   ├── consequences.md               # Hub document (links to consequences/)
+│   ├── consequences/                 # Modular consequence documentation
+│   │   ├── README.md                 # Taxonomy and quick reference
+│   │   ├── core/                     # Intrinsic workflow engine (3 files)
+│   │   │   ├── workflow.md           # State, evaluation, user interaction, control flow, skill, utility
+│   │   │   ├── shared.md             # Common patterns: interpolation, parameters, failure handling
+│   │   │   └── intent-detection.md   # 3VL routing system
+│   │   └── extensions/               # Domain-specific corpus extensions (5 files)
+│   │       ├── README.md             # Extension overview
+│   │       ├── file-system.md        # Corpus file operations
+│   │       ├── config.md             # Config.yaml operations
+│   │       ├── git.md                # Git operations
+│   │       ├── web.md                # Web operations
+│   │       └── discovery.md          # Corpus discovery
+│   ├── schema.md                     # Workflow YAML structure
+│   ├── preconditions.md              # Boolean evaluations
+│   ├── execution.md                  # Turn loop
+│   └── state.md                      # Runtime state structure
+│
 ├── templates/                        # Templates for generating new corpus skills
 │
 └── docs/                             # Specifications and design docs
@@ -244,6 +264,7 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
+| Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
 
 ### When Adding New Features
 

@@ -345,7 +345,10 @@ All file paths in the index use the format: `{source_id}:{relative_path}`
 
 - **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
 - **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
+- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
+  - Core operations: `consequences/core/workflow.md` (spawn_agent, state, evaluation)
+  - Config operations: `consequences/extensions/config.md`
+  - File operations: `consequences/extensions/file-system.md`
 - **Parallel Scanning:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/parallel-scanning.md`
 - **Index Generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-generation.md`
 

@@ -310,7 +310,10 @@ check_has_corpus_plugins              confirm_context_c
 
 - **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
 - **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
+- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
+  - Core operations: `consequences/core/workflow.md` (skill invocation, state, evaluation)
+  - File operations: `consequences/extensions/file-system.md`
+  - Config operations: `consequences/extensions/config.md`
 - **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
 - **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
 

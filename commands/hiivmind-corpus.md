@@ -93,7 +93,7 @@ LOOP:
 
      USER_PROMPT NODE:
      - Build AskUserQuestion from node.prompt:
-       ```json
+       '```json
        {
          "questions": [{
            "question": "[interpolated node.prompt.question]",
@@ -102,7 +102,7 @@ LOOP:
            "options": [map node.prompt.options to {label, description}]
          }]
        }
-       ```
+       ```'
      - Present via AskUserQuestion tool
      - Wait for user response
      - Find matching handler in node.on_response:
@@ -133,13 +133,13 @@ LOOP:
      - CONTINUE
 
   4. Record in history:
-     ```yaml
+     '```yaml
      history.append({
        node: previous_node_name,
        outcome: { success: true/false, branch: "true"/"false", response: "id" },
        timestamp: now()
      })
-     ```
+     ```'
 
   5. Update position:
      - previous_node = current_node (before update)
@@ -152,31 +152,13 @@ UNTIL ending reached
 
 ## Variable Interpolation
 
-Replace `${...}` patterns in strings:
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/variables.md`
 
-| Pattern | Resolution |
-|---------|------------|
-| `${ARGUMENTS}` | Command-line arguments passed to gateway |
-| `${arguments}` | `state.arguments` |
-| `${intent}` | `state.intent` |
-| `${target_corpus}` | `state.target_corpus` |
-| `${target_topic}` | `state.target_topic` |
-| `${source_url}` | `state.source_url` |
-| `${computed.context_type}` | `state.computed.context_type` |
-| `${computed.available_corpora}` | `state.computed.available_corpora` |
-| `${computed.selected_corpus}` | `state.computed.selected_corpus` |
-| `${computed.intent_flags}` | `state.computed.intent_flags` (3VL values) |
-| `${computed.intent_matches}` | `state.computed.intent_matches` (rule results) |
-| `${computed.matched_action}` | `state.computed.matched_action` |
-| `${flags.has_arguments}` | `state.flags.has_arguments` |
-| `${user_responses.node_name.id}` | Selected option id |
-| `${user_responses.node_name.raw.text}` | Custom text input |
-
-**Resolution order:**
-1. `state.computed.{path}`
-2. `state.flags.{path}`
-3. `state.user_responses.{path}`
-4. `state.{path}`
+This workflow uses standard variable interpolation for `${...}` patterns. Common variables used in this workflow:
+- `${arguments}`, `${intent}`, `${target_corpus}`, `${source_url}`
+- `${computed.*}` - Derived values (context_type, available_corpora, intent_flags)
+- `${flags.*}` - Boolean state flags
+- `${user_responses.*}` - User prompt responses
 
 ---
 
@@ -191,64 +173,21 @@ The gateway uses 3-Valued Logic (3VL) for compound intent handling. This allows 
 
 **Intent Mapping:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
 
-### Quick Reference
-
-| Value | Meaning |
-|-------|---------|
-| `T` | True - positive keyword matched |
-| `F` | False - negative keyword matched |
-| `U` | Unknown - no keywords matched |
-
-**Scoring:** T+T or F+F = +2, soft matches = +1, U+U = 0, T+F or F+T = EXCLUDED
-
-**Winner:** Clear winner needs top score >= second + 2, otherwise disambiguation menu
-
 ---
 
 ## Skill Invocation
 
-The `invoke_skill` consequence type delegates to another skill:
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences/core/workflow.md` § invoke_skill
 
-**Effect:**
-1. Display context summary to user
-2. Invoke the Skill tool with the skill name
-3. Pass any arguments to the skill
-4. The skill takes over the conversation
-
-**Example:**
-```yaml
-- type: invoke_skill
-  skill: "hiivmind-corpus-init"
-  args: "${source_url}"
-```
-
-Translates to Skill tool invocation:
-```
-Skill: hiivmind-corpus-init
-Args: [source_url value]
-```
+This workflow delegates to corpus skills (init, build, refresh, etc.) using the `invoke_skill` consequence. The invoked skill takes over the conversation.
 
 ---
 
 ## Corpus Discovery
 
-The `discover_installed_corpora` consequence type scans for installed corpora:
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences/extensions/discovery.md` § discover_installed_corpora
 
-**Locations to scan:**
-1. User-level: `~/.claude/skills/hiivmind-corpus-*`
-2. Repo-local: `.claude-plugin/skills/hiivmind-corpus-*`
-3. Marketplace plugins: `*/hiivmind-corpus-*/.claude-plugin/plugin.json`
-
-**Returns array of:**
-```yaml
-- name: "polars"
-  status: "built"        # built | stale | placeholder
-  description: "Polars DataFrame documentation"
-  path: "/path/to/corpus"
-  keywords: ["polars", "dataframe"]
-```
-
-See `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md` for full algorithm.
+This workflow discovers installed corpora using the `discover_installed_corpora` consequence. For the full discovery algorithm, see `lib/corpus/patterns/discovery.md`.
 
 ---
 
@@ -288,32 +227,17 @@ check_arguments
 
 ---
 
-## Intent Flags and Rules
+## Intent Configuration
 
-Intent flags and rules are defined in a separate configuration file for maintainability.
+Intent flags and rules are defined externally for maintainability.
 
-**Configuration:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
+**See:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
 
-### Flags Overview
+This file defines:
+- **11 intent flags** - Keywords that detect user intents
+- **19 intent rules** - Flag combinations mapped to actions with priorities
 
-11 intent flags detect different user intents:
-- **Creation:** has_init, has_add_source, has_build
-- **Navigation:** has_query, has_list, has_show
-- **Maintenance:** has_refresh, has_enhance, has_upgrade
-- **Other:** has_help, has_awareness
-
-### Rules Overview
-
-19 intent rules map flag combinations to actions, organized by priority:
-- **100:** Pure help (all others false)
-- **95:** Pure listing
-- **90:** Single intents (init, build, refresh, etc.)
-- **85:** Query/navigate with qualifiers
-- **80:** Help + X combinations
-- **70:** Multi-step intents (init + build)
-- **10:** Empty input fallback
-
-See `intent-mapping.yaml` for the complete definitions.
+For 3VL semantics (scoring, priorities, winner determination), see the framework documentation referenced above.
 
 ---
 
@@ -332,7 +256,10 @@ See `intent-mapping.yaml` for the complete definitions.
 ### Workflow Framework
 - **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
 - **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
+- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
+  - Core operations: `consequences/core/workflow.md` (state, evaluation, skill invocation)
+  - Intent detection: `consequences/core/intent-detection.md`
+  - Discovery: `consequences/extensions/discovery.md`
 - **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
 - **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
 

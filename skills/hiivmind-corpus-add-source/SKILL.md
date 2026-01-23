@@ -248,7 +248,12 @@ ask_source_input                           detect_pdf
 
 - **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
 - **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
+- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
+  - Core operations: `consequences/core/workflow.md`
+  - Git operations: `consequences/extensions/git.md`
+  - Config operations: `consequences/extensions/config.md`
+  - File operations: `consequences/extensions/file-system.md`
+  - Web operations: `consequences/extensions/web.md`
 - **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
 - **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
 
