@@ -34,7 +34,9 @@ Execute this workflow deterministically. State persists in conversation context 
      context_type: null
      available_corpora: []
      selected_corpus: null
-     detected_intent: null
+     intent_flags: {}            # 3VL flag values (T/F/U)
+     intent_matches: null        # 3VL rule matching results
+     matched_action: null        # Action from winning rule
      extracted_project: null
      extracted_corpus: null
    flags:
@@ -42,7 +44,6 @@ Execute this workflow deterministically. State persists in conversation context 
      in_corpus_dir: false
      in_marketplace: false
      has_installed_corpora: false
-     is_compound_intent: false
      corpora_discovered: false
    checkpoints: {}
    phase: "detect"
@@ -164,7 +165,9 @@ Replace `${...}` patterns in strings:
 | `${computed.context_type}` | `state.computed.context_type` |
 | `${computed.available_corpora}` | `state.computed.available_corpora` |
 | `${computed.selected_corpus}` | `state.computed.selected_corpus` |
-| `${computed.detected_intent}` | `state.computed.detected_intent` |
+| `${computed.intent_flags}` | `state.computed.intent_flags` (3VL values) |
+| `${computed.intent_matches}` | `state.computed.intent_matches` (rule results) |
+| `${computed.matched_action}` | `state.computed.matched_action` |
 | `${flags.has_arguments}` | `state.flags.has_arguments` |
 | `${user_responses.node_name.id}` | Selected option id |
 | `${user_responses.node_name.raw.text}` | Custom text input |
@@ -177,18 +180,28 @@ Replace `${...}` patterns in strings:
 
 ---
 
-## Keyword Detection
+## 3VL Intent Detection
 
-The `evaluate_keywords` consequence type is used to match user input against keyword sets. Match the **first** keyword set that contains a phrase found in the input (case-insensitive).
+The gateway uses 3-Valued Logic (3VL) for compound intent handling. This allows inputs like "help me initialize" to correctly route to init rather than help.
 
-**Algorithm:**
-```
-FOR each keyword_set IN keyword_sets:
-  FOR each keyword IN keyword_set.keywords:
-    IF input.toLowerCase().includes(keyword.toLowerCase()):
-      RETURN keyword_set.name
-RETURN null
-```
+**Framework Documentation:**
+- **Semantics & Scoring:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/framework.md`
+- **Algorithms:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/execution.md`
+- **Variables:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/variables.md`
+
+**Intent Mapping:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
+
+### Quick Reference
+
+| Value | Meaning |
+|-------|---------|
+| `T` | True - positive keyword matched |
+| `F` | False - negative keyword matched |
+| `U` | Unknown - no keywords matched |
+
+**Scoring:** T+T or F+F = +2, soft matches = +1, U+U = 0, T+F or F+T = EXCLUDED
+
+**Winner:** Clear winner needs top score >= second + 2, otherwise disambiguation menu
 
 ---
 
@@ -255,37 +268,52 @@ check_arguments
     │                                              ├─► list → delegate_discover
     │                                              └─► help → display_help
     │
-    └─► has args ──► detect_intent
-                          │
-                          ├─► init keywords ────► extract_project ──► delegate_init
-                          ├─► add-source keywords ─► detect_context → delegate_add_source
-                          ├─► build keywords ───► detect_context → delegate_build
-                          ├─► navigate keywords ─► discover_corpora → delegate_navigate
-                          ├─► refresh keywords ──► extract_corpus → delegate_refresh
-                          ├─► enhance keywords ──► extract_topic → delegate_enhance
-                          ├─► upgrade keywords ──► extract_corpus → delegate_upgrade
-                          ├─► discover keywords ─► delegate_discover
-                          ├─► awareness keywords ► delegate_awareness
-                          ├─► help keywords ────► display_help
-                          └─► ambiguous ────────► ask_clarification
+    └─► has args ──► parse_intent_flags ──► match_intent_rules
+                                                    │
+                          ┌─────────────────────────┴─────────────────────────┐
+                          │                                                   │
+                    clear_winner                                        ambiguous
+                          │                                                   │
+                          ▼                                                   ▼
+                 execute_matched_action                         show_disambiguation_menu
+                          │                                                   │
+          ┌───────────────┼───────────────┬─────────────┐                     │
+          │               │               │             │                     │
+          ▼               ▼               ▼             ▼                     │
+    extract_project  detect_context  discover_corpora  ...                    │
+          │               │               │             │                     │
+          ▼               ▼               ▼             ▼                     │
+    delegate_init   delegate_*      delegate_navigate  ...◄──────────────────┘
 ```
 
 ---
 
-## Intent Keywords
+## Intent Flags and Rules
 
-| Intent | Keywords |
-|--------|----------|
-| init | create, new, index, set up, scaffold, initialize, start corpus |
-| add_source | add, include, import, fetch, clone, source, extend with, also index |
-| build | build, analyze, scan, create index, finish setup, index now |
-| navigate | navigate, find, search, look up, what does, how do, explain, show me, where is |
-| refresh | update, refresh, sync, check, upstream, stale, status, is up to date, current, behind |
-| enhance | expand, deepen, more detail, enhance, elaborate, deeper coverage, add depth |
-| upgrade | upgrade, migrate, latest, standards, template, modernize, update structure |
-| discover | list, show, available, installed, discover, what corpora, which corpora |
-| awareness | awareness, configure claude, setup claude, capabilities, tour, what can, claude.md, teach claude |
-| help | help, commands, ?, usage, guide |
+Intent flags and rules are defined in a separate configuration file for maintainability.
+
+**Configuration:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
+
+### Flags Overview
+
+11 intent flags detect different user intents:
+- **Creation:** has_init, has_add_source, has_build
+- **Navigation:** has_query, has_list, has_show
+- **Maintenance:** has_refresh, has_enhance, has_upgrade
+- **Other:** has_help, has_awareness
+
+### Rules Overview
+
+19 intent rules map flag combinations to actions, organized by priority:
+- **100:** Pure help (all others false)
+- **95:** Pure listing
+- **90:** Single intents (init, build, refresh, etc.)
+- **85:** Query/navigate with qualifiers
+- **80:** Help + X combinations
+- **70:** Multi-step intents (init + build)
+- **10:** Empty input fallback
+
+See `intent-mapping.yaml` for the complete definitions.
 
 ---
 
@@ -301,11 +329,17 @@ check_arguments
 
 ## Reference Documentation
 
+### Workflow Framework
 - **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
 - **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
 - **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md`
 - **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
 - **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
+
+### Intent Detection
+- **3VL Framework:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/framework.md`
+- **Execution Algorithms:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/execution.md`
+- **Variable Interpolation:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/variables.md`
 
 ---
 
