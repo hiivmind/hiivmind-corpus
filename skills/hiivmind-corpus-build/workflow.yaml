@@ -1,0 +1,1374 @@
+name: build
+version: "1.0.0"
+description: >
+  Build the documentation corpus index. Prepares all sources, scans for content,
+  consults user on organization, generates index.md, and updates config metadata.
+  Supports single and multi-source corpora, with tiered indexing for large (500+) corpora.
+
+entry_preconditions:
+  - type: config_exists
+    error_message: "No config.yaml found. Run hiivmind-corpus-init first."
+
+initial_state:
+  phase: "prepare"
+  sources: []
+  scan_results: {}
+  user_preferences:
+    use_case: null
+    priority_sources: []
+    skip_sections: []
+    organization: null           # by-source | by-topic | mixed
+  segmentation:
+    strategy: null               # single | tiered | by-section | by-source
+    sections: []
+  index:
+    content: null
+    sub_indexes: []
+  flags:
+    config_found: false
+    is_multi_source: false
+    is_large_corpus: false
+    needs_segmentation: false
+    user_satisfied: false
+    sources_prepared: false
+    scan_completed: false
+
+start_node: read_config
+
+nodes:
+  # ===========================================================================
+  # PHASE 1: PREPARE SOURCES
+  # ===========================================================================
+
+  read_config:
+    type: action
+    description: "Read corpus configuration and extract sources"
+    actions:
+      - type: display_message
+        message: "Reading corpus configuration..."
+      - type: read_config
+        store_as: config
+      - type: set_flag
+        flag: config_found
+        value: true
+      - type: set_state
+        field: sources
+        value: "${config.sources}"
+      - type: display_message
+        message: |
+          Found corpus: ${config.corpus.name}
+          Sources configured: ${len(config.sources)}
+    on_success: count_sources
+    on_failure: error_no_config
+
+  count_sources:
+    type: action
+    description: "Count sources and set multi-source flag"
+    actions:
+      - type: evaluate
+        expression: "len(sources) > 1"
+        set_flag: is_multi_source
+      - type: evaluate
+        expression: "len(sources)"
+        store_as: computed.source_count
+    on_success: check_has_sources
+    on_failure: check_has_sources
+
+  check_has_sources:
+    type: conditional
+    description: "Check if any sources are configured"
+    condition:
+      type: evaluate_expression
+      expression: "len(sources) > 0"
+    branches:
+      true: prepare_sources_start
+      false: error_no_sources
+
+  prepare_sources_start:
+    type: action
+    description: "Initialize source preparation loop"
+    actions:
+      - type: set_state
+        field: computed.current_source_index
+        value: 0
+      - type: set_state
+        field: computed.prepared_sources
+        value: []
+      - type: display_message
+        message: "Preparing ${computed.source_count} source(s)..."
+    on_success: prepare_next_source
+    on_failure: error_prepare_failed
+
+  prepare_next_source:
+    type: conditional
+    description: "Check if more sources to prepare"
+    condition:
+      type: evaluate_expression
+      expression: "computed.current_source_index < len(sources)"
+    branches:
+      true: get_current_source
+      false: sources_prepared_complete
+
+  get_current_source:
+    type: action
+    description: "Get current source from array"
+    actions:
+      - type: compute
+        expression: "sources[computed.current_source_index]"
+        store_as: computed.current_source
+      - type: display_message
+        message: "Preparing source: ${computed.current_source.id} (${computed.current_source.type})"
+    on_success: route_source_type
+    on_failure: error_prepare_failed
+
+  route_source_type:
+    type: conditional
+    description: "Route preparation by source type"
+    condition:
+      type: state_equals
+      field: computed.current_source.type
+      value: "git"
+    branches:
+      true: prepare_git_source
+      false: check_local_source
+
+  check_local_source:
+    type: conditional
+    description: "Check if local source"
+    condition:
+      type: state_equals
+      field: computed.current_source.type
+      value: "local"
+    branches:
+      true: prepare_local_source
+      false: check_web_source
+
+  check_web_source:
+    type: conditional
+    description: "Check if web source"
+    condition:
+      type: state_equals
+      field: computed.current_source.type
+      value: "web"
+    branches:
+      true: prepare_web_source
+      false: check_llms_txt_source
+
+  check_llms_txt_source:
+    type: conditional
+    description: "Check if llms-txt source"
+    condition:
+      type: any_of
+      conditions:
+        - type: state_equals
+          field: computed.current_source.type
+          value: "llms-txt"
+        - type: state_equals
+          field: computed.current_source.type
+          value: "generated-docs"
+    branches:
+      true: prepare_llms_txt_source
+      false: warn_unknown_source_type
+
+  # ---------------------------------------------------------------------------
+  # GIT SOURCE PREPARATION
+  # ---------------------------------------------------------------------------
+
+  prepare_git_source:
+    type: action
+    description: "Verify or clone git source"
+    actions:
+      - type: compute
+        expression: "'.source/' + computed.current_source.id"
+        store_as: computed.clone_path
+      - type: directory_exists_check
+        path: "${computed.clone_path}"
+        store_as: computed.clone_exists
+    on_success: check_git_clone_exists
+    on_failure: clone_git_source
+
+  check_git_clone_exists:
+    type: conditional
+    description: "Check if git clone already exists"
+    condition:
+      type: evaluate_expression
+      expression: "computed.clone_exists == true"
+    branches:
+      true: verify_git_clone
+      false: clone_git_source
+
+  verify_git_clone:
+    type: action
+    description: "Verify existing git clone"
+    actions:
+      - type: display_message
+        message: "  Found existing clone at ${computed.clone_path}"
+      - type: get_sha
+        repo_path: "${computed.clone_path}"
+        store_as: computed.current_sha
+    on_success: mark_source_prepared
+    on_failure: clone_git_source
+
+  clone_git_source:
+    type: action
+    description: "Clone git repository"
+    actions:
+      - type: display_message
+        message: "  Cloning ${computed.current_source.repo_url}..."
+      - type: clone_repo
+        url: "${computed.current_source.repo_url}"
+        dest: "${computed.clone_path}"
+        branch: "${computed.current_source.branch}"
+        depth: 1
+      - type: get_sha
+        repo_path: "${computed.clone_path}"
+        store_as: computed.current_sha
+      - type: display_message
+        message: "  Cloned to ${computed.clone_path} (SHA: ${computed.current_sha})"
+    on_success: mark_source_prepared
+    on_failure: error_clone_failed
+
+  # ---------------------------------------------------------------------------
+  # LOCAL SOURCE PREPARATION
+  # ---------------------------------------------------------------------------
+
+  prepare_local_source:
+    type: action
+    description: "Verify local source directory"
+    actions:
+      - type: compute
+        expression: "'data/uploads/' + computed.current_source.id"
+        store_as: computed.local_path
+      - type: directory_exists_check
+        path: "${computed.local_path}"
+        store_as: computed.local_exists
+    on_success: check_local_exists
+    on_failure: error_local_missing
+
+  check_local_exists:
+    type: conditional
+    description: "Check if local directory exists"
+    condition:
+      type: evaluate_expression
+      expression: "computed.local_exists == true"
+    branches:
+      true: verify_local_has_files
+      false: error_local_missing
+
+  verify_local_has_files:
+    type: action
+    description: "Verify local directory has files"
+    actions:
+      - type: glob_count
+        pattern: "${computed.local_path}/**/*.md"
+        store_as: computed.local_file_count
+      - type: display_message
+        message: "  Found ${computed.local_file_count} files in ${computed.local_path}"
+    on_success: check_local_has_content
+    on_failure: warn_local_empty
+
+  check_local_has_content:
+    type: conditional
+    description: "Check if local has files"
+    condition:
+      type: evaluate_expression
+      expression: "computed.local_file_count > 0"
+    branches:
+      true: mark_source_prepared
+      false: warn_local_empty
+
+  warn_local_empty:
+    type: action
+    description: "Warn about empty local source"
+    actions:
+      - type: display_message
+        message: |
+          ⚠️ Local source '${computed.current_source.id}' has no files.
+          Please place documents in: ${computed.local_path}/
+    on_success: mark_source_prepared
+    on_failure: mark_source_prepared
+
+  # ---------------------------------------------------------------------------
+  # WEB SOURCE PREPARATION
+  # ---------------------------------------------------------------------------
+
+  prepare_web_source:
+    type: action
+    description: "Verify web source cache"
+    actions:
+      - type: compute
+        expression: "'.cache/web/' + computed.current_source.id"
+        store_as: computed.cache_path
+      - type: directory_exists_check
+        path: "${computed.cache_path}"
+        store_as: computed.cache_exists
+    on_success: check_web_cache_exists
+    on_failure: warn_web_cache_missing
+
+  check_web_cache_exists:
+    type: conditional
+    description: "Check if web cache exists"
+    condition:
+      type: evaluate_expression
+      expression: "computed.cache_exists == true"
+    branches:
+      true: verify_web_cache_content
+      false: warn_web_cache_missing
+
+  verify_web_cache_content:
+    type: action
+    description: "Verify web cache has content"
+    actions:
+      - type: glob_count
+        pattern: "${computed.cache_path}/**/*.md"
+        store_as: computed.cache_file_count
+      - type: display_message
+        message: "  Found ${computed.cache_file_count} cached files in ${computed.cache_path}"
+    on_success: mark_source_prepared
+    on_failure: warn_web_cache_missing
+
+  warn_web_cache_missing:
+    type: action
+    description: "Warn about missing web cache"
+    actions:
+      - type: display_message
+        message: |
+          ⚠️ Web source '${computed.current_source.id}' has no cached content.
+          Run hiivmind-corpus-add-source to fetch content.
+    on_success: mark_source_prepared
+    on_failure: mark_source_prepared
+
+  # ---------------------------------------------------------------------------
+  # LLMS-TXT SOURCE PREPARATION
+  # ---------------------------------------------------------------------------
+
+  prepare_llms_txt_source:
+    type: action
+    description: "Verify llms-txt source cache"
+    actions:
+      - type: compute
+        expression: "'.cache/llms-txt/' + computed.current_source.id"
+        store_as: computed.llms_cache_path
+      - type: directory_exists_check
+        path: "${computed.llms_cache_path}"
+        store_as: computed.llms_cache_exists
+      - type: display_message
+        message: "  Checking llms-txt cache at ${computed.llms_cache_path}"
+    on_success: check_llms_cache_exists
+    on_failure: mark_source_prepared
+
+  check_llms_cache_exists:
+    type: conditional
+    description: "Check if llms-txt cache exists"
+    condition:
+      type: evaluate_expression
+      expression: "computed.llms_cache_exists == true"
+    branches:
+      true: mark_source_prepared
+      false: mark_source_prepared
+
+  warn_unknown_source_type:
+    type: action
+    description: "Warn about unknown source type"
+    actions:
+      - type: display_message
+        message: "⚠️ Unknown source type '${computed.current_source.type}' for source '${computed.current_source.id}'"
+    on_success: mark_source_prepared
+    on_failure: mark_source_prepared
+
+  # ---------------------------------------------------------------------------
+  # SOURCE PREPARATION LOOP CONTROL
+  # ---------------------------------------------------------------------------
+
+  mark_source_prepared:
+    type: action
+    description: "Mark current source as prepared and advance"
+    actions:
+      - type: append_state
+        field: computed.prepared_sources
+        value: "${computed.current_source.id}"
+      - type: compute
+        expression: "computed.current_source_index + 1"
+        store_as: computed.current_source_index
+    on_success: prepare_next_source
+    on_failure: prepare_next_source
+
+  sources_prepared_complete:
+    type: action
+    description: "All sources prepared, proceed to scanning"
+    actions:
+      - type: set_flag
+        flag: sources_prepared
+        value: true
+      - type: display_message
+        message: |
+          ✓ Prepared ${len(computed.prepared_sources)} source(s)
+    on_success: route_scanning
+    on_failure: error_prepare_failed
+
+  # ===========================================================================
+  # PHASE 2: SCAN SOURCES
+  # ===========================================================================
+
+  route_scanning:
+    type: conditional
+    description: "Route scanning based on source count"
+    condition:
+      type: flag_set
+      flag: is_multi_source
+    branches:
+      true: spawn_scanner_agents
+      false: scan_single_source
+
+  # ---------------------------------------------------------------------------
+  # SINGLE SOURCE SCANNING (DIRECT)
+  # ---------------------------------------------------------------------------
+
+  scan_single_source:
+    type: reference
+    doc: "lib/corpus/patterns/scanning.md"
+    section: "Single Source Scan"
+    context:
+      source: "${sources[0]}"
+      corpus_path: "${PWD}"
+    next_node: store_single_scan_result
+
+  store_single_scan_result:
+    type: action
+    description: "Store single source scan result"
+    actions:
+      - type: set_state
+        field: scan_results
+        value:
+          "${sources[0].id}": "${computed.scan_result}"
+      - type: compute
+        expression: "computed.scan_result.file_count"
+        store_as: computed.total_files
+    on_success: present_scan_summary
+    on_failure: error_scan_failed
+
+  # ---------------------------------------------------------------------------
+  # MULTI-SOURCE SCANNING (PARALLEL AGENTS)
+  # ---------------------------------------------------------------------------
+
+  spawn_scanner_agents:
+    type: action
+    description: "Spawn parallel source-scanner agents for multi-source corpus"
+    actions:
+      - type: display_message
+        message: "Spawning ${computed.source_count} scanner agents in parallel..."
+      - type: spawn_agents_parallel
+        agent_type: "source-scanner"
+        foreach: "sources"
+        prompt_template: |
+          Scan source '${item.id}' (type: ${item.type}) at corpus path '${PWD}'.
+
+          Source config:
+          - ID: ${item.id}
+          - Type: ${item.type}
+          - Repo URL: ${item.repo_url}
+          - Docs root: ${item.docs_root}
+          - Branch: ${item.branch}
+
+          Return YAML with:
+          - source_id: the source identifier
+          - type: source type
+          - status: ready|missing|error
+          - file_count: total doc files found
+          - sections: array with name, path, file_count
+          - large_files: files over 1000 lines with suggested_grep
+          - framework: detected doc framework
+          - frontmatter_type: yaml|toml|none
+          - notes: any observations
+        collect_as: computed.agent_results
+    on_success: aggregate_scan_results
+    on_failure: error_scan_failed
+
+  aggregate_scan_results:
+    type: action
+    description: "Aggregate results from scanner agents"
+    actions:
+      - type: compute
+        expression: |
+          computed.agent_results.reduce((acc, result) => {
+            acc[result.source_id] = result;
+            return acc;
+          }, {})
+        store_as: scan_results
+      - type: compute
+        expression: "computed.agent_results.reduce((sum, r) => sum + (r.file_count || 0), 0)"
+        store_as: computed.total_files
+      - type: display_message
+        message: "Aggregated results from ${len(computed.agent_results)} source scans"
+    on_success: present_scan_summary
+    on_failure: error_scan_failed
+
+  # ---------------------------------------------------------------------------
+  # SCAN SUMMARY PRESENTATION
+  # ---------------------------------------------------------------------------
+
+  present_scan_summary:
+    type: action
+    description: "Present combined scan summary to user"
+    actions:
+      - type: set_flag
+        flag: scan_completed
+        value: true
+      - type: display_message
+        message: |
+          ## Scan Results
+
+          Found ${computed.source_count} source(s) with ${computed.total_files} total files:
+
+          ${Object.entries(scan_results).map(([id, r]) =>
+            `- **${id}** (${r.type}): ${r.file_count} files` +
+            (r.sections ? `\n  Sections: ${r.sections.map(s => s.name).join(', ')}` : '') +
+            (r.framework && r.framework !== 'none' ? `\n  Framework: ${r.framework}` : '')
+          ).join('\n\n')}
+    on_success: check_corpus_size
+    on_failure: check_corpus_size
+
+  check_corpus_size:
+    type: action
+    description: "Check if corpus is large enough for segmentation"
+    actions:
+      - type: evaluate
+        expression: "computed.total_files >= 500"
+        set_flag: is_large_corpus
+      - type: evaluate
+        expression: "computed.total_files >= 200"
+        set_flag: needs_segmentation
+    on_success: route_segmentation
+    on_failure: route_segmentation
+
+  route_segmentation:
+    type: conditional
+    description: "Route to segmentation discussion if needed"
+    condition:
+      type: flag_set
+      flag: is_large_corpus
+    branches:
+      true: present_segmentation_options
+      false: check_moderate_corpus
+
+  check_moderate_corpus:
+    type: conditional
+    description: "Check if moderate-sized corpus that might benefit from segmentation"
+    condition:
+      type: flag_set
+      flag: needs_segmentation
+    branches:
+      true: suggest_segmentation
+      false: ask_use_case
+
+  # ===========================================================================
+  # PHASE 3: ASK USER PREFERENCES
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # SEGMENTATION OPTIONS (LARGE CORPUS)
+  # ---------------------------------------------------------------------------
+
+  present_segmentation_options:
+    type: user_prompt
+    prompt:
+      question: |
+        This is a large documentation set (${computed.total_files} files).
+        A single index file would be unwieldy.
+
+        Which indexing strategy fits your workflow?
+      header: "Strategy"
+      options:
+        - id: tiered
+          label: "Tiered Index (Recommended)"
+          description: "Main index with links to detailed sub-indexes"
+        - id: by_section
+          label: "Curated Single File"
+          description: "One file, but only top 20-30% of docs"
+        - id: by_source
+          label: "By Source"
+          description: "Separate index file per source"
+    on_response:
+      tiered:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "tiered"
+        next_node: collect_tiered_sections
+      by_section:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "by-section"
+        next_node: ask_use_case
+      by_source:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "by-source"
+        next_node: ask_use_case
+      other:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "tiered"
+        next_node: collect_tiered_sections
+
+  suggest_segmentation:
+    type: user_prompt
+    prompt:
+      question: |
+        This corpus has ${computed.total_files} files - consider segmentation?
+
+        Single index works but could be large. Segmentation organizes docs into sub-indexes.
+      header: "Segment"
+      options:
+        - id: single
+          label: "Single Index (Recommended)"
+          description: "One comprehensive index file"
+        - id: tiered
+          label: "Tiered Index"
+          description: "Main index with sub-indexes for large sections"
+    on_response:
+      single:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "single"
+        next_node: ask_use_case
+      tiered:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "tiered"
+        next_node: collect_tiered_sections
+      other:
+        consequence:
+          - type: set_state
+            field: segmentation.strategy
+            value: "single"
+        next_node: ask_use_case
+
+  collect_tiered_sections:
+    type: user_prompt
+    prompt:
+      question: |
+        For tiered indexing, what are the main sections you want?
+
+        Based on scan, detected sections:
+        ${Object.values(scan_results).flatMap(r => r.sections || []).map(s => `- ${s.name}`).join('\n')}
+
+        Suggest 5-10 top-level categories for the main index.
+      header: "Sections"
+      options:
+        - id: use_detected
+          label: "Use detected sections"
+          description: "Organize by section names found in sources"
+        - id: custom
+          label: "I'll specify custom sections"
+          description: "Define my own organization"
+    on_response:
+      use_detected:
+        consequence:
+          - type: compute
+            expression: "Object.values(scan_results).flatMap(r => r.sections || []).map(s => s.name)"
+            store_as: segmentation.sections
+        next_node: ask_use_case
+      custom:
+        next_node: collect_custom_sections
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_tiered_sections.raw.text.split(',').map(s => s.trim())"
+            store_as: segmentation.sections
+        next_node: ask_use_case
+
+  collect_custom_sections:
+    type: user_prompt
+    prompt:
+      question: "Enter section names (comma-separated):"
+      header: "Sections"
+      options:
+        - id: example
+          label: "Example format"
+          description: "getting-started, guides, reference, api, concepts"
+    on_response:
+      example:
+        next_node: collect_custom_sections
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_custom_sections.raw.text.split(',').map(s => s.trim())"
+            store_as: segmentation.sections
+        next_node: ask_use_case
+
+  # ---------------------------------------------------------------------------
+  # USE CASE AND ORGANIZATION PREFERENCES
+  # ---------------------------------------------------------------------------
+
+  ask_use_case:
+    type: user_prompt
+    prompt:
+      question: "What will you primarily use this corpus for?"
+      header: "Use Case"
+      options:
+        - id: daily_reference
+          label: "Daily reference"
+          description: "Quick lookups while coding"
+        - id: learning
+          label: "Learning"
+          description: "Understanding concepts and patterns"
+        - id: debugging
+          label: "Debugging"
+          description: "Finding solutions to problems"
+        - id: onboarding
+          label: "Team onboarding"
+          description: "Getting new team members up to speed"
+    on_response:
+      daily_reference:
+        consequence:
+          - type: set_state
+            field: user_preferences.use_case
+            value: "daily_reference"
+        next_node: ask_priority_sources
+      learning:
+        consequence:
+          - type: set_state
+            field: user_preferences.use_case
+            value: "learning"
+        next_node: ask_priority_sources
+      debugging:
+        consequence:
+          - type: set_state
+            field: user_preferences.use_case
+            value: "debugging"
+        next_node: ask_priority_sources
+      onboarding:
+        consequence:
+          - type: set_state
+            field: user_preferences.use_case
+            value: "onboarding"
+        next_node: ask_priority_sources
+      other:
+        consequence:
+          - type: set_state
+            field: user_preferences.use_case
+            value: "${user_responses.ask_use_case.raw.text}"
+        next_node: ask_priority_sources
+
+  ask_priority_sources:
+    type: conditional
+    description: "Check if multi-source to ask about priorities"
+    condition:
+      type: flag_set
+      flag: is_multi_source
+    branches:
+      true: ask_source_priorities
+      false: ask_organization
+
+  ask_source_priorities:
+    type: user_prompt
+    prompt:
+      question: |
+        Which sources are most important for your work?
+
+        Sources: ${sources.map(s => s.id).join(', ')}
+
+        List in priority order, or say "all equal".
+      header: "Priority"
+      options:
+        - id: all_equal
+          label: "All equally important"
+          description: "Weight sources equally in index"
+        - id: specify
+          label: "I'll specify priority"
+          description: "List sources in priority order"
+    on_response:
+      all_equal:
+        consequence:
+          - type: set_state
+            field: user_preferences.priority_sources
+            value: "${sources.map(s => s.id)}"
+        next_node: ask_organization
+      specify:
+        next_node: collect_priority_order
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.ask_source_priorities.raw.text.split(',').map(s => s.trim())"
+            store_as: user_preferences.priority_sources
+        next_node: ask_organization
+
+  collect_priority_order:
+    type: user_prompt
+    prompt:
+      question: "List sources in priority order (comma-separated, most important first):"
+      header: "Priority"
+      options:
+        - id: example
+          label: "Example format"
+          description: "${sources[0].id}, ${sources.length > 1 ? sources[1].id : 'other-source'}"
+    on_response:
+      example:
+        next_node: collect_priority_order
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_priority_order.raw.text.split(',').map(s => s.trim())"
+            store_as: user_preferences.priority_sources
+        next_node: ask_organization
+
+  ask_organization:
+    type: user_prompt
+    prompt:
+      question: "How should the index be organized?"
+      header: "Organization"
+      options:
+        - id: by_topic
+          label: "By topic (Recommended)"
+          description: "Group related docs across all sources"
+        - id: by_source
+          label: "By source"
+          description: "Separate sections for each source"
+        - id: mixed
+          label: "Mixed"
+          description: "Topics first, then source-specific sections"
+    on_response:
+      by_topic:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-topic"
+        next_node: ask_skip_sections
+      by_source:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-source"
+        next_node: ask_skip_sections
+      mixed:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "mixed"
+        next_node: ask_skip_sections
+      other:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-topic"
+        next_node: ask_skip_sections
+
+  ask_skip_sections:
+    type: user_prompt
+    prompt:
+      question: |
+        Any sections to skip entirely?
+
+        Common skips: about, support, contributing, changelog
+
+        You can also skip specific sources or sections within sources.
+      header: "Skip"
+      options:
+        - id: none
+          label: "Include everything"
+          description: "Don't skip any sections"
+        - id: common
+          label: "Skip common (about, support, contributing)"
+          description: "Skip typically unneeded sections"
+        - id: specify
+          label: "I'll specify"
+          description: "List sections to skip"
+    on_response:
+      none:
+        consequence:
+          - type: set_state
+            field: user_preferences.skip_sections
+            value: []
+        next_node: generate_index_draft
+      common:
+        consequence:
+          - type: set_state
+            field: user_preferences.skip_sections
+            value: ["about", "support", "contributing", "changelog"]
+        next_node: generate_index_draft
+      specify:
+        next_node: collect_skip_sections
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.ask_skip_sections.raw.text.split(',').map(s => s.trim())"
+            store_as: user_preferences.skip_sections
+        next_node: generate_index_draft
+
+  collect_skip_sections:
+    type: user_prompt
+    prompt:
+      question: "List sections to skip (comma-separated):"
+      header: "Skip"
+      options:
+        - id: example
+          label: "Example format"
+          description: "about, support, changelog"
+    on_response:
+      example:
+        next_node: collect_skip_sections
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_skip_sections.raw.text.split(',').map(s => s.trim())"
+            store_as: user_preferences.skip_sections
+        next_node: generate_index_draft
+
+  # ===========================================================================
+  # PHASE 4: BUILD INDEX
+  # ===========================================================================
+
+  generate_index_draft:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "${segmentation.strategy || 'single'}"
+    context:
+      config: "${config}"
+      sources: "${sources}"
+      scan_results: "${scan_results}"
+      user_preferences: "${user_preferences}"
+      segmentation: "${segmentation}"
+      total_files: "${computed.total_files}"
+    next_node: show_draft_to_user
+
+  show_draft_to_user:
+    type: user_prompt
+    prompt:
+      question: |
+        Here's the draft index. How does it look?
+
+        ${index.content ? index.content.substring(0, 2000) + '...' : '[Draft will be shown]'}
+
+        ${index.content && index.content.length > 2000 ? '(Truncated for display - full index is ' + index.content.length + ' characters)' : ''}
+      header: "Review"
+      options:
+        - id: satisfied
+          label: "Looks good, save it"
+          description: "Proceed to save the index"
+        - id: expand
+          label: "Expand sections"
+          description: "Add more detail to specific sections"
+        - id: reorganize
+          label: "Reorganize"
+          description: "Change the organization structure"
+        - id: add_docs
+          label: "Add missing docs"
+          description: "Include additional documentation"
+    on_response:
+      satisfied:
+        consequence:
+          - type: set_flag
+            flag: user_satisfied
+            value: true
+        next_node: save_index_file
+      expand:
+        next_node: ask_which_sections_to_expand
+      reorganize:
+        next_node: ask_new_organization
+      add_docs:
+        next_node: ask_missing_docs
+      other:
+        consequence:
+          - type: set_state
+            field: computed.refinement_request
+            value: "${user_responses.show_draft_to_user.raw.text}"
+        next_node: apply_custom_refinement
+
+  # ---------------------------------------------------------------------------
+  # ITERATION LOOP: REFINEMENT
+  # ---------------------------------------------------------------------------
+
+  ask_which_sections_to_expand:
+    type: user_prompt
+    prompt:
+      question: "Which sections should I expand with more detail?"
+      header: "Expand"
+      options:
+        - id: all
+          label: "Expand all sections"
+          description: "Add more entries throughout"
+        - id: specific
+          label: "Specific sections only"
+          description: "I'll list which sections"
+    on_response:
+      all:
+        consequence:
+          - type: set_state
+            field: computed.expansion_scope
+            value: "all"
+        next_node: apply_expansion
+      specific:
+        next_node: collect_sections_to_expand
+      other:
+        consequence:
+          - type: set_state
+            field: computed.sections_to_expand
+            value: "${user_responses.ask_which_sections_to_expand.raw.text}"
+          - type: set_state
+            field: computed.expansion_scope
+            value: "specific"
+        next_node: apply_expansion
+
+  collect_sections_to_expand:
+    type: user_prompt
+    prompt:
+      question: "Which sections? (comma-separated)"
+      header: "Sections"
+      options:
+        - id: example
+          label: "Example format"
+          description: "reference, guides"
+    on_response:
+      example:
+        next_node: collect_sections_to_expand
+      other:
+        consequence:
+          - type: set_state
+            field: computed.sections_to_expand
+            value: "${user_responses.collect_sections_to_expand.raw.text}"
+          - type: set_state
+            field: computed.expansion_scope
+            value: "specific"
+        next_node: apply_expansion
+
+  apply_expansion:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Expand Sections"
+    context:
+      current_index: "${index.content}"
+      scope: "${computed.expansion_scope}"
+      sections: "${computed.sections_to_expand}"
+      scan_results: "${scan_results}"
+    next_node: show_draft_to_user
+
+  ask_new_organization:
+    type: user_prompt
+    prompt:
+      question: "How would you like it reorganized?"
+      header: "Reorganize"
+      options:
+        - id: by_topic
+          label: "By topic"
+          description: "Group related docs across sources"
+        - id: by_source
+          label: "By source"
+          description: "Separate sections per source"
+        - id: by_workflow
+          label: "By workflow"
+          description: "Getting started → Common tasks → Advanced"
+    on_response:
+      by_topic:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-topic"
+        next_node: regenerate_index
+      by_source:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-source"
+        next_node: regenerate_index
+      by_workflow:
+        consequence:
+          - type: set_state
+            field: user_preferences.organization
+            value: "by-workflow"
+        next_node: regenerate_index
+      other:
+        consequence:
+          - type: set_state
+            field: computed.reorganize_request
+            value: "${user_responses.ask_new_organization.raw.text}"
+        next_node: apply_custom_reorganization
+
+  regenerate_index:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "${segmentation.strategy || 'single'}"
+    context:
+      config: "${config}"
+      sources: "${sources}"
+      scan_results: "${scan_results}"
+      user_preferences: "${user_preferences}"
+      segmentation: "${segmentation}"
+      total_files: "${computed.total_files}"
+    next_node: show_draft_to_user
+
+  apply_custom_reorganization:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Custom Reorganization"
+    context:
+      current_index: "${index.content}"
+      request: "${computed.reorganize_request}"
+      scan_results: "${scan_results}"
+    next_node: show_draft_to_user
+
+  ask_missing_docs:
+    type: user_prompt
+    prompt:
+      question: "What documentation is missing that you'd like included?"
+      header: "Missing"
+      options:
+        - id: list
+          label: "I'll describe what's missing"
+          description: "Describe the docs to add"
+    on_response:
+      list:
+        next_node: collect_missing_docs_description
+      other:
+        consequence:
+          - type: set_state
+            field: computed.missing_docs_request
+            value: "${user_responses.ask_missing_docs.raw.text}"
+        next_node: apply_missing_docs
+
+  collect_missing_docs_description:
+    type: user_prompt
+    prompt:
+      question: "Describe the missing documentation:"
+      header: "Missing"
+      options:
+        - id: example
+          label: "Example"
+          description: "Need more on error handling, testing patterns"
+    on_response:
+      example:
+        next_node: collect_missing_docs_description
+      other:
+        consequence:
+          - type: set_state
+            field: computed.missing_docs_request
+            value: "${user_responses.collect_missing_docs_description.raw.text}"
+        next_node: apply_missing_docs
+
+  apply_missing_docs:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Add Missing Docs"
+    context:
+      current_index: "${index.content}"
+      request: "${computed.missing_docs_request}"
+      scan_results: "${scan_results}"
+    next_node: show_draft_to_user
+
+  apply_custom_refinement:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Custom Refinement"
+    context:
+      current_index: "${index.content}"
+      request: "${computed.refinement_request}"
+      scan_results: "${scan_results}"
+    next_node: show_draft_to_user
+
+  # ===========================================================================
+  # PHASE 5: SAVE
+  # ===========================================================================
+
+  save_index_file:
+    type: action
+    description: "Write index.md to data directory"
+    actions:
+      - type: display_message
+        message: "Saving index to data/index.md..."
+      - type: write_file
+        path: "data/index.md"
+        content: "${index.content}"
+    on_success: check_sub_indexes
+    on_failure: error_save_failed
+
+  check_sub_indexes:
+    type: conditional
+    description: "Check if sub-indexes need to be saved (tiered strategy)"
+    condition:
+      type: evaluate_expression
+      expression: "index.sub_indexes && index.sub_indexes.length > 0"
+    branches:
+      true: save_sub_indexes
+      false: update_config_metadata
+
+  save_sub_indexes:
+    type: action
+    description: "Save sub-index files for tiered strategy"
+    actions:
+      - type: foreach
+        items: "${index.sub_indexes}"
+        actions:
+          - type: write_file
+            path: "data/${item.filename}"
+            content: "${item.content}"
+          - type: display_message
+            message: "  Saved data/${item.filename}"
+    on_success: update_config_metadata
+    on_failure: warn_sub_index_save_failed
+
+  warn_sub_index_save_failed:
+    type: action
+    description: "Warn about sub-index save failure but continue"
+    actions:
+      - type: display_message
+        message: "⚠️ Some sub-indexes may not have saved correctly. Check data/ directory."
+    on_success: update_config_metadata
+    on_failure: update_config_metadata
+
+  update_config_metadata:
+    type: action
+    description: "Update config.yaml with per-source metadata"
+    actions:
+      - type: display_message
+        message: "Updating config.yaml metadata..."
+      - type: set_timestamp
+        store_as: computed.indexed_at
+      - type: update_config_index_metadata
+        last_updated_at: "${computed.indexed_at}"
+        format: "markdown"
+    on_success: update_per_source_metadata
+    on_failure: warn_config_update_failed
+
+  update_per_source_metadata:
+    type: action
+    description: "Update per-source tracking fields"
+    actions:
+      - type: foreach
+        items: "${sources}"
+        actions:
+          - type: update_source_metadata
+            id: "${item.id}"
+            fields:
+              last_indexed_at: "${computed.indexed_at}"
+      - type: display_message
+        message: "Updated tracking metadata for ${len(sources)} source(s)"
+    on_success: present_completion
+    on_failure: warn_config_update_failed
+
+  warn_config_update_failed:
+    type: action
+    description: "Warn about config update failure but continue"
+    actions:
+      - type: display_message
+        message: |
+          ⚠️ Could not update config.yaml metadata.
+          Index was saved successfully. You may want to manually update the config.
+    on_success: present_completion
+    on_failure: present_completion
+
+  present_completion:
+    type: action
+    description: "Present completion summary and remind to commit"
+    actions:
+      - type: compute
+        expression: |
+          segmentation.strategy === 'tiered'
+            ? 'data/index.md + ' + (index.sub_indexes?.length || 0) + ' sub-indexes'
+            : 'data/index.md'
+        store_as: computed.files_created
+      - type: display_message
+        message: |
+          ## Index Built Successfully
+
+          **Corpus:** ${config.corpus.name}
+          **Sources indexed:** ${len(sources)}
+          **Total entries:** ${computed.total_files}
+          **Strategy:** ${segmentation.strategy || 'single'}
+          **Files created:** ${computed.files_created}
+
+          To commit:
+          ```bash
+          git add data/index.md data/config.yaml
+          git commit -m "Build ${config.corpus.name} docs index"
+          ```
+    on_success: success
+    on_failure: success
+
+  # ===========================================================================
+  # ERROR HANDLING
+  # ===========================================================================
+
+  error_local_missing:
+    type: action
+    description: "Handle missing local source directory"
+    actions:
+      - type: display_message
+        message: |
+          Error: Local source directory not found: ${computed.local_path}
+
+          Create this directory and place your documents there, then run build again.
+    on_success: error_source_preparation
+    on_failure: error_source_preparation
+
+  # ===========================================================================
+  # ENDINGS
+  # ===========================================================================
+
+endings:
+  success:
+    type: success
+    message: |
+      Index built successfully at data/index.md
+
+      Sources indexed: ${len(sources)}
+      Total entries: ${computed.total_files}
+      Strategy: ${segmentation.strategy || 'single'}
+
+      To commit: git add data/index.md data/config.yaml && git commit -m "Build ${config.corpus.name} docs index"
+    summary:
+      corpus_name: "${config.corpus.name}"
+      sources_count: "${len(sources)}"
+      strategy: "${segmentation.strategy || 'single'}"
+      index_path: "data/index.md"
+
+  error_no_config:
+    type: error
+    message: "No config.yaml found"
+    recovery: "hiivmind-corpus-init"
+    details: "Run /hiivmind-corpus-init first to create the corpus scaffold."
+
+  error_no_sources:
+    type: error
+    message: "No sources configured"
+    recovery: "hiivmind-corpus-add-source"
+    details: "Run /hiivmind-corpus-add-source to add documentation sources."
+
+  error_source_preparation:
+    type: error
+    message: "Failed to prepare source '${computed.current_source.id}'"
+    details: "Check source configuration and network connectivity."
+
+  error_prepare_failed:
+    type: error
+    message: "Failed to prepare sources"
+    details: "One or more sources could not be prepared. Check the error messages above."
+
+  error_clone_failed:
+    type: error
+    message: "Failed to clone git repository"
+    details: |
+      Could not clone: ${computed.current_source.repo_url}
+
+      Verify:
+      - URL is correct
+      - Repository is accessible
+      - You have read permissions
+
+  error_scan_failed:
+    type: error
+    message: "Scanning failed"
+    details: "${computed.scan_error}"
+
+  error_save_failed:
+    type: error
+    message: "Failed to save index file"
+    details: "Check write permissions for data/index.md"
+
+  cancelled:
+    type: error
+    message: "Build cancelled by user"

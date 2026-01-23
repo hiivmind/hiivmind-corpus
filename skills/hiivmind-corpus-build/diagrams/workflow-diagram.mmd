@@ -1,0 +1,238 @@
+
+flowchart TD
+    subgraph Phase1["Phase 1: Prepare Sources"]
+        read_config["read_config<br/>Read config.yaml"]
+        count_sources["count_sources<br/>Set is_multi_source flag"]
+        check_has_sources{"check_has_sources<br/>sources > 0?"}
+        prepare_sources_start["prepare_sources_start<br/>Initialize loop"]
+        prepare_next_source{"prepare_next_source<br/>More sources?"}
+        get_current_source["get_current_source<br/>Get source[i]"]
+        route_source_type{"route_source_type<br/>Source type?"}
+
+        subgraph GitPrep["Git Source"]
+            prepare_git_source["prepare_git_source"]
+            check_git_clone_exists{"Clone exists?"}
+            verify_git_clone["verify_git_clone"]
+            clone_git_source["clone_git_source"]
+        end
+
+        subgraph LocalPrep["Local Source"]
+            prepare_local_source["prepare_local_source"]
+            check_local_exists{"Directory exists?"}
+            verify_local_has_files["verify_local_has_files"]
+            warn_local_empty["warn_local_empty"]
+        end
+
+        subgraph WebPrep["Web Source"]
+            prepare_web_source["prepare_web_source"]
+            check_web_cache_exists{"Cache exists?"}
+            verify_web_cache_content["verify_web_cache_content"]
+            warn_web_cache_missing["warn_web_cache_missing"]
+        end
+
+        subgraph LlmsPrep["LLMS-txt Source"]
+            prepare_llms_txt_source["prepare_llms_txt_source"]
+            check_llms_cache_exists{"Cache exists?"}
+        end
+
+        mark_source_prepared["mark_source_prepared<br/>i++"]
+        sources_prepared_complete["sources_prepared_complete<br/>✓ All sources ready"]
+    end
+
+    subgraph Phase2["Phase 2: Scan Sources"]
+        route_scanning{"route_scanning<br/>Multi-source?"}
+
+        subgraph SingleScan["Single Source"]
+            scan_single_source["scan_single_source<br/>Direct scan"]
+            store_single_scan_result["store_single_scan_result"]
+        end
+
+        subgraph MultiScan["Multi-Source (Parallel)"]
+            spawn_scanner_agents["spawn_scanner_agents<br/>🔀 Parallel Task calls"]
+            aggregate_scan_results["aggregate_scan_results"]
+        end
+
+        present_scan_summary["present_scan_summary<br/>Show findings"]
+        check_corpus_size["check_corpus_size<br/>Set size flags"]
+    end
+
+    subgraph Phase3["Phase 3: Ask User Preferences"]
+        route_segmentation{"route_segmentation<br/>≥500 files?"}
+        check_moderate_corpus{"check_moderate_corpus<br/>≥200 files?"}
+        present_segmentation_options["present_segmentation_options<br/>🗣️ Strategy choice"]
+        suggest_segmentation["suggest_segmentation<br/>🗣️ Suggest tiered"]
+        collect_tiered_sections["collect_tiered_sections<br/>🗣️ Section names"]
+        collect_custom_sections["collect_custom_sections<br/>🗣️ Custom sections"]
+        ask_use_case["ask_use_case<br/>🗣️ Primary use"]
+        ask_source_priorities{"ask_priority_sources<br/>Multi-source?"}
+        ask_source_priorities_prompt["ask_source_priorities<br/>🗣️ Source order"]
+        collect_priority_order["collect_priority_order<br/>🗣️ Priority list"]
+        ask_organization["ask_organization<br/>🗣️ by-topic/source/mixed"]
+        ask_skip_sections["ask_skip_sections<br/>🗣️ Sections to skip"]
+        collect_skip_sections["collect_skip_sections<br/>🗣️ Skip list"]
+    end
+
+    subgraph Phase4["Phase 4: Build Index"]
+        generate_index_draft["generate_index_draft<br/>📝 Generate markdown"]
+        show_draft_to_user["show_draft_to_user<br/>🗣️ Review draft"]
+
+        subgraph Refinement["Refinement Loop"]
+            ask_which_sections_to_expand["ask_which_sections_to_expand<br/>🗣️ Which sections?"]
+            collect_sections_to_expand["collect_sections_to_expand"]
+            apply_expansion["apply_expansion"]
+            ask_new_organization["ask_new_organization<br/>🗣️ New structure?"]
+            apply_custom_reorganization["apply_custom_reorganization"]
+            regenerate_index["regenerate_index"]
+            ask_missing_docs["ask_missing_docs<br/>🗣️ What's missing?"]
+            collect_missing_docs_description["collect_missing_docs_description"]
+            apply_missing_docs["apply_missing_docs"]
+            apply_custom_refinement["apply_custom_refinement"]
+        end
+    end
+
+    subgraph Phase5["Phase 5: Save"]
+        save_index_file["save_index_file<br/>💾 Write index.md"]
+        check_sub_indexes{"check_sub_indexes<br/>Tiered strategy?"}
+        save_sub_indexes["save_sub_indexes<br/>💾 Write sub-indexes"]
+        update_config_metadata["update_config_metadata<br/>Update timestamps"]
+        update_per_source_metadata["update_per_source_metadata"]
+        present_completion["present_completion<br/>📋 Summary + commit cmd"]
+    end
+
+    subgraph Endings["Endings"]
+        success(["✅ success"])
+        error_no_config(["❌ error_no_config"])
+        error_no_sources(["❌ error_no_sources"])
+        error_clone_failed(["❌ error_clone_failed"])
+        error_scan_failed(["❌ error_scan_failed"])
+        error_save_failed(["❌ error_save_failed"])
+    end
+
+    %% Phase 1 Flow
+    read_config --> count_sources
+    read_config -.->|failure| error_no_config
+    count_sources --> check_has_sources
+    check_has_sources -->|yes| prepare_sources_start
+    check_has_sources -->|no| error_no_sources
+    prepare_sources_start --> prepare_next_source
+    prepare_next_source -->|yes| get_current_source
+    prepare_next_source -->|no| sources_prepared_complete
+    get_current_source --> route_source_type
+
+    route_source_type -->|git| prepare_git_source
+    route_source_type -->|local| prepare_local_source
+    route_source_type -->|web| prepare_web_source
+    route_source_type -->|llms-txt| prepare_llms_txt_source
+
+    prepare_git_source --> check_git_clone_exists
+    check_git_clone_exists -->|yes| verify_git_clone
+    check_git_clone_exists -->|no| clone_git_source
+    verify_git_clone --> mark_source_prepared
+    clone_git_source --> mark_source_prepared
+    clone_git_source -.->|failure| error_clone_failed
+
+    prepare_local_source --> check_local_exists
+    check_local_exists -->|yes| verify_local_has_files
+    check_local_exists -->|no| warn_local_empty
+    verify_local_has_files --> mark_source_prepared
+    warn_local_empty --> mark_source_prepared
+
+    prepare_web_source --> check_web_cache_exists
+    check_web_cache_exists -->|yes| verify_web_cache_content
+    check_web_cache_exists -->|no| warn_web_cache_missing
+    verify_web_cache_content --> mark_source_prepared
+    warn_web_cache_missing --> mark_source_prepared
+
+    prepare_llms_txt_source --> check_llms_cache_exists
+    check_llms_cache_exists --> mark_source_prepared
+
+    mark_source_prepared --> prepare_next_source
+
+    %% Phase 2 Flow
+    sources_prepared_complete --> route_scanning
+    route_scanning -->|single| scan_single_source
+    route_scanning -->|multi| spawn_scanner_agents
+    scan_single_source --> store_single_scan_result
+    store_single_scan_result --> present_scan_summary
+    spawn_scanner_agents --> aggregate_scan_results
+    spawn_scanner_agents -.->|failure| error_scan_failed
+    aggregate_scan_results --> present_scan_summary
+    present_scan_summary --> check_corpus_size
+
+    %% Phase 3 Flow
+    check_corpus_size --> route_segmentation
+    route_segmentation -->|≥500| present_segmentation_options
+    route_segmentation -->|<500| check_moderate_corpus
+    check_moderate_corpus -->|≥200| suggest_segmentation
+    check_moderate_corpus -->|<200| ask_use_case
+
+    present_segmentation_options -->|tiered| collect_tiered_sections
+    present_segmentation_options -->|by-section/by-source| ask_use_case
+    suggest_segmentation -->|single| ask_use_case
+    suggest_segmentation -->|tiered| collect_tiered_sections
+    collect_tiered_sections -->|use detected| ask_use_case
+    collect_tiered_sections -->|custom| collect_custom_sections
+    collect_custom_sections --> ask_use_case
+
+    ask_use_case --> ask_source_priorities
+    ask_source_priorities -->|multi| ask_source_priorities_prompt
+    ask_source_priorities -->|single| ask_organization
+    ask_source_priorities_prompt -->|all equal| ask_organization
+    ask_source_priorities_prompt -->|specify| collect_priority_order
+    collect_priority_order --> ask_organization
+    ask_organization --> ask_skip_sections
+    ask_skip_sections -->|none/common| generate_index_draft
+    ask_skip_sections -->|specify| collect_skip_sections
+    collect_skip_sections --> generate_index_draft
+
+    %% Phase 4 Flow
+    generate_index_draft --> show_draft_to_user
+    show_draft_to_user -->|satisfied| save_index_file
+    show_draft_to_user -->|expand| ask_which_sections_to_expand
+    show_draft_to_user -->|reorganize| ask_new_organization
+    show_draft_to_user -->|add docs| ask_missing_docs
+    show_draft_to_user -->|other| apply_custom_refinement
+
+    ask_which_sections_to_expand -->|all| apply_expansion
+    ask_which_sections_to_expand -->|specific| collect_sections_to_expand
+    collect_sections_to_expand --> apply_expansion
+    apply_expansion --> show_draft_to_user
+
+    ask_new_organization -->|preset| regenerate_index
+    ask_new_organization -->|custom| apply_custom_reorganization
+    regenerate_index --> show_draft_to_user
+    apply_custom_reorganization --> show_draft_to_user
+
+    ask_missing_docs -->|list| collect_missing_docs_description
+    ask_missing_docs -->|other| apply_missing_docs
+    collect_missing_docs_description --> apply_missing_docs
+    apply_missing_docs --> show_draft_to_user
+
+    apply_custom_refinement --> show_draft_to_user
+
+    %% Phase 5 Flow
+    save_index_file --> check_sub_indexes
+    save_index_file -.->|failure| error_save_failed
+    check_sub_indexes -->|yes| save_sub_indexes
+    check_sub_indexes -->|no| update_config_metadata
+    save_sub_indexes --> update_config_metadata
+    update_config_metadata --> update_per_source_metadata
+    update_per_source_metadata --> present_completion
+    present_completion --> success
+
+    %% Styling
+    classDef userPrompt fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef action fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef conditional fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef reference fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef success fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef error fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef parallel fill:#fff9c4,stroke:#f9a825,stroke-width:2px
+
+    class present_segmentation_options,suggest_segmentation,collect_tiered_sections,collect_custom_sections,ask_use_case,ask_source_priorities_prompt,collect_priority_order,ask_organization,ask_skip_sections,collect_skip_sections,show_draft_to_user,ask_which_sections_to_expand,collect_sections_to_expand,ask_new_organization,ask_missing_docs,collect_missing_docs_description userPrompt
+    class read_config,count_sources,prepare_sources_start,get_current_source,prepare_git_source,verify_git_clone,clone_git_source,prepare_local_source,verify_local_has_files,warn_local_empty,prepare_web_source,verify_web_cache_content,warn_web_cache_missing,prepare_llms_txt_source,mark_source_prepared,sources_prepared_complete,store_single_scan_result,aggregate_scan_results,present_scan_summary,check_corpus_size,save_index_file,save_sub_indexes,update_config_metadata,update_per_source_metadata,present_completion action
+    class check_has_sources,prepare_next_source,route_source_type,check_git_clone_exists,check_local_exists,check_web_cache_exists,check_llms_cache_exists,route_scanning,route_segmentation,check_moderate_corpus,ask_source_priorities,check_sub_indexes conditional
+    class scan_single_source,generate_index_draft,apply_expansion,regenerate_index,apply_custom_reorganization,apply_missing_docs,apply_custom_refinement reference
+    class success success
+    class error_no_config,error_no_sources,error_clone_failed,error_scan_failed,error_save_failed error
+    class spawn_scanner_agents parallel

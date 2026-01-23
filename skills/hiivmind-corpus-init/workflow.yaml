@@ -1,0 +1,989 @@
+name: init
+version: "1.0.0"
+description: >
+  Initialize a new documentation corpus. Detects context (established repo,
+  fresh directory, or existing marketplace), selects destination, scaffolds
+  directory structure, and delegates to add-source for initial content.
+
+entry_preconditions: []  # None - init creates the corpus
+
+initial_state:
+  phase: "detect"
+  context_type: null           # A | B | C
+  destination_type: null       # user-level | repo-local | single-corpus | multi-corpus-new | multi-corpus-existing
+  corpus_name: null
+  source_url: null
+  keywords: []
+  placeholders:
+    plugin_name: null
+    project_name: null
+    project_display_name: null
+    corpus_short_name: null
+    keyword_list: null
+    keywords_sentence: null
+  flags:
+    is_git_repo: false
+    has_marketplace: false
+    has_corpus_plugins: false
+    is_established_project: false
+    user_wants_source: false
+    start_empty: false
+
+start_node: detect_context
+
+nodes:
+  # ===========================================================================
+  # PHASE 1: CONTEXT DETECTION
+  # ===========================================================================
+
+  detect_context:
+    type: action
+    description: "Detect current directory context"
+    actions:
+      - type: display_message
+        message: "Detecting directory context..."
+      - type: bash_check
+        command: "git rev-parse --show-toplevel 2>/dev/null"
+        set_flag: is_git_repo
+      - type: file_exists_check
+        path: ".claude-plugin/marketplace.json"
+        set_flag: has_marketplace
+      - type: glob_check
+        pattern: "hiivmind-corpus-*/"
+        set_flag: has_corpus_plugins
+      - type: any_file_exists_check
+        paths: ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "setup.py", "requirements.txt"]
+        set_flag: is_established_project
+    on_success: route_context
+    on_failure: route_context
+
+  route_context:
+    type: conditional
+    description: "Route based on detected context"
+    condition:
+      type: flag_set
+      flag: has_marketplace
+    branches:
+      true: confirm_context_c
+      false: check_has_corpus_plugins
+
+  check_has_corpus_plugins:
+    type: conditional
+    description: "Check if existing corpus plugins present"
+    condition:
+      type: flag_set
+      flag: has_corpus_plugins
+    branches:
+      true: confirm_context_c
+      false: check_established_project
+
+  check_established_project:
+    type: conditional
+    description: "Check if this is an established project"
+    condition:
+      type: flag_set
+      flag: is_established_project
+    branches:
+      true: confirm_context_a
+      false: confirm_context_b
+
+  # ===========================================================================
+  # CONTEXT A: ESTABLISHED NON-CORPUS REPOSITORY
+  # ===========================================================================
+
+  confirm_context_a:
+    type: action
+    description: "Set context type to A (established project)"
+    actions:
+      - type: set_state
+        field: context_type
+        value: "A"
+      - type: display_message
+        message: |
+          Detected: Established project repository
+
+          This appears to be an existing codebase (has project files).
+          The corpus can be added as a user-level skill or repo-local skill.
+    on_success: choose_dest_a
+    on_failure: choose_dest_a
+
+  choose_dest_a:
+    type: user_prompt
+    prompt:
+      question: "Where should the documentation corpus be created?"
+      header: "Location"
+      options:
+        - id: user_level
+          label: "User-level skill (Recommended)"
+          description: "~/.claude/skills/ - Available in all your projects"
+        - id: repo_local
+          label: "Repo-local skill"
+          description: ".claude-plugin/skills/ - Shared with team via repo"
+    on_response:
+      user_level:
+        consequence:
+          - type: set_state
+            field: destination_type
+            value: "user-level"
+          - type: compute
+            expression: "'${HOME}/.claude/skills'"
+            store_as: computed.base_path
+        next_node: collect_source_url
+      repo_local:
+        consequence:
+          - type: set_state
+            field: destination_type
+            value: "repo-local"
+        next_node: compute_repo_local_path
+      other:
+        next_node: choose_dest_a
+
+  compute_repo_local_path:
+    type: action
+    description: "Compute repo-local skill path"
+    actions:
+      - type: bash_exec
+        command: "git rev-parse --show-toplevel 2>/dev/null || echo '${PWD}'"
+        store_as: computed.repo_root
+      - type: compute
+        expression: "computed.repo_root + '/.claude-plugin/skills'"
+        store_as: computed.base_path
+    on_success: collect_source_url
+    on_failure: error_path_compute
+
+  # ===========================================================================
+  # CONTEXT B: FRESH REPOSITORY / NEW DIRECTORY
+  # ===========================================================================
+
+  confirm_context_b:
+    type: action
+    description: "Set context type to B (fresh directory)"
+    actions:
+      - type: set_state
+        field: context_type
+        value: "B"
+      - type: display_message
+        message: |
+          Detected: Fresh directory
+
+          This directory doesn't appear to be an established project.
+          You can create a user-level skill, or set up this directory as a corpus plugin.
+    on_success: choose_dest_b
+    on_failure: choose_dest_b
+
+  choose_dest_b:
+    type: user_prompt
+    prompt:
+      question: "How should the corpus be structured?"
+      header: "Structure"
+      options:
+        - id: user_level
+          label: "User-level skill"
+          description: "~/.claude/skills/ - Personal use across all projects"
+        - id: single_corpus
+          label: "Single-corpus repo (Recommended)"
+          description: "This directory becomes a standalone corpus plugin"
+        - id: multi_corpus
+          label: "Multi-corpus marketplace"
+          description: "This directory hosts multiple corpus plugins"
+    on_response:
+      user_level:
+        consequence:
+          - type: set_state
+            field: destination_type
+            value: "user-level"
+          - type: compute
+            expression: "'${HOME}/.claude/skills'"
+            store_as: computed.base_path
+        next_node: collect_source_url
+      single_corpus:
+        consequence:
+          - type: set_state
+            field: destination_type
+            value: "single-corpus"
+          - type: compute
+            expression: "'${PWD}'"
+            store_as: computed.plugin_root
+        next_node: collect_source_url
+      multi_corpus:
+        consequence:
+          - type: set_state
+            field: destination_type
+            value: "multi-corpus-new"
+          - type: compute
+            expression: "'${PWD}'"
+            store_as: computed.marketplace_root
+        next_node: collect_source_url
+      other:
+        next_node: choose_dest_b
+
+  # ===========================================================================
+  # CONTEXT C: EXISTING HIIVMIND-CORPUS MARKETPLACE
+  # ===========================================================================
+
+  confirm_context_c:
+    type: action
+    description: "Set context type to C (existing marketplace)"
+    actions:
+      - type: set_state
+        field: context_type
+        value: "C"
+      - type: set_state
+        field: destination_type
+        value: "multi-corpus-existing"
+      - type: compute
+        expression: "'${PWD}'"
+        store_as: computed.marketplace_root
+      - type: display_message
+        message: |
+          Detected: Existing corpus marketplace
+
+          This directory contains a hiivmind-corpus marketplace.
+          The new corpus will be added as a subdirectory.
+    on_success: collect_source_url
+    on_failure: collect_source_url
+
+  # ===========================================================================
+  # PHASE 2: SOURCE URL COLLECTION
+  # ===========================================================================
+
+  collect_source_url:
+    type: user_prompt
+    prompt:
+      question: "What documentation would you like to index?"
+      header: "Source"
+      options:
+        - id: github
+          label: "GitHub repository"
+          description: "e.g., https://github.com/org/repo"
+        - id: docs_site
+          label: "Documentation site"
+          description: "e.g., https://docs.example.com"
+        - id: empty
+          label: "Start empty"
+          description: "Create scaffold without initial source"
+    on_response:
+      github:
+        next_node: collect_github_url
+      docs_site:
+        next_node: collect_docs_url
+      empty:
+        consequence:
+          - type: set_flag
+            flag: start_empty
+            value: true
+        next_node: collect_corpus_name_manual
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_source_url.raw.text}"
+          - type: set_flag
+            flag: user_wants_source
+            value: true
+        next_node: derive_corpus_name
+
+  collect_github_url:
+    type: user_prompt
+    prompt:
+      question: "Enter the GitHub repository URL:"
+      header: "GitHub URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://github.com/owner/repo"
+    on_response:
+      example:
+        next_node: collect_github_url
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_github_url.raw.text}"
+          - type: set_flag
+            flag: user_wants_source
+            value: true
+        next_node: derive_corpus_name
+
+  collect_docs_url:
+    type: user_prompt
+    prompt:
+      question: "Enter the documentation site URL:"
+      header: "Docs URL"
+      options:
+        - id: example
+          label: "Example format"
+          description: "https://docs.example.com"
+    on_response:
+      example:
+        next_node: collect_docs_url
+      other:
+        consequence:
+          - type: set_state
+            field: source_url
+            value: "${user_responses.collect_docs_url.raw.text}"
+          - type: set_flag
+            flag: user_wants_source
+            value: true
+        next_node: derive_corpus_name
+
+  # ===========================================================================
+  # PHASE 3: CORPUS NAME DERIVATION
+  # ===========================================================================
+
+  derive_corpus_name:
+    type: action
+    description: "Derive corpus name from source URL"
+    actions:
+      - type: compute
+        expression: |
+          source_url.includes('github.com')
+            ? source_url.replace(/\\.git$/, '').split('/').pop().toLowerCase()
+            : source_url.replace(/^https?:\\/\\//, '').split('/')[0].replace(/^docs?\\./, '').split('.')[0].toLowerCase()
+        store_as: computed.derived_name
+      - type: set_state
+        field: corpus_name
+        value: "${computed.derived_name}"
+    on_success: confirm_corpus_name
+    on_failure: collect_corpus_name_manual
+
+  confirm_corpus_name:
+    type: user_prompt
+    prompt:
+      question: "Corpus name derived as '${corpus_name}'. Is this correct?"
+      header: "Name"
+      options:
+        - id: accept
+          label: "Yes, use '${corpus_name}'"
+          description: "Proceed with derived name"
+        - id: change
+          label: "No, let me specify"
+          description: "Enter a different name"
+    on_response:
+      accept:
+        next_node: compute_placeholders
+      change:
+        next_node: collect_corpus_name_manual
+      other:
+        consequence:
+          - type: set_state
+            field: corpus_name
+            value: "${user_responses.confirm_corpus_name.raw.text}"
+        next_node: compute_placeholders
+
+  collect_corpus_name_manual:
+    type: user_prompt
+    prompt:
+      question: "What should the corpus be named? (lowercase, no spaces)"
+      header: "Corpus name"
+      options:
+        - id: example
+          label: "Example format"
+          description: "e.g., polars, react, kubernetes"
+    on_response:
+      example:
+        next_node: collect_corpus_name_manual
+      other:
+        consequence:
+          - type: set_state
+            field: corpus_name
+            value: "${user_responses.collect_corpus_name_manual.raw.text}"
+        next_node: compute_placeholders
+
+  # ===========================================================================
+  # PHASE 4: PLACEHOLDER COMPUTATION
+  # ===========================================================================
+
+  compute_placeholders:
+    type: action
+    description: "Compute template placeholders from corpus name"
+    actions:
+      - type: compute
+        expression: "'hiivmind-corpus-' + corpus_name"
+        store_as: placeholders.plugin_name
+      - type: compute
+        expression: "corpus_name.toLowerCase()"
+        store_as: placeholders.project_name
+      - type: compute
+        expression: "corpus_name.charAt(0).toUpperCase() + corpus_name.slice(1)"
+        store_as: placeholders.project_display_name
+      - type: compute
+        expression: "corpus_name.toLowerCase()"
+        store_as: placeholders.corpus_short_name
+    on_success: collect_keywords
+    on_failure: error_placeholder_compute
+
+  collect_keywords:
+    type: user_prompt
+    prompt:
+      question: |
+        What keywords should route documentation questions to this corpus?
+
+        These help the global navigator find this corpus when users ask questions.
+        Suggest defaults based on the project name: ${corpus_name}
+      header: "Keywords"
+      options:
+        - id: default
+          label: "Use project name only"
+          description: "${corpus_name}"
+        - id: suggest
+          label: "Suggest more keywords"
+          description: "I'll provide additional keywords"
+    on_response:
+      default:
+        consequence:
+          - type: set_state
+            field: keywords
+            value: ["${corpus_name}"]
+          - type: compute
+            expression: "corpus_name"
+            store_as: placeholders.keyword_list
+          - type: compute
+            expression: "corpus_name"
+            store_as: placeholders.keywords_sentence
+        next_node: compute_skill_root
+      suggest:
+        next_node: collect_additional_keywords
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_keywords.raw.text.split(',').map(k => k.trim())"
+            store_as: keywords
+          - type: compute
+            expression: "keywords.join(', ')"
+            store_as: placeholders.keyword_list
+          - type: compute
+            expression: "keywords.join(', ').replace(/, ([^,]*)$/, ', or $1')"
+            store_as: placeholders.keywords_sentence
+        next_node: compute_skill_root
+
+  collect_additional_keywords:
+    type: user_prompt
+    prompt:
+      question: "Enter additional keywords (comma-separated):"
+      header: "Keywords"
+      options:
+        - id: example
+          label: "Example format"
+          description: "dataframe, lazy, expression, series"
+    on_response:
+      example:
+        next_node: collect_additional_keywords
+      other:
+        consequence:
+          - type: compute
+            expression: "[corpus_name].concat(user_responses.collect_additional_keywords.raw.text.split(',').map(k => k.trim()))"
+            store_as: keywords
+          - type: compute
+            expression: "keywords.join(', ')"
+            store_as: placeholders.keyword_list
+          - type: compute
+            expression: "keywords.join(', ').replace(/, ([^,]*)$/, ', or $1')"
+            store_as: placeholders.keywords_sentence
+        next_node: compute_skill_root
+
+  # ===========================================================================
+  # PHASE 5: PATH COMPUTATION
+  # ===========================================================================
+
+  compute_skill_root:
+    type: conditional
+    description: "Route to appropriate path computation based on destination"
+    condition:
+      type: any_of
+      conditions:
+        - type: state_equals
+          field: destination_type
+          value: "user-level"
+        - type: state_equals
+          field: destination_type
+          value: "repo-local"
+    branches:
+      true: compute_skill_path
+      false: compute_plugin_path
+
+  compute_skill_path:
+    type: action
+    description: "Compute skill root for user-level or repo-local"
+    actions:
+      - type: compute
+        expression: "computed.base_path + '/hiivmind-corpus-' + corpus_name"
+        store_as: computed.skill_root
+      - type: display_message
+        message: "Skill will be created at: ${computed.skill_root}"
+    on_success: create_checkpoint_before_scaffold
+    on_failure: error_path_compute
+
+  compute_plugin_path:
+    type: conditional
+    description: "Route plugin path computation by destination type"
+    condition:
+      type: state_equals
+      field: destination_type
+      value: "single-corpus"
+    branches:
+      true: compute_single_corpus_path
+      false: compute_multi_corpus_path
+
+  compute_single_corpus_path:
+    type: action
+    description: "Compute paths for single-corpus repo"
+    actions:
+      - type: compute
+        expression: "computed.plugin_root"
+        store_as: computed.skill_root
+      - type: display_message
+        message: "Single-corpus plugin will be created at: ${computed.plugin_root}"
+    on_success: create_checkpoint_before_scaffold
+    on_failure: error_path_compute
+
+  compute_multi_corpus_path:
+    type: action
+    description: "Compute paths for multi-corpus marketplace"
+    actions:
+      - type: compute
+        expression: "computed.marketplace_root + '/hiivmind-corpus-' + corpus_name"
+        store_as: computed.plugin_root
+      - type: compute
+        expression: "computed.plugin_root"
+        store_as: computed.skill_root
+      - type: display_message
+        message: "Plugin will be created at: ${computed.plugin_root}"
+    on_success: create_checkpoint_before_scaffold
+    on_failure: error_path_compute
+
+  # ===========================================================================
+  # PHASE 6: SCAFFOLD CREATION
+  # ===========================================================================
+
+  create_checkpoint_before_scaffold:
+    type: action
+    description: "Create checkpoint before scaffold creation"
+    actions:
+      - type: create_checkpoint
+        name: "before_scaffold"
+    on_success: route_scaffold_by_destination
+    on_failure: route_scaffold_by_destination
+
+  route_scaffold_by_destination:
+    type: conditional
+    description: "Route to appropriate scaffold creation"
+    condition:
+      type: any_of
+      conditions:
+        - type: state_equals
+          field: destination_type
+          value: "user-level"
+        - type: state_equals
+          field: destination_type
+          value: "repo-local"
+    branches:
+      true: scaffold_skill_directories
+      false: route_plugin_scaffold
+
+  route_plugin_scaffold:
+    type: conditional
+    description: "Route plugin scaffold by type"
+    condition:
+      type: state_equals
+      field: destination_type
+      value: "single-corpus"
+    branches:
+      true: scaffold_single_corpus
+      false: route_multi_corpus_scaffold
+
+  route_multi_corpus_scaffold:
+    type: conditional
+    description: "Check if new or existing marketplace"
+    condition:
+      type: state_equals
+      field: destination_type
+      value: "multi-corpus-new"
+    branches:
+      true: scaffold_multi_corpus_new
+      false: scaffold_multi_corpus_existing
+
+  # ===========================================================================
+  # SCAFFOLD: USER-LEVEL / REPO-LOCAL SKILL
+  # ===========================================================================
+
+  scaffold_skill_directories:
+    type: action
+    description: "Create directory structure for skill"
+    actions:
+      - type: display_message
+        message: "Creating skill directory structure..."
+      - type: create_directory
+        path: "${computed.skill_root}"
+      - type: create_directory
+        path: "${computed.skill_root}/data"
+      - type: create_directory
+        path: "${computed.skill_root}/data/uploads"
+      - type: create_directory
+        path: "${computed.skill_root}/references"
+      - type: create_directory
+        path: "${computed.skill_root}/.source"
+      - type: create_directory
+        path: "${computed.skill_root}/.cache"
+    on_success: generate_skill_files
+    on_failure: error_scaffold_failed
+
+  generate_skill_files:
+    type: reference
+    doc: "lib/corpus/patterns/template-generation.md"
+    section: "User-level or Repo-local Skill"
+    context:
+      skill_root: "${computed.skill_root}"
+      placeholders: "${placeholders}"
+      corpus_name: "${corpus_name}"
+    next_node: verify_skill_structure
+
+  verify_skill_structure:
+    type: validation_gate
+    description: "Verify skill scaffold is complete"
+    validations:
+      - type: file_exists
+        path: "${computed.skill_root}/SKILL.md"
+        error_message: "Navigate skill not created"
+      - type: file_exists
+        path: "${computed.skill_root}/data/config.yaml"
+        error_message: "Config file not created"
+      - type: file_exists
+        path: "${computed.skill_root}/data/index.md"
+        error_message: "Index placeholder not created"
+      - type: file_exists
+        path: "${computed.skill_root}/references/project-awareness.md"
+        error_message: "Project awareness file not created"
+    on_valid: check_source_delegation
+    on_invalid: error_scaffold_failed
+
+  # ===========================================================================
+  # SCAFFOLD: SINGLE-CORPUS REPO
+  # ===========================================================================
+
+  scaffold_single_corpus:
+    type: action
+    description: "Create directory structure for single-corpus plugin"
+    actions:
+      - type: display_message
+        message: "Creating single-corpus plugin structure..."
+      - type: create_directory
+        path: "${computed.plugin_root}/.claude-plugin"
+      - type: create_directory
+        path: "${computed.plugin_root}/skills/navigate"
+      - type: create_directory
+        path: "${computed.plugin_root}/commands"
+      - type: create_directory
+        path: "${computed.plugin_root}/data"
+      - type: create_directory
+        path: "${computed.plugin_root}/data/uploads"
+      - type: create_directory
+        path: "${computed.plugin_root}/references"
+      - type: create_directory
+        path: "${computed.plugin_root}/.source"
+      - type: create_directory
+        path: "${computed.plugin_root}/.cache"
+    on_success: generate_single_corpus_files
+    on_failure: error_scaffold_failed
+
+  generate_single_corpus_files:
+    type: reference
+    doc: "lib/corpus/patterns/template-generation.md"
+    section: "Single-corpus Plugin"
+    context:
+      plugin_root: "${computed.plugin_root}"
+      skill_root: "${computed.skill_root}"
+      placeholders: "${placeholders}"
+      corpus_name: "${corpus_name}"
+    next_node: verify_single_corpus_structure
+
+  verify_single_corpus_structure:
+    type: validation_gate
+    description: "Verify single-corpus scaffold is complete"
+    validations:
+      - type: file_exists
+        path: "${computed.plugin_root}/.claude-plugin/plugin.json"
+        error_message: "Plugin manifest not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/skills/navigate/SKILL.md"
+        error_message: "Navigate skill not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/commands/navigate.md"
+        error_message: "Navigate command not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/data/config.yaml"
+        error_message: "Config file not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/data/index.md"
+        error_message: "Index placeholder not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/.gitignore"
+        error_message: ".gitignore not created"
+    on_valid: check_source_delegation
+    on_invalid: error_scaffold_failed
+
+  # ===========================================================================
+  # SCAFFOLD: MULTI-CORPUS (NEW MARKETPLACE)
+  # ===========================================================================
+
+  scaffold_multi_corpus_new:
+    type: action
+    description: "Create directory structure for new marketplace"
+    actions:
+      - type: display_message
+        message: "Creating new marketplace structure..."
+      # Marketplace-level directories
+      - type: create_directory
+        path: "${computed.marketplace_root}/.claude-plugin"
+      # Plugin directories
+      - type: create_directory
+        path: "${computed.plugin_root}/.claude-plugin"
+      - type: create_directory
+        path: "${computed.plugin_root}/skills/navigate"
+      - type: create_directory
+        path: "${computed.plugin_root}/commands"
+      - type: create_directory
+        path: "${computed.plugin_root}/data"
+      - type: create_directory
+        path: "${computed.plugin_root}/data/uploads"
+      - type: create_directory
+        path: "${computed.plugin_root}/references"
+      - type: create_directory
+        path: "${computed.plugin_root}/.source"
+      - type: create_directory
+        path: "${computed.plugin_root}/.cache"
+    on_success: generate_multi_corpus_new_files
+    on_failure: error_scaffold_failed
+
+  generate_multi_corpus_new_files:
+    type: reference
+    doc: "lib/corpus/patterns/template-generation.md"
+    section: "Multi-corpus Marketplace (New)"
+    context:
+      marketplace_root: "${computed.marketplace_root}"
+      plugin_root: "${computed.plugin_root}"
+      skill_root: "${computed.skill_root}"
+      placeholders: "${placeholders}"
+      corpus_name: "${corpus_name}"
+    next_node: verify_multi_corpus_new_structure
+
+  verify_multi_corpus_new_structure:
+    type: validation_gate
+    description: "Verify new marketplace scaffold is complete"
+    validations:
+      - type: file_exists
+        path: "${computed.marketplace_root}/.claude-plugin/marketplace.json"
+        error_message: "Marketplace manifest not created"
+      - type: file_exists
+        path: "${computed.marketplace_root}/CLAUDE.md"
+        error_message: "Marketplace CLAUDE.md not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/.claude-plugin/plugin.json"
+        error_message: "Plugin manifest not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/skills/navigate/SKILL.md"
+        error_message: "Navigate skill not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/data/config.yaml"
+        error_message: "Config file not created"
+    on_valid: check_source_delegation
+    on_invalid: error_scaffold_failed
+
+  # ===========================================================================
+  # SCAFFOLD: MULTI-CORPUS (EXISTING MARKETPLACE)
+  # ===========================================================================
+
+  scaffold_multi_corpus_existing:
+    type: action
+    description: "Create directory structure for plugin in existing marketplace"
+    actions:
+      - type: display_message
+        message: "Adding corpus to existing marketplace..."
+      # Plugin directories only (marketplace already exists)
+      - type: create_directory
+        path: "${computed.plugin_root}/.claude-plugin"
+      - type: create_directory
+        path: "${computed.plugin_root}/skills/navigate"
+      - type: create_directory
+        path: "${computed.plugin_root}/commands"
+      - type: create_directory
+        path: "${computed.plugin_root}/data"
+      - type: create_directory
+        path: "${computed.plugin_root}/data/uploads"
+      - type: create_directory
+        path: "${computed.plugin_root}/references"
+      - type: create_directory
+        path: "${computed.plugin_root}/.source"
+      - type: create_directory
+        path: "${computed.plugin_root}/.cache"
+    on_success: generate_multi_corpus_existing_files
+    on_failure: error_scaffold_failed
+
+  generate_multi_corpus_existing_files:
+    type: reference
+    doc: "lib/corpus/patterns/template-generation.md"
+    section: "Multi-corpus Marketplace (Existing)"
+    context:
+      marketplace_root: "${computed.marketplace_root}"
+      plugin_root: "${computed.plugin_root}"
+      skill_root: "${computed.skill_root}"
+      placeholders: "${placeholders}"
+      corpus_name: "${corpus_name}"
+    next_node: verify_multi_corpus_existing_structure
+
+  verify_multi_corpus_existing_structure:
+    type: validation_gate
+    description: "Verify plugin added to marketplace correctly"
+    validations:
+      - type: file_exists
+        path: "${computed.plugin_root}/.claude-plugin/plugin.json"
+        error_message: "Plugin manifest not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/skills/navigate/SKILL.md"
+        error_message: "Navigate skill not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/data/config.yaml"
+        error_message: "Config file not created"
+      - type: file_exists
+        path: "${computed.plugin_root}/data/index.md"
+        error_message: "Index placeholder not created"
+    on_valid: update_marketplace_registry
+    on_invalid: error_scaffold_failed
+
+  update_marketplace_registry:
+    type: action
+    description: "Add new plugin to marketplace.json"
+    actions:
+      - type: display_message
+        message: "Updating marketplace registry..."
+      - type: update_marketplace_json
+        marketplace_path: "${computed.marketplace_root}/.claude-plugin/marketplace.json"
+        plugin_name: "${placeholders.plugin_name}"
+        plugin_path: "${placeholders.plugin_name}"
+    on_success: check_source_delegation
+    on_failure: warn_marketplace_update
+
+  warn_marketplace_update:
+    type: action
+    description: "Warn about failed marketplace update"
+    actions:
+      - type: display_message
+        message: |
+          Warning: Could not automatically update marketplace.json.
+          Please manually add the following entry:
+
+          {
+            "name": "${placeholders.plugin_name}",
+            "path": "${placeholders.plugin_name}"
+          }
+    on_success: check_source_delegation
+    on_failure: check_source_delegation
+
+  # ===========================================================================
+  # PHASE 7: DELEGATION TO ADD-SOURCE
+  # ===========================================================================
+
+  check_source_delegation:
+    type: conditional
+    description: "Check if source URL was provided"
+    condition:
+      type: flag_set
+      flag: user_wants_source
+    branches:
+      true: prepare_add_source_delegation
+      false: success_empty
+
+  prepare_add_source_delegation:
+    type: action
+    description: "Prepare context for add-source delegation"
+    actions:
+      - type: display_message
+        message: |
+          Corpus scaffold created successfully at ${computed.skill_root}
+
+          Now delegating to add-source to add initial documentation...
+      - type: set_state
+        field: computed.add_source_context
+        value:
+          source_url: "${source_url}"
+          working_directory: "${computed.skill_root}"
+    on_success: success_with_source
+    on_failure: success_with_source
+
+  # ===========================================================================
+  # ERROR HANDLING
+  # ===========================================================================
+
+  show_validation_errors:
+    type: action
+    actions:
+      - type: display_message
+        message: |
+          Validation failed:
+          ${computed.validation_errors}
+    on_success: error_scaffold_failed
+    on_failure: error_scaffold_failed
+
+  # ===========================================================================
+  # ENDINGS
+  # ===========================================================================
+
+endings:
+  success_with_source:
+    type: success
+    message: |
+      Corpus '${corpus_name}' initialized at ${computed.skill_root}
+
+      Delegating to add-source skill with URL: ${source_url}
+
+      **Next step:** The add-source skill will now handle source acquisition.
+    summary:
+      corpus_name: "${corpus_name}"
+      destination_type: "${destination_type}"
+      skill_root: "${computed.skill_root}"
+      source_url: "${source_url}"
+    delegate:
+      skill: "hiivmind-corpus-add-source"
+      context:
+        source_url: "${source_url}"
+        working_directory: "${computed.skill_root}"
+
+  success_empty:
+    type: success
+    message: |
+      Corpus '${corpus_name}' scaffold created at ${computed.skill_root}
+
+      **Structure created:**
+      - SKILL.md (or skills/navigate/SKILL.md for plugins)
+      - data/config.yaml
+      - data/index.md (placeholder)
+      - references/project-awareness.md
+
+      **Next step:** Run `/hiivmind-corpus-add-source` to add documentation sources.
+    summary:
+      corpus_name: "${corpus_name}"
+      destination_type: "${destination_type}"
+      skill_root: "${computed.skill_root}"
+
+  error_path_compute:
+    type: error
+    message: "Failed to compute installation path"
+    details: "Could not determine git repository root or home directory"
+
+  error_placeholder_compute:
+    type: error
+    message: "Failed to compute template placeholders"
+    details: "Check that corpus name is valid (lowercase, no spaces)"
+
+  error_scaffold_failed:
+    type: error
+    message: "Failed to create corpus scaffold"
+    details: "${computed.validation_errors}"
+    recovery: |
+      Check file system permissions and try again.
+      You may need to manually create directories.
+
+  error_generic:
+    type: error
+    message: "An unexpected error occurred"
+    details: "Please try again or report this issue"
