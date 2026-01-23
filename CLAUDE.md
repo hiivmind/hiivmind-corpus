@@ -254,7 +254,7 @@ These features span multiple skills and must stay synchronized:
 | Tiered indexes | build, enhance, refresh, upgrade | Detection logic, update handling |
 | Source types (git/local/web/generated-docs/llms-txt) | add-source, build, enhance, refresh | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
-| Project awareness | init, upgrade | Template exists, navigate skill section |
+| Project awareness | init, upgrade, navigate command (template) | Template exists, command help mentions it, skill has NO project awareness section |
 | Config schema | all skills | Schema fields, validation |
 | Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
@@ -264,6 +264,7 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
+| Command/skill separation | navigate (template), upgrade | Command is thin wrapper (~30 lines), skill has no maintenance refs |
 | Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
 
 ### When Adding New Features

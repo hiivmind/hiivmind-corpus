@@ -16,7 +16,7 @@ Bring an existing corpus skill up to date with the latest hiivmind-corpus templa
 
 - After hiivmind-corpus has been updated with new features
 - When a corpus is missing files that newer corpora have (e.g., `project-awareness.md`)
-- When navigate skill is missing sections (e.g., "Making Projects Aware", tiered index support)
+- When navigate skill has sections that belong elsewhere (e.g., "Making Projects Aware" should be in command)
 - To ensure all your corpora follow current best practices
 
 ## Process
@@ -144,6 +144,9 @@ grep -qi "triggers:" skills/navigate/SKILL.md || echo "MISSING_TRIGGERS"
 grep -q "^context: fork" skills/navigate/SKILL.md || echo "MISSING_FORK_CONTEXT"
 grep -q "^agent: Explore" skills/navigate/SKILL.md || echo "MISSING_AGENT_EXPLORE"
 grep -q "^allowed-tools:" skills/navigate/SKILL.md || echo "MISSING_ALLOWED_TOOLS"
+
+# Check skill has AskUserQuestion in allowed-tools
+grep -q "AskUserQuestion" skills/navigate/SKILL.md || echo "MISSING_ASKUSERQUESTION_TOOL"
 ```
 
 **Expected formats:**
@@ -173,6 +176,15 @@ grep -q "{{" skills/navigate/SKILL.md && echo "UNFILLED_PLACEHOLDERS"
 
 # Old format check (< 200 lines)
 [ $(wc -l < skills/navigate/SKILL.md) -lt 200 ] && echo "OLD_FORMAT_SKILL"
+
+# Check command file length (> 50 lines = duplicated logic)
+[ -f commands/navigate.md ] && [ $(wc -l < commands/navigate.md) -gt 50 ] && echo "COMMAND_DUPLICATES_SKILL"
+
+# Check skill still has maintenance references (should be removed)
+grep -q "/hiivmind-corpus" skills/navigate/SKILL.md && echo "SKILL_HAS_MAINTENANCE_REFS"
+
+# Check skill has project awareness section (should be in command, not skill)
+grep -q "Making Projects Aware" skills/navigate/SKILL.md && echo "SKILL_HAS_PROJECT_AWARENESS"
 ```
 
 **Note:** Skills with OLD_FORMAT_SKILL or GENERIC_WORKED_EXAMPLE require full regeneration, not section patching. See `references/upgrade-templates.md` → "Navigate Skill Regeneration".
@@ -205,8 +217,9 @@ grep -qE "^\s+display_name:" data/config.yaml || echo "MISSING_DISPLAY_NAME"
 Present a clear report showing:
 - ✅ UP TO DATE items
 - ⚠️ NAMING VIOLATIONS (wrong command/skill paths)
-- ⚠️ FRONTMATTER ISSUES (wrong name format, missing triggers)
+- ⚠️ FRONTMATTER ISSUES (wrong name format, missing triggers, missing AskUserQuestion tool)
 - ⚠️ CONTENT QUALITY (generic examples, old format, unfilled placeholders)
+- ⚠️ COMMAND/SKILL SEPARATION (command duplicates skill logic, skill has maintenance references, skill has project awareness section)
 - ⚠️ CONFIG SCHEMA (deprecated fields, missing fields)
 - ⚠️ MISSING FILES
 - ⚠️ MISSING CONFIG FIELDS (with suggestions)
@@ -325,6 +338,71 @@ allowed-tools: Read, Grep, Glob, WebFetch
 ```
 
 This runs the navigate skill in an isolated sub-agent context, keeping the main conversation clean.
+
+### Fixing Missing AskUserQuestion Tool
+
+**MISSING_ASKUSERQUESTION_TOOL:**
+Add `AskUserQuestion` to the allowed-tools in frontmatter:
+```yaml
+---
+name: hiivmind-corpus-{project}-navigate
+description: ...
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, WebFetch, AskUserQuestion
+---
+```
+
+### Simplifying Navigate Command (Duplicated Logic)
+
+**COMMAND_DUPLICATES_SKILL:**
+The command should be a thin wrapper that invokes the skill, not duplicate navigation logic.
+
+Replace `commands/navigate.md` with minimal version:
+```markdown
+---
+description: Ask questions about {Project} documentation
+argument-hint: Your question (e.g., "how does X work?")
+allowed-tools: ["Skill"]
+---
+
+# {Project} Navigator
+
+**User request:** $ARGUMENTS
+
+---
+
+## If No Arguments Provided
+
+Show a brief help message with 2-3 example queries.
+
+---
+
+## If Arguments Provided
+
+Invoke the navigate skill to handle the query:
+
+**Skill:** {plugin_name}-navigate
+**Args:** $ARGUMENTS
+```
+
+### Removing Maintenance References from Skill
+
+**SKILL_HAS_MAINTENANCE_REFS:**
+The navigate skill should be pure navigation - no maintenance references.
+
+1. Remove the "Corpus Maintenance" section if present
+2. In Step 4 (Clarify Before Exploring), replace maintenance suggestions with:
+   - "This topic isn't covered in the current index."
+   - "The source documentation may have content not yet indexed."
+
+### Removing Project Awareness from Skill
+
+**SKILL_HAS_PROJECT_AWARENESS:**
+The navigate skill should be pure navigation - project awareness guidance belongs in the command.
+
+1. Remove the "Making Projects Aware of This Corpus" section from `skills/navigate/SKILL.md`
+2. Ensure `commands/navigate.md` mentions `references/project-awareness.md` in its help output
 
 ### Regenerating Navigate Skill (ADR-006 Content Quality)
 

@@ -34,8 +34,8 @@ Simpler structure without plugin manifest.
 | Source Access | Yes | Per-source-type access patterns |
 | File Locations | Yes | Where files are stored |
 | Output | Yes | How to format responses |
-| Making Projects Aware | Recommended | Reference to project-awareness.md |
-| Corpus Maintenance | Recommended | Points to parent skills |
+
+**Note:** The "Making Projects Aware" section should NOT be in the skill - it belongs in the command's help output.
 
 ---
 
@@ -88,8 +88,26 @@ Same as user-level/repo-local, plus:
 | Source Access | Yes | Per-source-type access patterns |
 | File Locations | Yes | Where files are stored |
 | Output | Yes | How to format responses |
-| Making Projects Aware | Recommended | Reference to project-awareness.md |
-| Corpus Maintenance | Recommended | Points to parent gateway |
+
+**Note:** The "Making Projects Aware" section should NOT be in the skill - it belongs in the command.
+
+### Navigate Skill Allowed Tools
+
+| Tool | Required | Purpose |
+|------|----------|---------|
+| `Read` | Yes | Read documentation files |
+| `Grep` | Yes | Search indexes and content |
+| `Glob` | Yes | Check for local clones |
+| `WebFetch` | Yes | Fetch remote content |
+| `AskUserQuestion` | Yes | Clarify when no direct match found |
+
+### Navigate Skill Content Quality
+
+| Check | Violation | Detection |
+|-------|-----------|-----------|
+| No maintenance references | `SKILL_HAS_MAINTENANCE_REFS` | `grep -q "/hiivmind-corpus" skills/navigate/SKILL.md` |
+| No project awareness section | `SKILL_HAS_PROJECT_AWARENESS` | `grep -q "Making Projects Aware" skills/navigate/SKILL.md` |
+| Has AskUserQuestion tool | `MISSING_ASKUSERQUESTION_TOOL` | `grep -q "AskUserQuestion" skills/navigate/SKILL.md` |
 
 ### Navigate Command Sections (commands/navigate.md)
 
@@ -97,10 +115,11 @@ Same as user-level/repo-local, plus:
 |---------|----------|-------------|
 | Frontmatter: `description` | Yes | Command description |
 | Frontmatter: `argument-hint` | Yes | Example usage |
-| Frontmatter: `allowed-tools` | Yes | Tools the command can use |
+| Frontmatter: `allowed-tools` | Yes | Should only be `["Skill"]` |
 | If No Arguments | Yes | Help message with examples |
-| Navigation Process | Yes | Same as skill |
-| Corpus Maintenance | Recommended | Points to parent gateway |
+| If Arguments Provided | Yes | Invokes the navigate skill |
+
+**Note:** The command should be a thin wrapper (~30-40 lines) that delegates to the skill. Commands > 50 lines likely duplicate skill logic.
 
 ### ADR-005 Compliance
 
@@ -108,8 +127,20 @@ Same as user-level/repo-local, plus:
 |-------|----------|---------|
 | Has navigate skill | `skills/navigate/SKILL.md` exists | `ls skills/navigate/SKILL.md` |
 | Has navigate command | `commands/navigate.md` exists | `ls commands/navigate.md` |
-| No routing in command | No `hiivmind-corpus-refresh` references | `grep -c "hiivmind-corpus-refresh" commands/navigate.md` (should be 0) |
-| Points to parent | Maintenance section references `/hiivmind-corpus` | `grep "/hiivmind-corpus" commands/navigate.md` |
+| Command is thin wrapper | ≤ 50 lines | `wc -l < commands/navigate.md` |
+| Skill is pure navigation | No `/hiivmind-corpus` references | `grep -c "/hiivmind-corpus" skills/navigate/SKILL.md` (should be 0) |
+
+### Command/Skill Separation
+
+| Check | Violation | Detection |
+|-------|-----------|-----------|
+| Command duplicates skill logic | `COMMAND_DUPLICATES_SKILL` | `[ $(wc -l < commands/navigate.md) -gt 50 ]` |
+| Skill has maintenance references | `SKILL_HAS_MAINTENANCE_REFS` | `grep -q "/hiivmind-corpus" skills/navigate/SKILL.md` |
+| Skill has project awareness section | `SKILL_HAS_PROJECT_AWARENESS` | `grep -q "Making Projects Aware" skills/navigate/SKILL.md` |
+
+**Correct separation:**
+- **Command**: User entry point with help, examples, and project awareness mention
+- **Skill**: Pure navigation (read indexes, fetch docs, answer questions)
 
 ---
 
@@ -182,10 +213,25 @@ if [ "$TYPE" = "plugin" ]; then
   [ -f "commands/navigate.md" ] && echo "✅ commands/navigate.md" || echo "❌ commands/navigate.md"
 
   if [ -f "commands/navigate.md" ]; then
-    if grep -q "hiivmind-corpus-refresh" commands/navigate.md 2>/dev/null; then
-      echo "⚠️  Command has routing table (needs simplification)"
+    CMD_LINES=$(wc -l < commands/navigate.md)
+    if [ "$CMD_LINES" -gt 50 ]; then
+      echo "⚠️  Command too long ($CMD_LINES lines > 50) - duplicates skill logic"
     else
-      echo "✅ Command has no routing table"
+      echo "✅ Command is thin wrapper ($CMD_LINES lines)"
+    fi
+  fi
+
+  if [ -f "skills/navigate/SKILL.md" ]; then
+    if grep -q "/hiivmind-corpus" skills/navigate/SKILL.md 2>/dev/null; then
+      echo "⚠️  Skill has maintenance references (should be removed)"
+    else
+      echo "✅ Skill is pure navigation"
+    fi
+
+    if grep -q "AskUserQuestion" skills/navigate/SKILL.md 2>/dev/null; then
+      echo "✅ Skill has AskUserQuestion tool"
+    else
+      echo "⚠️  Skill missing AskUserQuestion in allowed-tools"
     fi
   fi
 fi

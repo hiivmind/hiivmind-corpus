@@ -3,7 +3,7 @@ name: {{plugin_name}}-navigate
 description: This skill answers questions about {{project_display_name}} documentation. Use when user asks about {{keywords_sentence}}. Triggers: {{keyword_list}}.
 context: fork
 agent: Explore
-allowed-tools: Read, Grep, Glob, WebFetch
+allowed-tools: Read, Grep, Glob, WebFetch, AskUserQuestion
 ---
 
 # {{project_display_name}} Documentation Navigator
@@ -94,7 +94,7 @@ Don't start exploring, guessing paths, or searching the source files. Instead, *
 
 3. **Identify an index gap** - If the user confirms their request was valid
    - "This topic isn't covered in the current index."
-   - Offer: "Would you like me to enhance the index for this topic?"
+   - "The source documentation may have content not yet indexed."
 
 ---
 
@@ -251,33 +251,6 @@ grep -n "/{path}" openapi.yaml -A 30
 - Include code examples from the docs
 - Suggest related docs from the same index section
 - Note source type and freshness warnings if relevant
-
----
-
-## Corpus Maintenance
-
-For corpus maintenance, use the parent plugin:
-
-```
-/hiivmind-corpus refresh {{corpus_short_name}}     - Update index from upstream
-/hiivmind-corpus enhance {{corpus_short_name}} X   - Add depth to topic X
-/hiivmind-corpus status {{corpus_short_name}}      - Check corpus freshness
-```
-
----
-
-## Making Projects Aware of This Corpus
-
-If you're working in a project that uses {{project_display_name}} but doesn't know about this corpus, you can add awareness to the project's CLAUDE.md.
-
-**The `references/project-awareness.md` file** contains a ready-to-use snippet that can be added to any project's CLAUDE.md.
-
-### When to Suggest Injection
-
-Suggest adding project awareness when:
-- User is working in a project that heavily uses {{project_display_name}}
-- User repeatedly asks {{project_display_name}} questions without invoking the corpus
-- User says "I keep forgetting to use the docs"
 
 ---
 
