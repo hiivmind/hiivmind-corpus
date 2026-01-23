@@ -1,0 +1,1045 @@
+name: hiivmind-corpus-gateway
+version: "1.0.0"
+description: >
+  Unified entry point for all corpus operations. Routes natural language
+  requests to appropriate skills: init, add-source, build, navigate, refresh,
+  enhance, upgrade, discover, awareness.
+
+entry_preconditions: []  # Gateway is always available
+
+initial_state:
+  phase: "detect"
+  intent: null                       # init | add-source | build | navigate | refresh | enhance | upgrade | discover | awareness | help
+  target_corpus: null                # corpus name if identified
+  target_topic: null                 # for enhance operations
+  source_url: null                   # for init/add-source operations
+  arguments: null                    # raw arguments from $ARGUMENTS
+  flags:
+    has_arguments: false
+    in_corpus_dir: false
+    in_marketplace: false
+    has_installed_corpora: false
+    is_compound_intent: false
+    corpora_discovered: false
+  computed:
+    context_type: null               # corpus-dir | marketplace | project | fresh
+    available_corpora: []            # list of discovered corpora
+    selected_corpus: null            # user-selected corpus for operations
+
+start_node: check_arguments
+
+nodes:
+  # ===========================================================================
+  # PHASE 1: ARGUMENT DETECTION
+  # ===========================================================================
+
+  check_arguments:
+    type: action
+    description: "Check if arguments were provided"
+    actions:
+      - type: set_state
+        field: arguments
+        value: "${ARGUMENTS}"
+      - type: evaluate
+        expression: "arguments != null && arguments.trim().length > 0"
+        set_flag: has_arguments
+    on_success: route_by_arguments
+    on_failure: route_by_arguments
+
+  route_by_arguments:
+    type: conditional
+    description: "Route based on whether arguments were provided"
+    condition:
+      type: flag_set
+      flag: has_arguments
+    branches:
+      true: detect_intent
+      false: show_main_menu
+
+  # ===========================================================================
+  # PHASE 2A: NO ARGUMENTS - INTERACTIVE MENU
+  # ===========================================================================
+
+  show_main_menu:
+    type: user_prompt
+    prompt:
+      question: "What would you like to do with documentation corpora?"
+      header: "Corpus"
+      options:
+        - id: navigate
+          label: "Navigate a corpus"
+          description: "Ask questions about installed documentation"
+        - id: create
+          label: "Create a new corpus"
+          description: "Index documentation for a project"
+        - id: manage
+          label: "Manage existing corpus"
+          description: "Refresh, enhance, or check status"
+        - id: list
+          label: "List installed corpora"
+          description: "See what's available"
+        - id: help
+          label: "Help"
+          description: "View commands and learn how this works"
+    on_response:
+      navigate:
+        consequence:
+          - type: set_state
+            field: intent
+            value: navigate
+        next_node: discover_corpora
+      create:
+        consequence:
+          - type: set_state
+            field: intent
+            value: init
+        next_node: delegate_init
+      manage:
+        consequence:
+          - type: set_state
+            field: intent
+            value: manage
+        next_node: discover_corpora
+      list:
+        consequence:
+          - type: set_state
+            field: intent
+            value: discover
+        next_node: delegate_discover
+      help:
+        next_node: display_help
+      other:
+        consequence:
+          - type: set_state
+            field: arguments
+            value: "${user_responses.show_main_menu.raw.text}"
+          - type: set_flag
+            flag: has_arguments
+            value: true
+        next_node: detect_intent
+
+  # ===========================================================================
+  # PHASE 2B: WITH ARGUMENTS - INTENT DETECTION
+  # ===========================================================================
+
+  detect_intent:
+    type: action
+    description: "Parse arguments for intent keywords"
+    actions:
+      - type: display_message
+        message: "Analyzing request: ${arguments}"
+      - type: evaluate_keywords
+        input: "${arguments}"
+        keyword_sets:
+          init:
+            - "create"
+            - "new"
+            - "index"
+            - "set up"
+            - "scaffold"
+            - "initialize"
+            - "start corpus"
+          add_source:
+            - "add"
+            - "include"
+            - "import"
+            - "fetch"
+            - "clone"
+            - "source"
+            - "extend with"
+            - "also index"
+          build:
+            - "build"
+            - "analyze"
+            - "scan"
+            - "create index"
+            - "finish setup"
+            - "index now"
+          navigate:
+            - "navigate"
+            - "find"
+            - "search"
+            - "look up"
+            - "what does"
+            - "how do"
+            - "explain"
+            - "show me"
+            - "where is"
+          refresh:
+            - "update"
+            - "refresh"
+            - "sync"
+            - "check"
+            - "upstream"
+            - "stale"
+            - "status"
+            - "is up to date"
+            - "current"
+            - "behind"
+          enhance:
+            - "expand"
+            - "deepen"
+            - "more detail"
+            - "enhance"
+            - "elaborate"
+            - "deeper coverage"
+            - "add depth"
+          upgrade:
+            - "upgrade"
+            - "migrate"
+            - "latest"
+            - "standards"
+            - "template"
+            - "modernize"
+            - "update structure"
+          discover:
+            - "list"
+            - "show"
+            - "available"
+            - "installed"
+            - "discover"
+            - "what corpora"
+            - "which corpora"
+          awareness:
+            - "awareness"
+            - "configure claude"
+            - "setup claude"
+            - "capabilities"
+            - "tour"
+            - "what can"
+            - "claude.md"
+            - "teach claude"
+          help:
+            - "help"
+            - "commands"
+            - "?"
+            - "usage"
+            - "guide"
+        store_as: computed.detected_intent
+    on_success: evaluate_detected_intent
+    on_failure: ask_clarification
+
+  evaluate_detected_intent:
+    type: conditional
+    description: "Check if intent was detected"
+    condition:
+      type: state_not_null
+      field: computed.detected_intent
+    branches:
+      true: set_intent_from_detection
+      false: check_navigate_fallback
+
+  set_intent_from_detection:
+    type: action
+    description: "Set intent from keyword detection"
+    actions:
+      - type: set_state
+        field: intent
+        value: "${computed.detected_intent}"
+    on_success: check_compound_intent
+    on_failure: ask_clarification
+
+  check_navigate_fallback:
+    type: action
+    description: "If no keywords matched, assume navigation query"
+    actions:
+      - type: set_state
+        field: intent
+        value: navigate
+      - type: display_message
+        message: "Treating as navigation query: ${arguments}"
+    on_success: discover_corpora
+    on_failure: ask_clarification
+
+  # ===========================================================================
+  # COMPOUND INTENT DETECTION
+  # ===========================================================================
+
+  check_compound_intent:
+    type: action
+    description: "Check if request implies multiple skills"
+    actions:
+      - type: evaluate
+        expression: |
+          arguments.includes(' and ') ||
+          (intent == 'init' && (arguments.includes('index') || arguments.includes('docs')))
+        set_flag: is_compound_intent
+    on_success: route_by_intent
+    on_failure: route_by_intent
+
+  # ===========================================================================
+  # PHASE 3: INTENT ROUTING
+  # ===========================================================================
+
+  route_by_intent:
+    type: conditional
+    description: "Route to appropriate skill based on detected intent"
+    condition:
+      type: state_equals
+      field: intent
+      value: init
+    branches:
+      true: extract_project_for_init
+      false: route_intent_add_source
+
+  route_intent_add_source:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: add_source
+    branches:
+      true: detect_context
+      false: route_intent_build
+
+  route_intent_build:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: build
+    branches:
+      true: detect_context
+      false: route_intent_navigate
+
+  route_intent_navigate:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: navigate
+    branches:
+      true: discover_corpora
+      false: route_intent_refresh
+
+  route_intent_refresh:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: refresh
+    branches:
+      true: extract_corpus_for_refresh
+      false: route_intent_enhance
+
+  route_intent_enhance:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: enhance
+    branches:
+      true: extract_topic_for_enhance
+      false: route_intent_upgrade
+
+  route_intent_upgrade:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: upgrade
+    branches:
+      true: extract_corpus_for_upgrade
+      false: route_intent_discover
+
+  route_intent_discover:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: discover
+    branches:
+      true: delegate_discover
+      false: route_intent_awareness
+
+  route_intent_awareness:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: awareness
+    branches:
+      true: delegate_awareness
+      false: route_intent_help
+
+  route_intent_help:
+    type: conditional
+    condition:
+      type: state_equals
+      field: intent
+      value: help
+    branches:
+      true: display_help
+      false: ask_clarification
+
+  # ===========================================================================
+  # CONTEXT DETECTION
+  # ===========================================================================
+
+  detect_context:
+    type: action
+    description: "Detect current directory context"
+    actions:
+      - type: file_exists_check
+        path: "data/config.yaml"
+        set_flag: in_corpus_dir
+      - type: file_exists_check
+        path: ".claude-plugin/marketplace.json"
+        set_flag: in_marketplace
+    on_success: route_by_context
+    on_failure: route_by_context
+
+  route_by_context:
+    type: conditional
+    description: "Route based on directory context"
+    condition:
+      type: flag_set
+      flag: in_corpus_dir
+    branches:
+      true: set_context_corpus_dir
+      false: check_marketplace_context
+
+  set_context_corpus_dir:
+    type: action
+    description: "Set context as corpus directory"
+    actions:
+      - type: set_state
+        field: computed.context_type
+        value: "corpus-dir"
+    on_success: route_context_to_skill
+    on_failure: route_context_to_skill
+
+  check_marketplace_context:
+    type: conditional
+    description: "Check if in marketplace"
+    condition:
+      type: flag_set
+      flag: in_marketplace
+    branches:
+      true: set_context_marketplace
+      false: set_context_fresh
+
+  set_context_marketplace:
+    type: action
+    description: "Set context as marketplace"
+    actions:
+      - type: set_state
+        field: computed.context_type
+        value: "marketplace"
+    on_success: route_context_to_skill
+    on_failure: route_context_to_skill
+
+  set_context_fresh:
+    type: action
+    description: "Set context as fresh directory"
+    actions:
+      - type: set_state
+        field: computed.context_type
+        value: "fresh"
+    on_success: route_context_to_skill
+    on_failure: route_context_to_skill
+
+  route_context_to_skill:
+    type: conditional
+    description: "Route to skill based on intent and context"
+    condition:
+      type: state_equals
+      field: intent
+      value: add_source
+    branches:
+      true: delegate_add_source
+      false: delegate_build
+
+  # ===========================================================================
+  # EXTRACTION NODES
+  # ===========================================================================
+
+  extract_project_for_init:
+    type: action
+    description: "Extract project name or URL from arguments"
+    actions:
+      - type: compute
+        expression: |
+          arguments.match(/github\.com\/[\w-]+\/[\w-]+/)?.[0] ||
+          arguments.match(/https?:\/\/[^\s]+/)?.[0] ||
+          arguments.replace(/^(create|new|index|set up|scaffold|initialize|start corpus)\s*/i, '').trim()
+        store_as: computed.extracted_project
+      - type: evaluate
+        expression: "computed.extracted_project && computed.extracted_project.length > 0"
+        set_flag: has_extracted_project
+    on_success: check_extracted_project
+    on_failure: delegate_init
+
+  check_extracted_project:
+    type: conditional
+    description: "Check if project was extracted"
+    condition:
+      type: flag_set
+      flag: has_extracted_project
+    branches:
+      true: set_source_url
+      false: delegate_init
+
+  set_source_url:
+    type: action
+    description: "Set source URL from extracted project"
+    actions:
+      - type: set_state
+        field: source_url
+        value: "${computed.extracted_project}"
+    on_success: delegate_init
+    on_failure: delegate_init
+
+  extract_corpus_for_refresh:
+    type: action
+    description: "Extract corpus name from arguments for refresh"
+    actions:
+      - type: compute
+        expression: |
+          arguments.replace(/^(update|refresh|sync|check|status)\s*/i, '')
+                   .replace(/\s*(corpus|documentation|docs).*$/i, '')
+                   .replace(/^(my|the)\s*/i, '')
+                   .trim()
+        store_as: computed.extracted_corpus
+    on_success: check_extracted_corpus_refresh
+    on_failure: detect_context
+
+  check_extracted_corpus_refresh:
+    type: conditional
+    description: "Check if corpus name was extracted"
+    condition:
+      type: evaluate_expression
+      expression: "computed.extracted_corpus && computed.extracted_corpus.length > 0"
+    branches:
+      true: set_target_corpus_refresh
+      false: detect_context
+
+  set_target_corpus_refresh:
+    type: action
+    description: "Set target corpus for refresh"
+    actions:
+      - type: set_state
+        field: target_corpus
+        value: "${computed.extracted_corpus}"
+    on_success: delegate_refresh
+    on_failure: delegate_refresh
+
+  extract_corpus_for_upgrade:
+    type: action
+    description: "Extract corpus name from arguments for upgrade"
+    actions:
+      - type: compute
+        expression: |
+          arguments.replace(/^(upgrade|migrate|modernize)\s*/i, '')
+                   .replace(/\s*(corpus|to|latest|standards).*$/i, '')
+                   .replace(/^(my|the)\s*/i, '')
+                   .trim()
+        store_as: computed.extracted_corpus
+    on_success: check_extracted_corpus_upgrade
+    on_failure: detect_context
+
+  check_extracted_corpus_upgrade:
+    type: conditional
+    description: "Check if corpus name was extracted"
+    condition:
+      type: evaluate_expression
+      expression: "computed.extracted_corpus && computed.extracted_corpus.length > 0"
+    branches:
+      true: set_target_corpus_upgrade
+      false: detect_context
+
+  set_target_corpus_upgrade:
+    type: action
+    description: "Set target corpus for upgrade"
+    actions:
+      - type: set_state
+        field: target_corpus
+        value: "${computed.extracted_corpus}"
+    on_success: delegate_upgrade
+    on_failure: delegate_upgrade
+
+  extract_topic_for_enhance:
+    type: action
+    description: "Extract topic from arguments for enhance"
+    actions:
+      - type: compute
+        expression: |
+          arguments.replace(/^(expand|deepen|more detail on|enhance|elaborate|deeper coverage on|add depth to)\s*/i, '')
+                   .replace(/\s*(section|topic|area|coverage).*$/i, '')
+                   .trim()
+        store_as: target_topic
+    on_success: check_extracted_topic
+    on_failure: detect_context
+
+  check_extracted_topic:
+    type: conditional
+    description: "Check if topic was extracted"
+    condition:
+      type: state_not_null
+      field: target_topic
+    branches:
+      true: delegate_enhance
+      false: detect_context
+
+  # ===========================================================================
+  # CORPUS DISCOVERY
+  # ===========================================================================
+
+  discover_corpora:
+    type: action
+    description: "Find all installed corpora"
+    actions:
+      - type: display_message
+        message: "Discovering installed corpora..."
+      - type: discover_installed_corpora
+        store_as: computed.available_corpora
+      - type: evaluate
+        expression: "computed.available_corpora && computed.available_corpora.length > 0"
+        set_flag: has_installed_corpora
+      - type: set_flag
+        flag: corpora_discovered
+        value: true
+    on_success: check_has_corpora
+    on_failure: error_no_corpora
+
+  check_has_corpora:
+    type: conditional
+    description: "Check if any corpora are installed"
+    condition:
+      type: flag_set
+      flag: has_installed_corpora
+    branches:
+      true: route_discovered_corpora
+      false: error_no_corpora
+
+  route_discovered_corpora:
+    type: conditional
+    description: "Route based on intent after discovery"
+    condition:
+      type: state_equals
+      field: intent
+      value: navigate
+    branches:
+      true: check_single_corpus_navigate
+      false: select_corpus_for_manage
+
+  check_single_corpus_navigate:
+    type: conditional
+    description: "Check if only one corpus - skip selection"
+    condition:
+      type: evaluate_expression
+      expression: "computed.available_corpora.length == 1"
+    branches:
+      true: auto_select_single_corpus
+      false: select_corpus_for_navigate
+
+  auto_select_single_corpus:
+    type: action
+    description: "Auto-select the only installed corpus"
+    actions:
+      - type: set_state
+        field: computed.selected_corpus
+        value: "${computed.available_corpora[0]}"
+    on_success: delegate_navigate
+    on_failure: select_corpus_for_navigate
+
+  select_corpus_for_navigate:
+    type: user_prompt
+    prompt:
+      question: "Which corpus would you like to query?"
+      header: "Select"
+      options_from_state: computed.available_corpora
+      option_template:
+        label: "${corpus.name} [${corpus.status}]"
+        description: "${corpus.description}"
+    on_response:
+      selected:
+        consequence:
+          - type: set_state
+            field: computed.selected_corpus
+            value: "${user_responses.select_corpus_for_navigate.selected}"
+        next_node: delegate_navigate
+      other:
+        next_node: delegate_navigate
+
+  select_corpus_for_manage:
+    type: user_prompt
+    prompt:
+      question: "Which corpus would you like to manage?"
+      header: "Select"
+      options_from_state: computed.available_corpora
+      option_template:
+        label: "${corpus.name} [${corpus.status}]"
+        description: "${corpus.description}"
+    on_response:
+      selected:
+        consequence:
+          - type: set_state
+            field: computed.selected_corpus
+            value: "${user_responses.select_corpus_for_manage.selected}"
+        next_node: show_corpus_action_menu
+      other:
+        next_node: show_corpus_action_menu
+
+  show_corpus_action_menu:
+    type: user_prompt
+    prompt:
+      question: "What would you like to do with ${computed.selected_corpus.name}?"
+      header: "Action"
+      options:
+        - id: navigate
+          label: "Navigate"
+          description: "Ask questions about this documentation"
+        - id: check
+          label: "Check freshness"
+          description: "See if source has updates"
+        - id: enhance
+          label: "Enhance"
+          description: "Add more depth to specific topics"
+        - id: refresh
+          label: "Refresh"
+          description: "Sync index with upstream changes"
+        - id: upgrade
+          label: "Upgrade"
+          description: "Apply latest template standards"
+    on_response:
+      navigate:
+        consequence:
+          - type: set_state
+            field: intent
+            value: navigate
+        next_node: delegate_navigate
+      check:
+        consequence:
+          - type: set_state
+            field: intent
+            value: refresh
+        next_node: delegate_refresh
+      enhance:
+        consequence:
+          - type: set_state
+            field: intent
+            value: enhance
+        next_node: ask_enhance_topic
+      refresh:
+        consequence:
+          - type: set_state
+            field: intent
+            value: refresh
+        next_node: delegate_refresh
+      upgrade:
+        consequence:
+          - type: set_state
+            field: intent
+            value: upgrade
+        next_node: delegate_upgrade
+      other:
+        next_node: delegate_navigate
+
+  ask_enhance_topic:
+    type: user_prompt
+    prompt:
+      question: "What topic would you like to enhance?"
+      header: "Topic"
+      options:
+        - id: specify
+          label: "Specify topic"
+          description: "Enter the topic or section to expand"
+        - id: review
+          label: "Review index"
+          description: "Show current index to choose from"
+        - id: shallow
+          label: "Shallow sections"
+          description: "Find sections that need more depth"
+    on_response:
+      specify:
+        next_node: collect_enhance_topic
+      review:
+        next_node: delegate_enhance
+      shallow:
+        next_node: delegate_enhance
+      other:
+        consequence:
+          - type: set_state
+            field: target_topic
+            value: "${user_responses.ask_enhance_topic.raw.text}"
+        next_node: delegate_enhance
+
+  collect_enhance_topic:
+    type: user_prompt
+    prompt:
+      question: "Enter the topic or section name to enhance:"
+      header: "Topic"
+      options:
+        - id: example
+          label: "Example format"
+          description: "e.g., lazy API, authentication, error handling"
+    on_response:
+      example:
+        next_node: collect_enhance_topic
+      other:
+        consequence:
+          - type: set_state
+            field: target_topic
+            value: "${user_responses.collect_enhance_topic.raw.text}"
+        next_node: delegate_enhance
+
+  # ===========================================================================
+  # SKILL DELEGATION NODES
+  # ===========================================================================
+
+  delegate_init:
+    type: action
+    description: "Hand off to init skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: init
+          **Target**: ${source_url}
+      - type: invoke_skill
+        skill: "hiivmind-corpus-init"
+        args: "${source_url}"
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_add_source:
+    type: action
+    description: "Hand off to add-source skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: add-source
+      - type: invoke_skill
+        skill: "hiivmind-corpus-add-source"
+        args: ""
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_build:
+    type: action
+    description: "Hand off to build skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: build
+      - type: invoke_skill
+        skill: "hiivmind-corpus-build"
+        args: ""
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_navigate:
+    type: action
+    description: "Hand off to navigate skill"
+    actions:
+      - type: display_message
+        message: |
+          **Intent**: navigate
+          **Query**: ${arguments}
+          **Corpus**: ${computed.selected_corpus.name}
+      - type: invoke_skill
+        skill: "hiivmind-corpus-navigate"
+        args: "${arguments}"
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_refresh:
+    type: action
+    description: "Hand off to refresh skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: refresh
+          **Target**: ${target_corpus}
+      - type: invoke_skill
+        skill: "hiivmind-corpus-refresh"
+        args: "${target_corpus}"
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_enhance:
+    type: action
+    description: "Hand off to enhance skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: enhance
+          **Topic**: ${target_topic}
+      - type: invoke_skill
+        skill: "hiivmind-corpus-enhance"
+        args: "${target_topic}"
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_upgrade:
+    type: action
+    description: "Hand off to upgrade skill"
+    actions:
+      - type: display_message
+        message: |
+          **Context**: ${computed.context_type}
+          **Intent**: upgrade
+          **Target**: ${target_corpus}
+      - type: invoke_skill
+        skill: "hiivmind-corpus-upgrade"
+        args: "${target_corpus}"
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_discover:
+    type: action
+    description: "Hand off to discover skill"
+    actions:
+      - type: display_message
+        message: |
+          **Intent**: discover
+      - type: invoke_skill
+        skill: "hiivmind-corpus-discover"
+        args: ""
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  delegate_awareness:
+    type: action
+    description: "Hand off to awareness skill"
+    actions:
+      - type: display_message
+        message: |
+          **Intent**: awareness
+      - type: invoke_skill
+        skill: "hiivmind-corpus-awareness"
+        args: ""
+    on_success: success_delegated
+    on_failure: error_delegation_failed
+
+  # ===========================================================================
+  # HELP DISPLAY
+  # ===========================================================================
+
+  display_help:
+    type: action
+    description: "Show quick reference"
+    actions:
+      - type: display_message
+        message: |
+          ═══════════════════════════════════════════════════════════
+          HIIVMIND-CORPUS - Documentation Corpus Manager
+          ═══════════════════════════════════════════════════════════
+
+          CREATE
+            /hiivmind-corpus create [project]     Create new corpus
+            /hiivmind-corpus add [source]         Add source to existing corpus
+            /hiivmind-corpus build                Build/rebuild the index
+
+          NAVIGATE
+            /hiivmind-corpus                      Interactive menu
+            /hiivmind-corpus [question]           Query installed corpora
+            /hiivmind-corpus list                 Show installed corpora
+
+          MAINTAIN
+            /hiivmind-corpus refresh [corpus]     Check/apply upstream updates
+            /hiivmind-corpus enhance [topic]      Deepen coverage on topic
+            /hiivmind-corpus upgrade [corpus]     Apply latest template standards
+
+          CONFIGURE
+            /hiivmind-corpus awareness            Add plugin awareness to CLAUDE.md
+
+          NATURAL LANGUAGE EXAMPLES
+            "index the polars docs"               → init + build
+            "add kent's blog to my react corpus"  → add-source
+            "is my polars corpus up to date?"     → refresh (status)
+            "more detail on lazy evaluation"      → enhance
+            "what corpora do I have?"             → discover
+
+          ═══════════════════════════════════════════════════════════
+    on_success: success_help
+    on_failure: success_help
+
+  # ===========================================================================
+  # CLARIFICATION
+  # ===========================================================================
+
+  ask_clarification:
+    type: user_prompt
+    prompt:
+      question: "I couldn't determine what you'd like to do. Please select an action:"
+      header: "Action"
+      options:
+        - id: navigate
+          label: "Search documentation"
+          description: "Find information in installed corpora"
+        - id: create
+          label: "Create new corpus"
+          description: "Index documentation for a project"
+        - id: manage
+          label: "Manage corpus"
+          description: "Refresh, enhance, or check status"
+        - id: help
+          label: "Show help"
+          description: "View available commands"
+    on_response:
+      navigate:
+        consequence:
+          - type: set_state
+            field: intent
+            value: navigate
+        next_node: discover_corpora
+      create:
+        consequence:
+          - type: set_state
+            field: intent
+            value: init
+        next_node: delegate_init
+      manage:
+        consequence:
+          - type: set_state
+            field: intent
+            value: manage
+        next_node: discover_corpora
+      help:
+        next_node: display_help
+      other:
+        consequence:
+          - type: set_state
+            field: arguments
+            value: "${user_responses.ask_clarification.raw.text}"
+        next_node: detect_intent
+
+# ===========================================================================
+# ENDINGS
+# ===========================================================================
+
+endings:
+  success_delegated:
+    type: success
+    message: ""
+
+  success_help:
+    type: success
+    message: ""
+
+  error_no_corpora:
+    type: error
+    message: |
+      No documentation corpora are installed yet.
+
+      Would you like to:
+      1. **Create a new corpus** - `/hiivmind-corpus create [project]`
+      2. **Install from marketplace** - `/plugin install hiivmind-corpus-polars@hiivmind`
+
+      Or describe what you'd like to index: "/hiivmind-corpus index the react docs"
+    recovery: "hiivmind-corpus-init"
+
+  error_delegation_failed:
+    type: error
+    message: "Failed to invoke skill: ${computed.error}"
+    details: "Check that the skill exists and try again."
+
+  cancelled:
+    type: success
+    message: "Operation cancelled"

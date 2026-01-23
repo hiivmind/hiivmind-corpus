@@ -739,6 +739,109 @@ set_state_value(store_as, "sha256:" + hash)
 
 ---
 
+## Skill Invocation Consequences
+
+### invoke_skill
+
+Invoke another skill and wait for completion.
+
+```yaml
+- type: invoke_skill
+  skill: "hiivmind-corpus-init"
+  args: "${source_url}"
+```
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `skill` | string | Yes | Skill name (without plugin prefix) |
+| `args` | string | No | Arguments to pass to the skill |
+
+**Effect:**
+```
+Invoke the Skill tool:
+  Skill: {skill}
+  Args: {args}
+```
+
+The invoked skill takes over the conversation. This consequence is typically the last action before reaching a success ending.
+
+---
+
+### evaluate_keywords
+
+Match user input against keyword sets to detect intent.
+
+```yaml
+- type: evaluate_keywords
+  input: "${arguments}"
+  keyword_sets:
+    init:
+      - "create"
+      - "new"
+      - "index"
+    refresh:
+      - "update"
+      - "sync"
+      - "check"
+  store_as: computed.detected_intent
+```
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `input` | string | Yes | User input to match against |
+| `keyword_sets` | object | Yes | Map of intent names to keyword arrays |
+| `store_as` | string | Yes | State field for matched intent |
+
+**Effect:**
+```
+FOR each keyword_set IN keyword_sets:
+  FOR each keyword IN keyword_set.keywords:
+    IF input.toLowerCase().includes(keyword.toLowerCase()):
+      set_state_value(store_as, keyword_set.name)
+      RETURN success
+set_state_value(store_as, null)
+RETURN success
+```
+
+Matches the **first** keyword set that contains a phrase found in the input (case-insensitive). Returns null if no match found.
+
+---
+
+### discover_installed_corpora
+
+Scan for installed documentation corpora.
+
+```yaml
+- type: discover_installed_corpora
+  store_as: computed.available_corpora
+```
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `store_as` | string | Yes | State field for corpus array |
+
+**Effect:**
+Scans these locations for corpora:
+1. User-level: `~/.claude/skills/hiivmind-corpus-*`
+2. Repo-local: `.claude-plugin/skills/hiivmind-corpus-*`
+3. Marketplace plugins: `*/hiivmind-corpus-*/.claude-plugin/plugin.json`
+
+Returns array of corpus objects:
+```yaml
+- name: "polars"
+  status: "built"        # built | stale | placeholder
+  description: "Polars DataFrame documentation"
+  path: "/path/to/corpus"
+  keywords: ["polars", "dataframe"]
+```
+
+See `lib/corpus/patterns/discovery.md` for full algorithm.
+
+---
+
 ## Consequence Execution
 
 Consequences in an action node execute **sequentially**:
