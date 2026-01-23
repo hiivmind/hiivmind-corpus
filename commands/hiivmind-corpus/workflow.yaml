@@ -25,6 +25,17 @@ initial_state:
     context_type: null               # corpus-dir | marketplace | project | fresh
     available_corpora: []            # list of discovered corpora
     selected_corpus: null            # user-selected corpus for operations
+    intent_flags: {}                 # 3VL flag values (T/F/U)
+    intent_matches: null             # 3VL rule matching results
+
+# ===========================================================================
+# IMPORTS
+# ===========================================================================
+# External configuration files loaded at workflow start.
+# See: lib/intent_detection/variables.md for interpolation syntax.
+
+imports:
+  intent_mapping: "intent-mapping.yaml"  # Flags and rules for 3VL intent detection
 
 start_node: check_arguments
 
@@ -53,7 +64,7 @@ nodes:
       type: flag_set
       flag: has_arguments
     branches:
-      true: detect_intent
+      true: parse_intent_flags
       false: show_main_menu
 
   # ===========================================================================
@@ -116,128 +127,108 @@ nodes:
           - type: set_flag
             flag: has_arguments
             value: true
-        next_node: detect_intent
+        next_node: parse_intent_flags
 
   # ===========================================================================
-  # PHASE 2B: WITH ARGUMENTS - INTENT DETECTION
+  # PHASE 2B: WITH ARGUMENTS - 3VL INTENT DETECTION
   # ===========================================================================
+  # Uses 3-Valued Logic (T/F/U) for compound intent handling.
+  # See lib/workflow/consequences.md for algorithm details.
 
-  detect_intent:
+  parse_intent_flags:
     type: action
-    description: "Parse arguments for intent keywords"
+    description: "Parse input and set 3VL flags"
     actions:
       - type: display_message
         message: "Analyzing request: ${arguments}"
-      - type: evaluate_keywords
+      - type: parse_intent_flags
         input: "${arguments}"
-        keyword_sets:
-          init:
-            - "create"
-            - "new"
-            - "index"
-            - "set up"
-            - "scaffold"
-            - "initialize"
-            - "start corpus"
-          add_source:
-            - "add"
-            - "include"
-            - "import"
-            - "fetch"
-            - "clone"
-            - "source"
-            - "extend with"
-            - "also index"
-          build:
-            - "build"
-            - "analyze"
-            - "scan"
-            - "create index"
-            - "finish setup"
-            - "index now"
-          navigate:
-            - "navigate"
-            - "find"
-            - "search"
-            - "look up"
-            - "what does"
-            - "how do"
-            - "explain"
-            - "show me"
-            - "where is"
-          refresh:
-            - "update"
-            - "refresh"
-            - "sync"
-            - "check"
-            - "upstream"
-            - "stale"
-            - "status"
-            - "is up to date"
-            - "current"
-            - "behind"
-          enhance:
-            - "expand"
-            - "deepen"
-            - "more detail"
-            - "enhance"
-            - "elaborate"
-            - "deeper coverage"
-            - "add depth"
-          upgrade:
-            - "upgrade"
-            - "migrate"
-            - "latest"
-            - "standards"
-            - "template"
-            - "modernize"
-            - "update structure"
-          discover:
-            - "list"
-            - "show"
-            - "available"
-            - "installed"
-            - "discover"
-            - "what corpora"
-            - "which corpora"
-          awareness:
-            - "awareness"
-            - "configure claude"
-            - "setup claude"
-            - "capabilities"
-            - "tour"
-            - "what can"
-            - "claude.md"
-            - "teach claude"
-          help:
-            - "help"
-            - "commands"
-            - "?"
-            - "usage"
-            - "guide"
-        store_as: computed.detected_intent
-    on_success: evaluate_detected_intent
+        flag_definitions: "${imports.intent_mapping.intent_flags}"
+        store_as: computed.intent_flags
+    on_success: match_intent_rules
+    on_failure: show_main_menu
+
+  match_intent_rules:
+    type: action
+    description: "Match flags against 3VL rule table"
+    actions:
+      - type: match_3vl_rules
+        flags: "${computed.intent_flags}"
+        rules: "${imports.intent_mapping.intent_rules}"
+        store_as: computed.intent_matches
+    on_success: check_clear_winner
     on_failure: ask_clarification
 
-  evaluate_detected_intent:
+  check_clear_winner:
     type: conditional
-    description: "Check if intent was detected"
+    description: "Check if there's a clear winner"
     condition:
-      type: state_not_null
-      field: computed.detected_intent
+      type: evaluate_expression
+      expression: "computed.intent_matches.clear_winner == true"
     branches:
-      true: set_intent_from_detection
-      false: check_navigate_fallback
+      true: set_intent_from_winner
+      false: check_has_candidates
 
-  set_intent_from_detection:
+  set_intent_from_winner:
     type: action
-    description: "Set intent from keyword detection"
+    description: "Set intent from winning rule"
     actions:
       - type: set_state
         field: intent
-        value: "${computed.detected_intent}"
-    on_success: check_compound_intent
+        value: "${computed.intent_matches.winner.name}"
+      - type: set_state
+        field: computed.matched_action
+        value: "${computed.intent_matches.winner.action}"
+    on_success: execute_matched_action
     on_failure: ask_clarification
+
+  check_has_candidates:
+    type: conditional
+    description: "Check if there are any candidates for disambiguation"
+    condition:
+      type: evaluate_expression
+      expression: "computed.intent_matches.top_candidates && computed.intent_matches.top_candidates.length > 0"
+    branches:
+      true: show_disambiguation_menu
+      false: check_navigate_fallback
+
+  show_disambiguation_menu:
+    type: user_prompt
+    prompt:
+      question: "I detected multiple possible intents. Which did you mean?"
+      header: "Clarify"
+      options:
+        - id: option_0
+          label: "${computed.intent_matches.top_candidates[0].rule.name}"
+          description: "${computed.intent_matches.top_candidates[0].rule.description}"
+        - id: option_1
+          label: "${computed.intent_matches.top_candidates[1].rule.name}"
+          description: "${computed.intent_matches.top_candidates[1].rule.description}"
+    on_response:
+      option_0:
+        consequence:
+          - type: set_state
+            field: intent
+            value: "${computed.intent_matches.top_candidates[0].rule.name}"
+          - type: set_state
+            field: computed.matched_action
+            value: "${computed.intent_matches.top_candidates[0].rule.action}"
+        next_node: execute_matched_action
+      option_1:
+        consequence:
+          - type: set_state
+            field: intent
+            value: "${computed.intent_matches.top_candidates[1].rule.name}"
+          - type: set_state
+            field: computed.matched_action
+            value: "${computed.intent_matches.top_candidates[1].rule.action}"
+        next_node: execute_matched_action
+      other:
+        consequence:
+          - type: set_state
+            field: arguments
+            value: "${user_responses.show_disambiguation_menu.raw.text}"
+        next_node: parse_intent_flags
 
   check_navigate_fallback:
     type: action
@@ -246,130 +237,119 @@ nodes:
       - type: set_state
         field: intent
         value: navigate
+      - type: set_state
+        field: computed.matched_action
+        value: discover_corpora
       - type: display_message
         message: "Treating as navigation query: ${arguments}"
     on_success: discover_corpora
     on_failure: ask_clarification
 
   # ===========================================================================
-  # COMPOUND INTENT DETECTION
+  # PHASE 3: DYNAMIC INTENT ROUTING
   # ===========================================================================
+  # Routes to the action specified by the winning rule.
+  # This replaces the cascade of route_intent_* nodes.
 
-  check_compound_intent:
-    type: action
-    description: "Check if request implies multiple skills"
-    actions:
-      - type: evaluate
-        expression: |
-          arguments.includes(' and ') ||
-          (intent == 'init' && (arguments.includes('index') || arguments.includes('docs')))
-        set_flag: is_compound_intent
-    on_success: route_by_intent
-    on_failure: route_by_intent
-
-  # ===========================================================================
-  # PHASE 3: INTENT ROUTING
-  # ===========================================================================
-
-  route_by_intent:
+  execute_matched_action:
     type: conditional
-    description: "Route to appropriate skill based on detected intent"
+    description: "Route to action from matched rule"
     condition:
       type: state_equals
-      field: intent
-      value: init
+      field: computed.matched_action
+      value: extract_project_for_init
     branches:
       true: extract_project_for_init
-      false: route_intent_add_source
+      false: route_action_detect_context
 
-  route_intent_add_source:
+  route_action_detect_context:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: add_source
+      field: computed.matched_action
+      value: detect_context
     branches:
       true: detect_context
-      false: route_intent_build
+      false: route_action_discover_corpora
 
-  route_intent_build:
+  route_action_discover_corpora:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: build
-    branches:
-      true: detect_context
-      false: route_intent_navigate
-
-  route_intent_navigate:
-    type: conditional
-    condition:
-      type: state_equals
-      field: intent
-      value: navigate
+      field: computed.matched_action
+      value: discover_corpora
     branches:
       true: discover_corpora
-      false: route_intent_refresh
+      false: route_action_extract_refresh
 
-  route_intent_refresh:
+  route_action_extract_refresh:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: refresh
+      field: computed.matched_action
+      value: extract_corpus_for_refresh
     branches:
       true: extract_corpus_for_refresh
-      false: route_intent_enhance
+      false: route_action_extract_enhance
 
-  route_intent_enhance:
+  route_action_extract_enhance:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: enhance
+      field: computed.matched_action
+      value: extract_topic_for_enhance
     branches:
       true: extract_topic_for_enhance
-      false: route_intent_upgrade
+      false: route_action_extract_upgrade
 
-  route_intent_upgrade:
+  route_action_extract_upgrade:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: upgrade
+      field: computed.matched_action
+      value: extract_corpus_for_upgrade
     branches:
       true: extract_corpus_for_upgrade
-      false: route_intent_discover
+      false: route_action_delegate_discover
 
-  route_intent_discover:
+  route_action_delegate_discover:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: discover
+      field: computed.matched_action
+      value: delegate_discover
     branches:
       true: delegate_discover
-      false: route_intent_awareness
+      false: route_action_delegate_awareness
 
-  route_intent_awareness:
+  route_action_delegate_awareness:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: awareness
+      field: computed.matched_action
+      value: delegate_awareness
     branches:
       true: delegate_awareness
-      false: route_intent_help
+      false: route_action_display_help
 
-  route_intent_help:
+  route_action_display_help:
     type: conditional
     condition:
       type: state_equals
-      field: intent
-      value: help
+      field: computed.matched_action
+      value: display_help
     branches:
       true: display_help
+      false: route_action_show_menu
+
+  route_action_show_menu:
+    type: conditional
+    condition:
+      type: state_equals
+      field: computed.matched_action
+      value: show_main_menu
+    branches:
+      true: show_main_menu
       false: ask_clarification
 
   # ===========================================================================
@@ -1008,7 +988,7 @@ nodes:
           - type: set_state
             field: arguments
             value: "${user_responses.ask_clarification.raw.text}"
-        next_node: detect_intent
+        next_node: parse_intent_flags
 
 # ===========================================================================
 # ENDINGS

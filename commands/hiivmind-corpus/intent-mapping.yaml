@@ -1,0 +1,339 @@
+# Intent Mapping for Corpus Gateway Command
+#
+# Defines intent flags and rules for 3VL (3-Valued Logic) intent detection.
+# See: lib/intent_detection/framework.md for semantics
+# See: lib/intent_detection/execution.md for algorithms
+
+# ===========================================================================
+# 3VL INTENT FLAG DEFINITIONS
+# ===========================================================================
+# Each flag can have:
+#   - keywords: phrases that set flag to T (True)
+#   - negative_keywords: phrases that set flag to F (False)
+#   - If neither matches: flag remains U (Unknown)
+
+intent_flags:
+  has_help:
+    keywords:
+      - "help"
+      - "how do i"
+      - "what is"
+      - "guide"
+      - "usage"
+      - "?"
+    description: "User is asking for help or guidance"
+
+  has_init:
+    keywords:
+      - "create"
+      - "new"
+      - "index"
+      - "set up"
+      - "scaffold"
+      - "initialize"
+      - "start corpus"
+    negative_keywords:
+      - "don't create"
+      - "don't init"
+      - "not new"
+      - "skip init"
+      - "without creating"
+    description: "User wants to create/initialize something"
+
+  has_add_source:
+    keywords:
+      - "add source"
+      - "add a source"
+      - "include"
+      - "import"
+      - "extend with"
+      - "also index"
+      - "add docs"
+      - "add documentation"
+    description: "User wants to add a source to existing corpus"
+
+  has_build:
+    keywords:
+      - "build"
+      - "analyze"
+      - "scan"
+      - "create index"
+      - "finish setup"
+      - "index now"
+    description: "User wants to build/rebuild index"
+
+  has_query:
+    keywords:
+      - "find"
+      - "search"
+      - "look up"
+      - "what does"
+      - "explain"
+      - "where is"
+      - "navigate"
+    negative_keywords:
+      - "don't search"
+      - "don't find"
+    description: "User wants to query/navigate documentation"
+
+  has_refresh:
+    keywords:
+      - "update"
+      - "refresh"
+      - "sync"
+      - "check"
+      - "stale"
+      - "status"
+      - "behind"
+      - "upstream"
+      - "current"
+      - "is up to date"
+    description: "User wants to check/sync corpus status"
+
+  has_enhance:
+    keywords:
+      - "expand"
+      - "deepen"
+      - "more detail"
+      - "enhance"
+      - "elaborate"
+      - "add depth"
+      - "deeper coverage"
+    description: "User wants to deepen coverage on topics"
+
+  has_upgrade:
+    keywords:
+      - "upgrade"
+      - "migrate"
+      - "latest"
+      - "standards"
+      - "template"
+      - "modernize"
+      - "update structure"
+    description: "User wants to upgrade corpus structure"
+
+  has_list:
+    keywords:
+      - "list"
+      - "available"
+      - "installed"
+      - "discover"
+      - "what corpora"
+      - "which corpora"
+      - "show corpora"
+    description: "User wants to list/discover corpora"
+
+  has_awareness:
+    keywords:
+      - "awareness"
+      - "configure claude"
+      - "setup claude"
+      - "capabilities"
+      - "tour"
+      - "claude.md"
+      - "teach claude"
+    description: "User wants to configure CLAUDE.md"
+
+  has_show:
+    keywords:
+      - "show"
+      - "show me"
+      - "display"
+    description: "User wants to see/display something"
+
+# ===========================================================================
+# 3VL INTENT RULES
+# ===========================================================================
+# Rules are matched against parsed flags using 3VL semantics:
+#   - T+T or F+F = +2 (hard match)
+#   - T+U, U+T, F+U, U+F = +1 (soft match)
+#   - U+U = 0 (no contribution)
+#   - T+F or F+T = EXCLUDED
+#
+# Winner is determined by:
+#   1. Score (descending)
+#   2. Priority (descending)
+# Clear winner requires score >= second_place + 2
+
+intent_rules:
+  # Priority 100: Pure help (no other intents)
+  - name: "help_only"
+    conditions:
+      has_help: T
+      has_init: F
+      has_add_source: F
+      has_build: F
+      has_query: F
+      has_refresh: F
+      has_enhance: F
+      has_upgrade: F
+      has_list: F
+      has_awareness: F
+    action: display_help
+    priority: 100
+    description: "Show help documentation"
+
+  # Priority 95: Pure listing (no query context)
+  - name: "list_only"
+    conditions:
+      has_list: T
+      has_query: F
+      has_help: F
+    action: delegate_discover
+    priority: 95
+    description: "List installed corpora"
+
+  # Priority 90: Pure single intents
+  - name: "init_only"
+    conditions:
+      has_init: T
+      has_add_source: F
+      has_build: F
+    action: extract_project_for_init
+    priority: 90
+    description: "Create a new corpus"
+
+  - name: "add_source_only"
+    conditions:
+      has_add_source: T
+      has_init: F
+    action: detect_context
+    priority: 90
+    description: "Add source to existing corpus"
+
+  - name: "build_only"
+    conditions:
+      has_build: T
+      has_init: F
+    action: detect_context
+    priority: 90
+    description: "Build corpus index"
+
+  - name: "refresh_only"
+    conditions:
+      has_refresh: T
+      has_enhance: F
+      has_upgrade: F
+    action: extract_corpus_for_refresh
+    priority: 90
+    description: "Check/refresh corpus status"
+
+  - name: "enhance_only"
+    conditions:
+      has_enhance: T
+      has_refresh: F
+    action: extract_topic_for_enhance
+    priority: 90
+    description: "Enhance topic coverage"
+
+  - name: "upgrade_only"
+    conditions:
+      has_upgrade: T
+      has_refresh: F
+    action: extract_corpus_for_upgrade
+    priority: 90
+    description: "Upgrade corpus structure"
+
+  - name: "awareness_only"
+    conditions:
+      has_awareness: T
+    action: delegate_awareness
+    priority: 90
+    description: "Configure CLAUDE.md awareness"
+
+  # Priority 85: Query/navigate (explicit or with show)
+  - name: "query_explicit"
+    conditions:
+      has_query: T
+      has_list: F
+      has_init: F
+    action: discover_corpora
+    priority: 85
+    description: "Navigate documentation"
+
+  - name: "show_with_list"
+    conditions:
+      has_show: T
+      has_list: T
+    action: delegate_discover
+    priority: 85
+    description: "Show installed corpora"
+
+  # Priority 80: Help + X combinations (intent is X, help is context)
+  - name: "help_with_init"
+    conditions:
+      has_help: T
+      has_init: T
+    action: extract_project_for_init
+    priority: 80
+    description: "Help creating a corpus"
+
+  - name: "help_with_query"
+    conditions:
+      has_help: T
+      has_query: T
+    action: discover_corpora
+    priority: 80
+    description: "Help navigating documentation"
+
+  - name: "help_with_refresh"
+    conditions:
+      has_help: T
+      has_refresh: T
+    action: extract_corpus_for_refresh
+    priority: 80
+    description: "Help refreshing corpus"
+
+  - name: "help_with_enhance"
+    conditions:
+      has_help: T
+      has_enhance: T
+    action: extract_topic_for_enhance
+    priority: 80
+    description: "Help enhancing topic"
+
+  - name: "help_with_list"
+    conditions:
+      has_help: T
+      has_list: T
+    action: delegate_discover
+    priority: 80
+    description: "Help listing corpora"
+
+  # Priority 70: Compound intents (init + build chain)
+  - name: "init_then_build"
+    conditions:
+      has_init: T
+      has_build: T
+    action: extract_project_for_init
+    priority: 70
+    description: "Create and build corpus"
+
+  # Priority 60: Show as fallback to query
+  - name: "show_as_query"
+    conditions:
+      has_show: T
+      has_query: U
+      has_list: F
+      has_init: F
+    action: discover_corpora
+    priority: 60
+    description: "Show documentation (navigate)"
+
+  # Priority 10: Empty input fallback
+  - name: "empty_input"
+    conditions:
+      has_help: U
+      has_init: U
+      has_add_source: U
+      has_build: U
+      has_query: U
+      has_refresh: U
+      has_enhance: U
+      has_upgrade: U
+      has_list: U
+      has_awareness: U
+      has_show: U
+    action: show_main_menu
+    priority: 10
+    description: "No keywords detected - show menu"
