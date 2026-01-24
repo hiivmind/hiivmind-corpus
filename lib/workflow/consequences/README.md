@@ -11,13 +11,14 @@ consequences/
 │   ├── workflow.md        # State, evaluation, user interaction, control flow, skill, utility
 │   ├── shared.md          # Common patterns: interpolation, parameters, failure handling
 │   └── intent-detection.md # 3VL routing system
-└── extensions/            # Domain-specific corpus extensions (5 files)
+└── extensions/            # Domain-specific corpus extensions (6 files)
     ├── README.md          # Extension overview
     ├── file-system.md     # Corpus file operations
     ├── config.md          # Config.yaml operations
     ├── git.md             # Git source operations
     ├── web.md             # Web source operations
-    └── discovery.md       # Corpus discovery
+    ├── discovery.md       # Corpus discovery
+    └── logging.md         # Workflow logging & CI output
 ```
 
 ## Core vs Extensions
@@ -75,6 +76,17 @@ consequences/
 | `web_fetch` | [extensions/web.md](extensions/web.md) | Fetch URL content |
 | `cache_web_content` | [extensions/web.md](extensions/web.md) | Save fetched content |
 | `discover_installed_corpora` | [extensions/discovery.md](extensions/discovery.md) | Scan for installed corpora |
+| `init_log` | [extensions/logging.md](extensions/logging.md) | Initialize log structure |
+| `log_node` | [extensions/logging.md](extensions/logging.md) | Record node execution |
+| `log_source_status` | [extensions/logging.md](extensions/logging.md) | Log source status check |
+| `log_source_changes` | [extensions/logging.md](extensions/logging.md) | Log source file changes |
+| `log_index_update` | [extensions/logging.md](extensions/logging.md) | Log index modifications |
+| `log_warning` | [extensions/logging.md](extensions/logging.md) | Add warning to log |
+| `log_error` | [extensions/logging.md](extensions/logging.md) | Add error to log |
+| `finalize_log` | [extensions/logging.md](extensions/logging.md) | Complete log with timing |
+| `write_log` | [extensions/logging.md](extensions/logging.md) | Write log to file |
+| `apply_log_retention` | [extensions/logging.md](extensions/logging.md) | Apply retention policy |
+| `output_ci_summary` | [extensions/logging.md](extensions/logging.md) | Output CI-formatted summary |
 
 ---
 
@@ -97,6 +109,7 @@ consequences/
 | [extensions/git.md](extensions/git.md) | Git Operations | 4 |
 | [extensions/web.md](extensions/web.md) | Web Operations | 2 |
 | [extensions/discovery.md](extensions/discovery.md) | Corpus Discovery | 1 |
+| [extensions/logging.md](extensions/logging.md) | Logging & CI Output | 11 |
 
 ---
 

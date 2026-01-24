@@ -15,6 +15,7 @@ While [core consequences](../core/) provide fundamental workflow operations, ext
 | [git.md](git.md) | Git source operations | 4 |
 | [web.md](web.md) | Web source operations | 2 |
 | [discovery.md](discovery.md) | Corpus discovery | 1 |
+| [logging.md](logging.md) | Workflow logging & CI output | 11 |
 
 ---
 
@@ -37,6 +38,17 @@ While [core consequences](../core/) provide fundamental workflow operations, ext
 | `web_fetch` | [web.md](web.md) | Fetch URL content |
 | `cache_web_content` | [web.md](web.md) | Save fetched content |
 | `discover_installed_corpora` | [discovery.md](discovery.md) | Scan for installed corpora |
+| `init_log` | [logging.md](logging.md) | Initialize log structure |
+| `log_node` | [logging.md](logging.md) | Record node execution |
+| `log_source_status` | [logging.md](logging.md) | Log source status check |
+| `log_source_changes` | [logging.md](logging.md) | Log source file changes |
+| `log_index_update` | [logging.md](logging.md) | Log index modifications |
+| `log_warning` | [logging.md](logging.md) | Add warning to log |
+| `log_error` | [logging.md](logging.md) | Add error to log |
+| `finalize_log` | [logging.md](logging.md) | Complete log with timing |
+| `write_log` | [logging.md](logging.md) | Write log to file |
+| `apply_log_retention` | [logging.md](logging.md) | Apply retention policy |
+| `output_ci_summary` | [logging.md](logging.md) | Output CI-formatted summary |
 
 ---
 
