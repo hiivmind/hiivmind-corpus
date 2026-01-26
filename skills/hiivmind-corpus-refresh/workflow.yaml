@@ -47,7 +47,7 @@ initial_state:
     # Logging flags (set via entry parameters)
     no_log: false                  # Skip writing log file
     log_format: "yaml"             # Log format: yaml | json | markdown
-    log_location: "data/logs/"     # Log file directory
+    log_location: "logs/"          # Log file directory (data-only: logs/, legacy: data/logs/)
     ci_output: "none"              # CI output: github | plain | json | none
     log_gitignore: false           # Add log to .gitignore
 
@@ -90,11 +90,10 @@ nodes:
         store_as: computed.timestamp_slug
         format: "YYYY-MM-DD-HHmmss"
       - type: init_log
-        store_as: computed.log
-        metadata:
-          workflow_version: "1.0.0"
-          corpus_name: "${config.corpus.name}"
-          corpus_path: "${PWD}"
+        workflow_name: "hiivmind-corpus-refresh"
+        workflow_version: "1.0.0"
+        skill_name: "refresh"
+        plugin_name: "hiivmind-corpus"
       - type: log_node
         node: "read_config"
         outcome: "success"
@@ -129,7 +128,7 @@ nodes:
     description: "Read index.md and check if it's built"
     actions:
       - type: read_file
-        path: "data/index.md"
+        path: "index.md"
         store_as: computed.index_content
     on_success: check_index_built
     on_failure: error_no_index
@@ -163,7 +162,7 @@ nodes:
     description: "Detect if corpus uses tiered indexing"
     actions:
       - type: glob_files
-        pattern: "data/index-*.md"
+        pattern: "index-*.md"
         store_as: computed.sub_index_files
       - type: evaluate
         expression: "len(computed.sub_index_files) > 0"
@@ -380,12 +379,14 @@ nodes:
           upstream_sha: "${computed.upstream_sha}"
           indexed_at: "${current_source.last_indexed_at}"
           status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
-      - type: log_source_status
-        source_id: "${current_source.id}"
-        type: "git"
-        status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
-        indexed_sha: "${current_source.last_commit_sha}"
-        upstream_sha: "${computed.upstream_sha}"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "git"
+          status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
+          indexed_sha: "${current_source.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
     on_success: present_status_report
     on_failure: present_status_report
 
@@ -394,7 +395,7 @@ nodes:
     description: "Check local source for modified files"
     actions:
       - type: compute
-        expression: "'data/uploads/' + current_source.id"
+        expression: "'uploads/' + current_source.id"
         store_as: computed.local_path
       - type: glob_files
         pattern: "${computed.local_path}/**/*.md"
@@ -408,10 +409,12 @@ nodes:
           last_indexed_at: "${current_source.last_indexed_at}"
           status: "check_manually"
           note: "Compare file modification times against last_indexed_at"
-      - type: log_source_status
-        source_id: "${current_source.id}"
-        type: "local"
-        status: "check_manually"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "local"
+          status: "check_manually"
     on_success: present_status_report
     on_failure: present_status_report
 
@@ -431,10 +434,12 @@ nodes:
           last_indexed_at: "${current_source.last_indexed_at}"
           status: "cache_check"
           note: "Re-fetch requires user approval"
-      - type: log_source_status
-        source_id: "${current_source.id}"
-        type: "web"
-        status: "cache_check"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "web"
+          status: "cache_check"
     on_success: present_status_report
     on_failure: present_status_report
 
@@ -463,12 +468,14 @@ nodes:
           upstream_sha: "${computed.upstream_sha}"
           status: "${computed.upstream_sha == current_source.source_repo.last_commit_sha ? 'current' : 'stale'}"
           note: "Source changed - docs may have been regenerated"
-      - type: log_source_status
-        source_id: "${current_source.id}"
-        type: "generated-docs"
-        status: "${computed.upstream_sha == current_source.source_repo.last_commit_sha ? 'current' : 'stale'}"
-        indexed_sha: "${current_source.source_repo.last_commit_sha}"
-        upstream_sha: "${computed.upstream_sha}"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "generated-docs"
+          status: "${computed.upstream_sha == current_source.source_repo.last_commit_sha ? 'current' : 'stale'}"
+          indexed_sha: "${current_source.source_repo.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
     on_success: present_status_report
     on_failure: present_status_report
 
@@ -497,12 +504,14 @@ nodes:
           indexed_hash: "${current_source.manifest.last_hash}"
           current_hash: "${computed.current_hash}"
           status: "${computed.freshness_status}"
-      - type: log_source_status
-        source_id: "${current_source.id}"
-        type: "llms-txt"
-        status: "${computed.freshness_status}"
-        indexed_hash: "${current_source.manifest.last_hash}"
-        current_hash: "${computed.current_hash}"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "llms-txt"
+          status: "${computed.freshness_status}"
+          indexed_hash: "${current_source.manifest.last_hash}"
+          current_hash: "${computed.current_hash}"
     on_success: present_status_report
     on_failure: present_status_report
 
@@ -1056,9 +1065,13 @@ nodes:
           type: "git"
           old_sha: "${current_source.last_commit_sha}"
           new_sha: "${computed.new_sha}"
-      - type: log_source_changes
-        source_id: "${current_source.id}"
-        changes: "${computed.file_changes}"
+      - type: log_event
+        event_type: "source_changes"
+        data:
+          source_id: "${current_source.id}"
+          added_files: "${computed.file_changes.added}"
+          modified_files: "${computed.file_changes.modified}"
+          deleted_files: "${computed.file_changes.deleted}"
     on_success: advance_update_loop
     on_failure: advance_update_loop
 
@@ -1068,7 +1081,7 @@ nodes:
     description: "Check local source for changes"
     actions:
       - type: compute
-        expression: "'data/uploads/' + current_source.id"
+        expression: "'uploads/' + current_source.id"
         store_as: computed.local_path
       - type: glob_files
         pattern: "${computed.local_path}/**/*.md"
@@ -1343,7 +1356,7 @@ nodes:
     doc: "lib/corpus/patterns/index-generation.md"
     section: "Refresh Single Index"
     context:
-      index_path: "data/index.md"
+      index_path: "index.md"
       changes: "${computed.all_changes}"
       preserve_keywords: true
     next_node: confirm_index_changes
@@ -1566,7 +1579,7 @@ nodes:
 
         ${index_structure.is_tiered ?
           'Files to update: index.md + ' + len(computed.sections_to_update || []) + ' sub-index(es)' :
-          'File to update: data/index.md'}
+          'File to update: index.md'}
       header: "Confirm"
       options:
         - id: save
@@ -1627,16 +1640,18 @@ nodes:
     description: "Write index file(s) to disk"
     actions:
       - type: write_file
-        path: "data/index.md"
+        path: "index.md"
         content: "${computed.updated_index_content || computed.index_content}"
       - type: display_message
-        message: "  Saved data/index.md"
-      - type: log_index_update
-        files:
-          - "data/index.md"
-        entries_added: "${computed.entries_added || 0}"
-        entries_removed: "${computed.entries_removed || 0}"
-        keywords_preserved: true
+        message: "  Saved index.md"
+      - type: log_event
+        event_type: "index_update"
+        data:
+          files:
+            - "index.md"
+          entries_added: "${computed.entries_added || 0}"
+          entries_removed: "${computed.entries_removed || 0}"
+          keywords_preserved: true
     on_success: check_sub_indexes_to_save
     on_failure: error_save_failed
 
@@ -1658,10 +1673,10 @@ nodes:
         items: "${computed.sections_to_update || []}"
         actions:
           - type: write_file
-            path: "data/index-${item}.md"
+            path: "index-${item}.md"
             content: "${computed.sub_index_content[item]}"
           - type: display_message
-            message: "  Saved data/index-${item}.md"
+            message: "  Saved index-${item}.md"
     on_success: update_config_metadata
     on_failure: warn_sub_index_save
 
@@ -1772,7 +1787,7 @@ nodes:
         format: "YYYY-MM-DD-HHmmss"
       - type: write_log
         format: "${flags.log_format || 'yaml'}"
-        location: "${flags.log_location || 'data/logs/'}"
+        location: "${flags.log_location || 'logs/'}"
         filename: "refresh-${computed.timestamp_slug}.${flags.log_format == 'markdown' ? 'md' : flags.log_format || 'yaml'}"
       - type: display_message
         message: "  Log written: ${computed.log_file_path}"
@@ -1819,8 +1834,8 @@ nodes:
       - type: compute
         expression: |
           index_structure.is_tiered
-            ? 'data/index.md + ' + (computed.sections_to_update || []).length + ' sub-index(es)'
-            : 'data/index.md'
+            ? 'index.md + ' + (computed.sections_to_update || []).length + ' sub-index(es)'
+            : 'index.md'
         store_as: computed.files_updated
       - type: compute
         expression: |
@@ -1850,7 +1865,7 @@ nodes:
     actions:
       - type: write_log
         format: "${flags.log_format || 'yaml'}"
-        location: "${flags.log_location || 'data/logs/'}"
+        location: "${flags.log_location || 'logs/'}"
         filename: "refresh-${computed.timestamp_slug}.${flags.log_format == 'markdown' ? 'md' : flags.log_format || 'yaml'}"
       - type: display_message
         message: "  Log written: ${computed.log_file_path}"
@@ -1887,7 +1902,7 @@ nodes:
         strategy: "${config.logging.retention.strategy || 'none'}"
         days: "${config.logging.retention.days}"
         count: "${config.logging.retention.count}"
-        location: "${flags.log_location || 'data/logs/'}"
+        location: "${flags.log_location || 'logs/'}"
     on_success: check_ci_output
     on_failure: check_ci_output
 
@@ -1933,7 +1948,7 @@ nodes:
 
           **To commit:**
           ```bash
-          git add data/index.md ${index_structure.is_tiered ? 'data/index-*.md ' : ''}data/config.yaml${!flags.no_log && !flags.log_gitignore ? ' data/logs/' : ''}
+          git add index.md ${index_structure.is_tiered ? 'index-*.md ' : ''}config.yaml${!flags.no_log && !flags.log_gitignore ? ' logs/' : ''}
           git commit -m "Refresh ${config.corpus.name} index"
           ```
     on_success: success
@@ -1998,7 +2013,7 @@ endings:
       Sources updated: ${len(computed.updated_sources)}
       Index files: ${computed.files_updated}
 
-      To commit: git add data/ && git commit -m "Refresh corpus index"
+      To commit: git add index.md index-*.md config.yaml logs/ && git commit -m "Refresh corpus index"
     summary:
       corpus_name: "${config.corpus.name}"
       sources_updated: "${len(computed.updated_sources)}"
@@ -2069,7 +2084,7 @@ endings:
   error_save_failed:
     type: error
     message: "Failed to save index"
-    details: "Could not write to data/index.md. Check file permissions."
+    details: "Could not write to index.md. Check file permissions."
 
   error_general:
     type: error

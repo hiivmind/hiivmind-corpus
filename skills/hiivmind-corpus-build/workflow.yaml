@@ -237,7 +237,7 @@ nodes:
     description: "Verify local source directory"
     actions:
       - type: compute
-        expression: "'data/uploads/' + computed.current_source.id"
+        expression: "'uploads/' + computed.current_source.id"
         store_as: computed.local_path
       - type: directory_exists_check
         path: "${computed.local_path}"
@@ -1176,12 +1176,12 @@ nodes:
 
   save_index_file:
     type: action
-    description: "Write index.md to data directory"
+    description: "Write index.md to corpus root"
     actions:
       - type: display_message
-        message: "Saving index to data/index.md..."
+        message: "Saving index to index.md..."
       - type: write_file
-        path: "data/index.md"
+        path: "index.md"
         content: "${index.content}"
     on_success: check_sub_indexes
     on_failure: error_save_failed
@@ -1204,10 +1204,10 @@ nodes:
         items: "${index.sub_indexes}"
         actions:
           - type: write_file
-            path: "data/${item.filename}"
+            path: "${item.filename}"
             content: "${item.content}"
           - type: display_message
-            message: "  Saved data/${item.filename}"
+            message: "  Saved ${item.filename}"
     on_success: update_config_metadata
     on_failure: warn_sub_index_save_failed
 
@@ -1216,7 +1216,7 @@ nodes:
     description: "Warn about sub-index save failure but continue"
     actions:
       - type: display_message
-        message: "⚠️ Some sub-indexes may not have saved correctly. Check data/ directory."
+        message: "⚠️ Some sub-indexes may not have saved correctly. Check corpus root directory."
     on_success: update_config_metadata
     on_failure: update_config_metadata
 
@@ -1268,8 +1268,8 @@ nodes:
       - type: compute
         expression: |
           segmentation.strategy === 'tiered'
-            ? 'data/index.md + ' + (index.sub_indexes?.length || 0) + ' sub-indexes'
-            : 'data/index.md'
+            ? 'index.md + ' + (index.sub_indexes?.length || 0) + ' sub-indexes'
+            : 'index.md'
         store_as: computed.files_created
       - type: display_message
         message: |
@@ -1283,7 +1283,7 @@ nodes:
 
           To commit:
           ```bash
-          git add data/index.md data/config.yaml
+          git add index.md index-*.md config.yaml
           git commit -m "Build ${config.corpus.name} docs index"
           ```
     on_success: success
@@ -1313,18 +1313,18 @@ endings:
   success:
     type: success
     message: |
-      Index built successfully at data/index.md
+      Index built successfully at index.md
 
       Sources indexed: ${len(sources)}
       Total entries: ${computed.total_files}
       Strategy: ${segmentation.strategy || 'single'}
 
-      To commit: git add data/index.md data/config.yaml && git commit -m "Build ${config.corpus.name} docs index"
+      To commit: git add index.md index-*.md config.yaml && git commit -m "Build ${config.corpus.name} docs index"
     summary:
       corpus_name: "${config.corpus.name}"
       sources_count: "${len(sources)}"
       strategy: "${segmentation.strategy || 'single'}"
-      index_path: "data/index.md"
+      index_path: "index.md"
 
   error_no_config:
     type: error
@@ -1367,7 +1367,7 @@ endings:
   error_save_failed:
     type: error
     message: "Failed to save index file"
-    details: "Check write permissions for data/index.md"
+    details: "Check write permissions for index.md"
 
   cancelled:
     type: error

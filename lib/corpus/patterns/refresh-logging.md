@@ -12,11 +12,58 @@ The refresh workflow produces detailed execution logs that:
 - Enable CI/CD integration with structured output
 - Track changes across refresh operations
 
+**Framework:** This document uses the generic logging framework from `lib/workflow/consequences/core/logging.md`. Corpus-specific events use `log_event` with domain-specific event types.
+
+---
+
+## Event Types (Corpus Domain)
+
+The refresh workflow uses `log_event` with the following corpus-specific event types:
+
+| Event Type | Description | Data Fields |
+|------------|-------------|-------------|
+| `source_status` | Source freshness check result | `source_id`, `source_type`, `status`, `indexed_sha`, `upstream_sha`, `indexed_hash`, `current_hash`, `commits_behind` |
+| `source_changes` | Files changed in a source | `source_id`, `added_files`, `modified_files`, `deleted_files` |
+| `index_update` | Index file modifications | `files`, `entries_added`, `entries_removed`, `keywords_preserved` |
+
+**Example usage:**
+
+```yaml
+# Log source status check
+- type: log_event
+  event_type: "source_status"
+  data:
+    source_id: "${current_source.id}"
+    source_type: "git"
+    status: "stale"
+    indexed_sha: "${current_source.last_commit_sha}"
+    upstream_sha: "${computed.upstream_sha}"
+    commits_behind: "${computed.commits_behind}"
+
+# Log file changes after update
+- type: log_event
+  event_type: "source_changes"
+  data:
+    source_id: "${current_source.id}"
+    added_files: "${computed.added_files}"
+    modified_files: "${computed.modified_files}"
+    deleted_files: "${computed.deleted_files}"
+
+# Log index modifications
+- type: log_event
+  event_type: "index_update"
+  data:
+    files: "${computed.index_files_modified}"
+    entries_added: "${computed.entries_added}"
+    entries_removed: "${computed.entries_removed}"
+    keywords_preserved: true
+```
+
 ---
 
 ## Log File Location
 
-**Default:** `data/logs/`
+**Default:** `logs/` (data-only) or `data/logs/` (legacy plugin)
 
 **Filename format:** `refresh-{YYYY-MM-DD}-{HHMMSS}.{ext}`
 
@@ -93,8 +140,8 @@ changes:
 
 index_updates:
   files_modified:
-    - "data/index.md"
-    - "data/index-reference.md"
+    - "index.md"
+    - "index-reference.md"
   entries_added: 3
   entries_removed: 1
   keywords_preserved: true
@@ -322,7 +369,7 @@ Human-readable format for review:
 
 ## Index Updates
 
-- **Files:** data/index.md, data/index-reference.md
+- **Files:** index.md, index-reference.md
 - **Entries Added:** 3
 - **Entries Removed:** 1
 - **Keywords Preserved:** Yes
@@ -381,7 +428,7 @@ logging:
   # Default log settings (can be overridden by CLI flags)
   defaults:
     format: "yaml"      # yaml | json | markdown
-    location: "data/logs/"
+    location: "logs/"   # logs/ for data-only, data/logs/ for legacy
     ci_output: "none"   # github | plain | json | none
     gitignore: false    # true to add logs to .gitignore
 ```
@@ -413,14 +460,14 @@ Parameters passed to refresh workflow:
 |-----------|------|---------|-------------|
 | `--no-log` | boolean | false | Skip writing log file |
 | `--log-format` | string | "yaml" | Log format: yaml, json, markdown |
-| `--log-location` | string | "data/logs/" | Override log directory |
+| `--log-location` | string | "logs/" | Override log directory |
 | `--ci-output` | string | "none" | CI output: github, plain, json, none |
 | `--log-gitignore` | boolean | false | Add log to .gitignore |
 
 ### CLI Examples
 
 ```bash
-# Normal interactive refresh (logs to data/logs/)
+# Normal interactive refresh (logs to logs/)
 /hiivmind-corpus-refresh
 
 # CI mode with GitHub Actions output
@@ -445,7 +492,7 @@ Parameters passed to refresh workflow:
 
 ### Default Behavior: Logs Are Committed
 
-By default, `data/logs/` is committed to git:
+By default, `logs/` is committed to git:
 - Provides audit trail across team members
 - Enables debugging historical issues
 - Tracks refresh frequency
@@ -460,7 +507,7 @@ To exclude logs from git:
 
 ```gitignore
 # Refresh logs (optional - keep if audit trail desired)
-data/logs/
+logs/
 ```
 
 ---
@@ -493,7 +540,7 @@ jobs:
       - name: Commit changes
         if: success()
         run: |
-          git add data/
+          git add index.md index-*.md config.yaml logs/
           git diff --staged --quiet || git commit -m "Refresh corpus index"
           git push
 ```
@@ -545,7 +592,11 @@ else:
 
 ## Related Documentation
 
-- **Logging consequences:** `lib/workflow/consequences/extensions/logging.md`
+- **Core logging consequences:** `lib/workflow/consequences/core/logging.md`
+- **Logging schema:** `lib/workflow/logging-schema.md`
+- **Logging configuration:** `lib/corpus/patterns/logging-configuration.md`
+- **Session tracking:** `lib/corpus/patterns/session-tracking.md`
+- **Deprecated logging:** `lib/workflow/consequences/extensions/logging.md` (migration guide)
 - **Refresh workflow:** `skills/hiivmind-corpus-refresh/workflow.yaml`
 - **Refresh skill:** `skills/hiivmind-corpus-refresh/SKILL.md`
 - **Status patterns:** `lib/corpus/patterns/status.md`

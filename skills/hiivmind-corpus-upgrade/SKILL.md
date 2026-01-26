@@ -34,8 +34,11 @@ Identify the corpus to upgrade. Can be run from:
 - Parent directory with corpus path specified
 
 ```bash
-# Check if we're in a corpus (has data/config.yaml)
-ls data/config.yaml 2>/dev/null && echo "IN_CORPUS=true"
+# Check if we're in a corpus (data-only or legacy)
+# Data-only: config.yaml at root
+# Legacy: data/config.yaml
+ls config.yaml 2>/dev/null && echo "IN_CORPUS=true (data-only)"
+ls data/config.yaml 2>/dev/null && echo "IN_CORPUS=true (legacy)"
 
 # Or check for corpus subdirectories
 ls -d hiivmind-corpus-*/ 2>/dev/null
@@ -50,25 +53,33 @@ ls -d hiivmind-corpus-*/ 2>/dev/null
 Determine what kind of corpus this is:
 
 ```bash
-# Check structure
-ls -la
-ls data/
+# Check structure - detect data-only vs legacy first
+if [ -f "config.yaml" ] && [ ! -d "data" ]; then
+    echo "DATA_ONLY=true"  # Data-only corpus (preferred)
+elif [ -f "data/config.yaml" ]; then
+    echo "LEGACY=true"     # Legacy structure with data/ subdirectory
+fi
+
+# Check for plugin indicators
+ls .claude-plugin/ 2>/dev/null
 ls skills/ 2>/dev/null
 ls commands/ 2>/dev/null
-ls .claude-plugin/ 2>/dev/null
 ```
 
 | Indicator | Corpus Type | Expected Structure |
 |-----------|-------------|-------------------|
-| `SKILL.md` at root + `data/` | User-level or repo-local skill | `SKILL.md`, `data/`, `references/` |
-| `.claude-plugin/plugin.json` | Standalone plugin | `skills/navigate/SKILL.md`, `commands/navigate.md`, `data/`, `references/` |
-| Parent has `marketplace.json` | Plugin in marketplace | Same as standalone plugin |
+| `config.yaml` at root, NO `.claude-plugin/` | **Data-only corpus** (preferred) | `config.yaml`, `index.md`, `uploads/` |
+| `SKILL.md` at root + `data/` | User-level or repo-local skill (legacy) | `SKILL.md`, `data/`, `references/` |
+| `.claude-plugin/plugin.json` | Standalone plugin (legacy) | `skills/navigate/SKILL.md`, `commands/navigate.md`, `data/`, `references/` |
+| Parent has `marketplace.json` | Plugin in marketplace (legacy) | Same as standalone plugin |
+
+**Data-only corpora** are the preferred format. They have NO plugin structure and are consumed via the `hiivmind-corpus` plugin's navigate skill.
 
 **Plugin types (ADR-005):** Must have BOTH:
 - `skills/navigate/SKILL.md` - Auto-triggers based on domain keywords
 - `commands/navigate.md` - Explicit entry point for users
 
-Record the corpus type - it affects which templates apply.
+Record the corpus type - it affects which templates and checks apply.
 
 ---
 
@@ -99,6 +110,8 @@ The templates are in the hiivmind-corpus plugin. Locate via:
 ---
 
 ### Step 3b: Naming Convention Checks (Plugins Only)
+
+**Skip this section for data-only corpora** - they have no plugin structure to validate.
 
 **See:** `references/upgrade-checklists.md` → "Naming Convention Checks" section.
 
@@ -198,14 +211,18 @@ grep -q "Making Projects Aware" skills/navigate/SKILL.md && echo "SKILL_HAS_PROJ
 Check for deprecated config fields:
 
 ```bash
+# Detect config path (data-only vs legacy)
+CONFIG_PATH="config.yaml"
+[ -f "data/config.yaml" ] && CONFIG_PATH="data/config.yaml"
+
 # Old corpus.version field (should be top-level schema_version)
-grep -q "corpus:" data/config.yaml && grep -qE "^\s+version:" data/config.yaml && echo "OLD_CORPUS_VERSION"
+grep -q "corpus:" "$CONFIG_PATH" && grep -qE "^\s+version:" "$CONFIG_PATH" && echo "OLD_CORPUS_VERSION"
 
 # Missing schema_version
-grep -q "^schema_version:" data/config.yaml || echo "MISSING_SCHEMA_VERSION"
+grep -q "^schema_version:" "$CONFIG_PATH" || echo "MISSING_SCHEMA_VERSION"
 
 # Missing display_name
-grep -qE "^\s+display_name:" data/config.yaml || echo "MISSING_DISPLAY_NAME"
+grep -qE "^\s+display_name:" "$CONFIG_PATH" || echo "MISSING_DISPLAY_NAME"
 ```
 
 ---
@@ -245,7 +262,7 @@ For each missing component, apply the upgrade:
    - Domain terms (infer from index sections)
    - Common aliases
 2. Ask user to confirm or modify suggestions
-3. Add to `data/config.yaml`:
+3. Add to `config.yaml` (or `data/config.yaml` for legacy):
    ```yaml
    corpus:
      name: "polars"
@@ -410,7 +427,7 @@ The navigate skill should be pure navigation - project awareness guidance belong
 
 When OLD_FORMAT_SKILL, GENERIC_WORKED_EXAMPLE, or UNFILLED_PLACEHOLDERS are detected, the skill needs **full regeneration** rather than patching:
 
-1. Read `data/config.yaml` for project metadata:
+1. Read `config.yaml` (or `data/config.yaml` for legacy) for project metadata:
    - `corpus.name`, `corpus.display_name`
    - `sources[0].id`, `sources[0].type`
    - For git sources: `repo_owner`, `repo_name`, `branch`, `docs_root`
@@ -489,7 +506,7 @@ grep -q "/hiivmind-corpus enhance\|/hiivmind-corpus refresh" commands/navigate.m
 **Creating missing navigate skill:**
 
 1. Create directory: `mkdir -p skills/navigate`
-2. Read `data/config.yaml` for keywords
+2. Read `config.yaml` (or `data/config.yaml` for legacy) for keywords
 3. Generate from `navigate-skill.md.template`:
    - Set `name: {plugin_name}-navigate`
    - Set `description:` with domain keywords for auto-triggering
@@ -557,9 +574,12 @@ For corpus maintenance, use the corpus gateway:
 After applying upgrades:
 
 ```bash
-# List updated files
-ls -la data/
-ls -la skills/navigate/
+# List updated files (data-only corpus)
+ls -la *.md *.yaml uploads/ 2>/dev/null
+
+# For legacy structure
+ls -la data/ 2>/dev/null
+ls -la skills/navigate/ 2>/dev/null
 
 # Show what changed
 git status

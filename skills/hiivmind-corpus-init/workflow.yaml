@@ -609,18 +609,14 @@ nodes:
 
   scaffold_skill_directories:
     type: action
-    description: "Create directory structure for skill"
+    description: "Create directory structure for skill (data-only)"
     actions:
       - type: display_message
         message: "Creating skill directory structure..."
       - type: create_directory
         path: "${computed.skill_root}"
       - type: create_directory
-        path: "${computed.skill_root}/data"
-      - type: create_directory
-        path: "${computed.skill_root}/data/uploads"
-      - type: create_directory
-        path: "${computed.skill_root}/references"
+        path: "${computed.skill_root}/uploads"
       - type: create_directory
         path: "${computed.skill_root}/.source"
       - type: create_directory
@@ -640,20 +636,17 @@ nodes:
 
   verify_skill_structure:
     type: validation_gate
-    description: "Verify skill scaffold is complete"
+    description: "Verify skill scaffold is complete (data-only)"
     validations:
       - type: file_exists
         path: "${computed.skill_root}/SKILL.md"
         error_message: "Navigate skill not created"
       - type: file_exists
-        path: "${computed.skill_root}/data/config.yaml"
+        path: "${computed.skill_root}/config.yaml"
         error_message: "Config file not created"
       - type: file_exists
-        path: "${computed.skill_root}/data/index.md"
+        path: "${computed.skill_root}/index.md"
         error_message: "Index placeholder not created"
-      - type: file_exists
-        path: "${computed.skill_root}/references/project-awareness.md"
-        error_message: "Project awareness file not created"
     on_valid: check_source_delegation
     on_invalid: error_scaffold_failed
 
@@ -954,10 +947,9 @@ endings:
       Corpus '${corpus_name}' scaffold created at ${computed.skill_root}
 
       **Structure created:**
+      - config.yaml (data-only) or data/config.yaml (plugin)
+      - index.md (data-only) or data/index.md (plugin)
       - SKILL.md (or skills/navigate/SKILL.md for plugins)
-      - data/config.yaml
-      - data/index.md (placeholder)
-      - references/project-awareness.md
 
       **Next step:** Run `/hiivmind-corpus-add-source` to add documentation sources.
     summary:

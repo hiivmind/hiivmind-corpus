@@ -238,7 +238,7 @@ nodes:
     section: "Split PDF"
     context:
       pdf_path: "${source_url}"
-      output_dir: "data/uploads/${computed.source_id}"
+      output_dir: "uploads/${computed.source_id}"
     next_node: setup_pdf_as_local
 
   setup_pdf_as_local:
@@ -688,7 +688,7 @@ nodes:
     description: "Create directory for local source"
     actions:
       - type: create_directory
-        path: "data/uploads/${computed.source_id}"
+        path: "uploads/${computed.source_id}"
       - type: add_source
         spec:
           id: "${computed.source_id}"
@@ -699,7 +699,7 @@ nodes:
           last_indexed_at: null
       - type: display_message
         message: |
-          Created directory: data/uploads/${computed.source_id}/
+          Created directory: uploads/${computed.source_id}/
 
           Place your documents in this directory.
           Supported formats: .md, .mdx, .pdf
@@ -1120,7 +1120,7 @@ nodes:
       options:
         - id: yes
           label: "Yes, index now"
-          description: "Add entries to data/index.md"
+          description: "Add entries to index.md"
         - id: no
           label: "No, later"
           description: "I'll run hiivmind-corpus-build later"
@@ -1170,13 +1170,13 @@ endings:
     summary:
       source_id: "${computed.source_id}"
       source_type: "${source_type}"
-      location: "${source_type == 'git' ? '.source/' : source_type == 'local' ? 'data/uploads/' : '.cache/'}${computed.source_id}"
+      location: "${source_type == 'git' ? '.source/' : source_type == 'local' ? 'uploads/' : '.cache/'}${computed.source_id}"
 
   error_no_config:
     type: error
     message: "No config.yaml found in current directory"
     recovery: "hiivmind-corpus-init"
-    details: "This skill must run from a corpus directory containing data/config.yaml"
+    details: "This skill must run from a corpus directory containing config.yaml"
 
   error_invalid_url:
     type: error
