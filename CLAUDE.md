@@ -4,9 +4,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**hiivmind-corpus** is a meta-plugin system for Claude Code that creates reusable documentation corpus skills for any open-source project. It provides a workflow to index, maintain, and navigate project documentation through Claude Code skills.
+**hiivmind-corpus** is a unified plugin for building AND reading documentation corpora in Claude Code. One plugin handles everything:
 
-The core value: Instead of relying on training data, web search, or on-demand fetching, this creates persistent human-curated indexes that track upstream changes.
+- **BUILD**: Create and maintain documentation indexes (init, build, refresh, enhance, upgrade)
+- **READ**: Navigate and query documentation (navigate, register, status, discover)
+
+The core value: Persistent human-curated indexes that track upstream changes, instead of relying on training data or on-demand fetching.
+
+## Ecosystem Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     hiivmind-corpus Ecosystem                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌────────────────────────────────────────────┐                    │
+│   │           hiivmind-corpus (plugin)          │                    │
+│   │                                             │                    │
+│   │   BUILD                    READ             │                    │
+│   │   ─────                    ────             │                    │
+│   │   • init                   • navigate       │                    │
+│   │   • add-source             • register       │                    │
+│   │   • build                  • status         │                    │
+│   │   • refresh                • discover       │                    │
+│   │   • enhance                                 │                    │
+│   │   • upgrade                                 │                    │
+│   │                                             │                    │
+│   └────────────────────┬────────────────────────┘                    │
+│                        │                                             │
+│            PRODUCES    │    CONSUMES                                 │
+│                        ▼                                             │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Data-Only Corpus Repositories               │       │
+│   │                                                          │       │
+│   │  github.com/hiivmind/hiivmind-corpus-flyio              │       │
+│   │  github.com/hiivmind/hiivmind-corpus-polars             │       │
+│   │  github.com/yourorg/internal-api-corpus                 │       │
+│   │                                                          │       │
+│   │  Each contains:                                          │       │
+│   │    • config.yaml  (source definitions + keywords)        │       │
+│   │    • index.md     (main index)                           │       │
+│   │    • index-*.md   (sub-indexes for tiered corpora)       │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Per-Project Configuration                    │       │
+│   │                                                          │       │
+│   │  .hiivmind/corpus/registry.yaml                         │       │
+│   │    - Which corpora are relevant to this project          │       │
+│   │    - Source locations (GitHub refs or local paths)       │       │
+│   │    - Caching preferences (per corpus)                    │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** One plugin does everything. Corpora are just data repositories.
 
 ## Architecture
 
@@ -48,18 +101,21 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │   ├── consequences.md               # Hub document (links to consequences/)
 │   ├── consequences/                 # Modular consequence documentation
 │   │   ├── README.md                 # Taxonomy and quick reference
-│   │   ├── core/                     # Intrinsic workflow engine (3 files)
+│   │   ├── core/                     # Intrinsic workflow engine (4 files)
 │   │   │   ├── workflow.md           # State, evaluation, user interaction, control flow, skill, utility
 │   │   │   ├── shared.md             # Common patterns: interpolation, parameters, failure handling
-│   │   │   └── intent-detection.md   # 3VL routing system
-│   │   └── extensions/               # Domain-specific corpus extensions (5 files)
+│   │   │   ├── intent-detection.md   # 3VL routing system
+│   │   │   └── logging.md            # Core logging (10 consequences)
+│   │   └── extensions/               # Domain-specific corpus extensions (6 files)
 │   │       ├── README.md             # Extension overview
 │   │       ├── file-system.md        # Corpus file operations
 │   │       ├── config.md             # Config.yaml operations
 │   │       ├── git.md                # Git operations
 │   │       ├── web.md                # Web operations
-│   │       └── discovery.md          # Corpus discovery
+│   │       ├── discovery.md          # Corpus discovery
+│   │       └── logging.md            # Deprecated corpus logging (use core/logging.md)
 │   ├── schema.md                     # Workflow YAML structure
+│   ├── logging-schema.md             # Log structure definition
 │   ├── preconditions.md              # Boolean evaluations
 │   ├── execution.md                  # Turn loop
 │   └── state.md                      # Runtime state structure
@@ -266,6 +322,9 @@ These features span multiple skills and must stay synchronized:
 | Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
 | Command/skill separation | navigate (template), upgrade | Command is thin wrapper (~30 lines), skill has no maintenance refs |
 | Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
+| Logging framework | refresh, all workflow-based skills | core/logging.md (10 consequences), log_event for domain events |
+| Log event types | refresh | source_status, source_changes, index_update |
+| Session tracking | refresh (optional) | Hook installation, session state file |
 
 ### When Adding New Features
 

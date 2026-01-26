@@ -272,6 +272,8 @@ For 3VL semantics (scoring, priorities, winner determination), see the framework
 
 ## Related Skills
 
+### Build Skills (Create/Maintain Corpora)
+
 | Skill | Purpose |
 |-------|---------|
 | `hiivmind-corpus-init` | Create new corpus scaffold |
@@ -280,6 +282,18 @@ For 3VL semantics (scoring, priorities, winner determination), see the framework
 | `hiivmind-corpus-enhance` | Deepen coverage on topics |
 | `hiivmind-corpus-refresh` | Sync with upstream changes |
 | `hiivmind-corpus-upgrade` | Apply latest templates |
-| `hiivmind-corpus-discover` | Find installed corpora |
+
+### Read Skills (Query/Navigate Corpora)
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-navigate` | Search and retrieve documentation |
+| `hiivmind-corpus-register` | Add corpus to project registry |
+| `hiivmind-corpus-status` | Check corpus health/freshness |
+
+### Shared Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-discover` | Find available corpora (registry + plugins) |
 | `hiivmind-corpus-awareness` | Add to CLAUDE.md |
-| `hiivmind-corpus-navigate` | Query across corpora |

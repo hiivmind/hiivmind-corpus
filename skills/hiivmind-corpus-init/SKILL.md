@@ -11,6 +11,46 @@ allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
 
 # Init Workflow
 
+## Architecture Options
+
+When creating a new corpus, choose between:
+
+| Type | Structure | Use Case |
+|------|-----------|----------|
+| **Data-only** (recommended) | Just config.yaml, index.md at root | New corpora, easy maintenance |
+| **Plugin-based** (legacy) | Full .claude-plugin/, skills/, commands/ | Existing plugins, special cases |
+
+**Recommendation:** Use data-only for new corpora. Navigation is handled by `hiivmind-corpus-navigate`.
+
+### Data-Only Structure
+
+```
+hiivmind-corpus-{name}/
+├── config.yaml          # Source definitions, keywords
+├── index.md             # Main documentation index
+├── index-*.md           # Sub-indexes (for large corpora)
+├── uploads/             # Local document uploads
+├── .source/             # Cloned git sources (gitignored)
+└── README.md
+```
+
+Users register this corpus via `/hiivmind-corpus register github:owner/repo`.
+
+### Legacy Plugin Structure
+
+```
+hiivmind-corpus-{name}/
+├── .claude-plugin/plugin.json
+├── skills/navigate/SKILL.md
+├── commands/navigate.md
+├── data/
+│   ├── config.yaml
+│   └── index.md
+└── ...
+```
+
+---
+
 Execute this workflow deterministically. State persists in conversation context across turns.
 
 > **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml`

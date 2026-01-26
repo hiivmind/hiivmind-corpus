@@ -123,6 +123,41 @@ intent_flags:
       - "show corpora"
     description: "User wants to list/discover corpora"
 
+  has_register:
+    keywords:
+      - "register"
+      - "add corpus"
+      - "connect corpus"
+      - "connect docs"
+      - "add to registry"
+      - "use corpus"
+      - "enable corpus"
+    negative_keywords:
+      - "don't register"
+      - "unregister"
+    description: "User wants to register a corpus with the project"
+
+  has_status:
+    keywords:
+      - "status"
+      - "health"
+      - "check health"
+      - "is healthy"
+      - "diagnose"
+      - "info"
+    description: "User wants to check corpus status/health"
+
+  has_navigate:
+    keywords:
+      - "navigate"
+      - "query"
+      - "ask"
+      - "look up"
+      - "search docs"
+      - "find in docs"
+      - "documentation for"
+    description: "User wants to navigate/search corpus documentation"
+
   has_awareness:
     keywords:
       - "awareness"
@@ -240,6 +275,31 @@ intent_rules:
     action: delegate_awareness
     priority: 90
     description: "Configure CLAUDE.md awareness"
+
+  - name: "register_only"
+    conditions:
+      has_register: T
+      has_init: F
+    action: delegate_register
+    priority: 90
+    description: "Register corpus with project"
+
+  - name: "status_only"
+    conditions:
+      has_status: T
+      has_refresh: F
+    action: delegate_status
+    priority: 90
+    description: "Check corpus status/health"
+
+  - name: "navigate_only"
+    conditions:
+      has_navigate: T
+      has_query: U
+      has_list: F
+    action: delegate_navigate
+    priority: 90
+    description: "Navigate corpus documentation"
 
   # Priority 85: Query/navigate (explicit or with show)
   - name: "query_explicit"
