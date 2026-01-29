@@ -419,14 +419,50 @@ elif source_type == 'web':
 
 ### Resolve Source Reference to URL
 
-For git sources without local clone, resolve to GitHub raw URL.
+For git sources without local clone, resolve to a fetchable URL or gh api command.
 
 **Algorithm:**
 1. Parse source_id and relative_path
 2. Get repo_owner, repo_name, branch, docs_root from config
-3. Construct: `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{docs_root}/{path}`
+3. Construct fetch command or URL
 
-**Using bash (with yq):**
+**Primary Method: gh api (Recommended)**
+
+```bash
+resolve_source_fetch() {
+    local corpus_path="${1%/}"
+    local source_ref="$2"
+
+    local source_id="${source_ref%%:*}"
+    local relative_path="${source_ref#*:}"
+
+    # Detect corpus type and get config path
+    local config_file
+    if [ -f "$corpus_path/config.yaml" ]; then
+        config_file="$corpus_path/config.yaml"
+    else
+        config_file="$corpus_path/data/config.yaml"
+    fi
+
+    local owner repo branch docs_root content_path
+    owner=$(yq ".sources[] | select(.id == \"$source_id\") | .repo_owner" "$config_file")
+    repo=$(yq ".sources[] | select(.id == \"$source_id\") | .repo_name" "$config_file")
+    branch=$(yq ".sources[] | select(.id == \"$source_id\") | .branch // \"main\"" "$config_file")
+    docs_root=$(yq ".sources[] | select(.id == \"$source_id\") | .docs_root // \"\"" "$config_file")
+
+    if [ -n "$docs_root" ]; then
+        content_path="$docs_root/$relative_path"
+    else
+        content_path="$relative_path"
+    fi
+
+    # Return gh api command to fetch content
+    echo "gh api repos/$owner/$repo/contents/$content_path?ref=$branch --jq '.content' | base64 -d"
+}
+```
+
+**Fallback Method: raw.githubusercontent.com URL**
+
 ```bash
 resolve_source_url() {
     local corpus_path="${1%/}"
@@ -456,6 +492,8 @@ resolve_source_url() {
     fi
 }
 ```
+
+**Note:** Prefer `gh api` as it works consistently for all public repositories. Use raw.githubusercontent.com URLs only as a fallback when `gh` CLI is unavailable.
 
 ---
 
@@ -650,8 +688,11 @@ Try running hiivmind-corpus-refresh to update the index.
 
 **If no clone:**
 1. Get repo info: owner=`pola-rs`, repo=`polars`, branch=`main`
-2. URL: `https://raw.githubusercontent.com/pola-rs/polars/main/docs/reference/expressions.md`
-3. WebFetch the URL
+2. Fetch with gh api (preferred):
+   ```bash
+   gh api repos/pola-rs/polars/contents/docs/reference/expressions.md --jq '.content' | base64 -d
+   ```
+3. Or fallback to WebFetch: `https://raw.githubusercontent.com/pola-rs/polars/main/docs/reference/expressions.md`
 
 ### Example 2: Tiered Index Navigation
 

@@ -16,6 +16,7 @@ Establish available tool capabilities at the start of corpus operations, enablin
 |------------|--------------|-----------|--------------|----------|
 | YAML parsing | Config reading | yq | python+pyyaml | grep+sed |
 | Git operations | Git sources | git | (none) | Web URLs only |
+| GitHub content fetch | Remote corpus/doc fetch | gh (GitHub CLI) | curl+raw.githubusercontent.com | WebFetch |
 | File search | Doc discovery | Claude Glob/Grep | rg, grep | find |
 | JSON parsing | (rare) | jq | python | grep |
 
@@ -28,6 +29,8 @@ Establish available tool capabilities at the start of corpus operations, enablin
 ### Tier 2: Strongly Recommended (degraded without)
 
 **YAML parsing** (yq OR python+pyyaml) - Essential for reading config.yaml reliably. Grep-based fallback exists but is fragile and may fail on complex YAML structures (multi-line values, nested objects, special characters).
+
+**gh (GitHub CLI)** - Preferred for fetching content from GitHub repositories. The `gh api` command works consistently for all public repos and uses authenticated access for better rate limits. Fallback methods (raw.githubusercontent.com URLs via curl or WebFetch) may return 404 for some repositories or have caching issues.
 
 ### Tier 3: Optional (Claude tools usually sufficient)
 
@@ -73,6 +76,28 @@ command -v git >/dev/null 2>&1 && echo "git:$(git --version)"
 if (Get-Command git -ErrorAction SilentlyContinue) { git --version }
 ```
 
+### Detect GitHub CLI (gh) Capability
+
+**Using bash:**
+```bash
+command -v gh >/dev/null 2>&1 && echo "gh:$(gh --version | head -1)"
+```
+
+**Using PowerShell:**
+```powershell
+if (Get-Command gh -ErrorAction SilentlyContinue) { gh --version | Select-Object -First 1 }
+```
+
+**Using Claude tools:**
+```
+Bash: command -v gh && gh --version | head -1
+```
+
+**Check authentication status:**
+```bash
+gh auth status 2>&1 | grep -q "Logged in" && echo "gh:authenticated" || echo "gh:not-authenticated"
+```
+
 ### Detect Search Tools (Optional)
 
 **Using bash:**
@@ -113,6 +138,21 @@ command -v jq >/dev/null 2>&1 && echo "jq:$(jq --version)"
             │               │ with git sources      │
             │               │ (show install help)   │
             │               └───────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────┐
+│          Check for gh CLI (if remote GitHub content)    │
+└─────────────────────────────────────────────────────────┘
+                          │
+            ┌─────────────┴─────────────┐
+            │                           │
+            ▼                           ▼
+     gh available              gh not available
+            │                           │
+            ▼                           ▼
+    Use gh api for          Use raw.githubusercontent.com
+    GitHub content          URLs with curl/WebFetch
+    (preferred)             (fallback, less reliable)
             │
             ▼
 ┌─────────────────────────────────────────────────────────┐
@@ -159,6 +199,23 @@ Operations will use grep-based fallback which may be unreliable for complex YAML
 For best results, install one of:
 - yq (recommended): https://github.com/mikefarah/yq#install
 - Python PyYAML: pip install pyyaml
+
+Proceeding with fallback method...
+```
+
+When gh CLI is not found (for remote corpus operations):
+
+```
+GitHub CLI (gh) not found.
+Using raw.githubusercontent.com URLs as fallback, which may be less reliable
+(some repositories return 404 or have caching issues).
+
+For best results, install the GitHub CLI:
+- Linux: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+- macOS: brew install gh
+- Windows: winget install --id GitHub.cli
+
+Then authenticate: gh auth login
 
 Proceeding with fallback method...
 ```
@@ -283,3 +340,5 @@ for complex configuration files.
 - **discovery.md** - Uses tool detection for YAML parsing
 - **status.md** - Uses tool detection for YAML parsing and git operations
 - **sources/git.md** - Requires git detection for clone operations
+- **index-fetching.md** - Uses gh CLI detection for GitHub content fetching
+- **registry-loading.md** - Uses gh CLI detection for remote config fetching

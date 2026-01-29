@@ -45,9 +45,16 @@ For each registered corpus, gather status information:
 
 #### 2a. Fetch Corpus Config
 
-**From GitHub:**
+**From GitHub (using gh api - preferred):**
+```bash
+gh api repos/{owner}/{repo}/contents/config.yaml?ref={ref} --jq '.content' | base64 -d
 ```
-WebFetch: https://raw.githubusercontent.com/{repo}/{ref}/config.yaml
+
+Then parse the YAML to extract: schema_version, corpus.name, corpus.keywords, sources[].last_commit_sha, index.last_updated_at
+
+**Fallback (WebFetch):**
+```
+WebFetch: https://raw.githubusercontent.com/{owner}/{repo}/{ref}/config.yaml
 prompt: "Extract schema_version, corpus.name, corpus.keywords, sources[].last_commit_sha, index.last_updated_at"
 ```
 
@@ -58,9 +65,18 @@ Read: {source.path}/config.yaml
 
 #### 2b. Check Index Exists
 
-**From GitHub:**
+**From GitHub (using gh api - preferred):**
+```bash
+# Check if file exists (will error if not found)
+gh api repos/{owner}/{repo}/contents/index.md?ref={ref} --jq '.name' 2>/dev/null && echo "exists"
+
+# Or fetch first portion to verify content
+gh api repos/{owner}/{repo}/contents/index.md?ref={ref} --jq '.content' | base64 -d | head -10
 ```
-WebFetch: https://raw.githubusercontent.com/{repo}/{ref}/index.md
+
+**Fallback (WebFetch):**
+```
+WebFetch: https://raw.githubusercontent.com/{owner}/{repo}/{ref}/index.md
 prompt: "Return just the first 10 lines to verify file exists"
 ```
 

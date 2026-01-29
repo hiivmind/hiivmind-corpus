@@ -79,8 +79,16 @@ corpora:
 
 For each registered corpus, fetch its config to get keywords:
 
+**Using gh api (preferred):**
+```bash
+gh api repos/{owner}/{repo}/contents/config.yaml?ref={ref} --jq '.content' | base64 -d
 ```
-WebFetch: https://raw.githubusercontent.com/{repo}/{ref}/config.yaml
+
+Then parse the YAML to extract: corpus.name, corpus.display_name, and corpus.keywords
+
+**Fallback (WebFetch):**
+```
+WebFetch: https://raw.githubusercontent.com/{owner}/{repo}/{ref}/config.yaml
 prompt: "Extract corpus.name, corpus.display_name, and corpus.keywords"
 ```
 

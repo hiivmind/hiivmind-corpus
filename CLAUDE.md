@@ -271,9 +271,14 @@ The `index.md` uses markdown headings to organize topics:
 
 When answering questions, the navigate skill:
 1. Reads `index.md` to find relevant file paths
-2. Fetches from `.source/{path}` (local) or `raw.githubusercontent.com/{path}` (remote)
+2. Fetches documentation content:
+   - **Local:** Read from `.source/{path}` if clone exists
+   - **Remote (preferred):** Use `gh api repos/{owner}/{repo}/contents/{path} --jq '.content' | base64 -d`
+   - **Remote (fallback):** Use WebFetch with `raw.githubusercontent.com/{path}` if gh unavailable
 3. Warns if local clone is newer than last indexed commit
 4. Cites file paths and suggests related docs
+
+**Note:** The `gh api` method is preferred for remote fetching as it works consistently for all public repositories and uses authenticated access for better rate limits.
 
 ## Working with Templates
 

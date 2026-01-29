@@ -5,7 +5,7 @@ description: >
   questions, want to look up API references, or mention keywords matching registered corpora.
   Triggers: documentation, docs, lookup, search corpus, what does, how to, API reference.
   Auto-triggers when query contains keywords from any registered corpus (flyio, polars, etc.).
-allowed-tools: Read, Glob, Grep, WebFetch, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Bash, WebFetch, AskUserQuestion
 ---
 
 # Corpus Navigate Skill
@@ -70,9 +70,20 @@ Arguments: "flyio how to deploy"
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-fetching.md`
 
-**From GitHub source:**
+**From GitHub source (using gh api - preferred):**
+```bash
+gh api repos/{owner}/{repo}/contents/index.md --jq '.content' | base64 -d
+
+# With subdirectory path:
+gh api repos/{owner}/{repo}/contents/{path}/index.md --jq '.content' | base64 -d
+
+# With specific ref:
+gh api repos/{owner}/{repo}/contents/index.md?ref={ref} --jq '.content' | base64 -d
 ```
-WebFetch: https://raw.githubusercontent.com/{repo}/{ref}/index.md
+
+**Fallback (WebFetch):**
+```
+WebFetch: https://raw.githubusercontent.com/{owner}/{repo}/{ref}/index.md
 prompt: "Return the full markdown content"
 ```
 
@@ -105,12 +116,18 @@ Search the index for relevant entries:
 For matched entry `source_id:relative_path`:
 
 1. Get source config from corpus config.yaml
-2. Build URL or local path to documentation
+2. Build gh api command or local path to documentation
 3. Fetch content
 
-**From GitHub (no local clone):**
+**From GitHub (using gh api - preferred):**
+```bash
+# Get source details from config, then fetch:
+gh api repos/{source_owner}/{source_repo}/contents/{docs_root}/{path}?ref={branch} --jq '.content' | base64 -d
 ```
-WebFetch: https://raw.githubusercontent.com/{source_repo}/{branch}/{docs_root}/{path}
+
+**Fallback (WebFetch):**
+```
+WebFetch: https://raw.githubusercontent.com/{source_owner}/{source_repo}/{branch}/{docs_root}/{path}
 prompt: "Return the documentation content"
 ```
 

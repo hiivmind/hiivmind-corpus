@@ -11,6 +11,16 @@ Load and parse the per-project corpus registry (`.hiivmind/corpus/registry.yaml`
 - When routing queries based on keywords
 - When updating corpus configuration
 
+## Prerequisites
+
+**See:** `lib/corpus/patterns/tool-detection.md`
+
+For fetching remote corpus configs from GitHub, detect available tools:
+
+| Tool | Purpose | Detection | Fallback |
+|------|---------|-----------|----------|
+| `gh` (GitHub CLI) | Fetch GitHub content via API | `command -v gh` | raw.githubusercontent.com URLs |
+
 ## Registry Location
 
 The registry file is stored at:
@@ -120,16 +130,34 @@ Once a corpus is identified from the registry, fetch its `config.yaml` to get ke
 
 ### From GitHub
 
+**Using gh api (preferred):**
+```bash
+# Parse owner/repo from registry
+owner=$(echo "$repo" | cut -d'/' -f1)
+name=$(echo "$repo" | cut -d'/' -f2)
+
+# Fetch config.yaml content
+gh api "repos/${owner}/${name}/contents/${path:+$path/}config.yaml${ref:+?ref=$ref}" --jq '.content' | base64 -d
+```
+
+**Using Claude Bash tool (preferred):**
+```bash
+gh api repos/hiivmind/hiivmind-corpus-flyio/contents/config.yaml --jq '.content' | base64 -d
+```
+
+**Fallback: Using curl with raw.githubusercontent.com:**
 ```bash
 # Fetch config.yaml from GitHub
 curl -sL "https://raw.githubusercontent.com/${repo}/${ref}/${path:+$path/}config.yaml"
 ```
 
-**Using Claude WebFetch:**
+**Fallback: Using Claude WebFetch:**
 ```
 WebFetch: https://raw.githubusercontent.com/hiivmind/hiivmind-corpus-flyio/main/config.yaml
 prompt: "Extract the corpus.keywords array from this YAML config"
 ```
+
+**Note:** Prefer `gh api` as it works consistently for all public repositories. The raw.githubusercontent.com fallback may return 404 for some repositories.
 
 ### From Local Path
 
@@ -190,6 +218,7 @@ Register with: /hiivmind-corpus register github:owner/repo
 
 ## Related Patterns
 
+- **Tool Detection:** `tool-detection.md` - Detecting gh CLI and other tools
 - **Index Fetching:** `index-fetching.md` - How to fetch index.md from sources
 - **Corpus Routing:** `corpus-routing.md` - Keyword-based corpus selection
 - **Config Parsing:** `config-parsing.md` - Parsing corpus config.yaml
