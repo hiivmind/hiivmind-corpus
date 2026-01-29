@@ -18,6 +18,27 @@ Resolve paths within corpus structures. Handle the `{source_id}:{relative_path}`
 
 ## Corpus Directory Structure
 
+### Data-Only Corpus (Recommended)
+
+```
+{corpus_path}/
+├── config.yaml                       # Corpus configuration
+├── index.md                          # Main index
+├── index-{section}.md                # Sub-indexes (tiered)
+├── uploads/                          # Local source files
+│   └── {source_id}/
+├── logs/                             # Refresh logs (optional)
+├── CLAUDE.md                         # Data corpus documentation
+├── README.md                         # Repository documentation
+├── .source/                          # Git clones (gitignored)
+│   └── {source_id}/
+└── .cache/                           # Web caches (gitignored)
+    └── web/
+        └── {source_id}/
+```
+
+### Legacy Plugin Corpus
+
 ```
 {corpus_path}/
 ├── SKILL.md                          # Navigate skill (or skills/navigate/SKILL.md)
@@ -25,9 +46,10 @@ Resolve paths within corpus structures. Handle the `{source_id}:{relative_path}`
 │   ├── config.yaml                   # Corpus configuration
 │   ├── index.md                      # Main index
 │   ├── index-{section}.md            # Sub-indexes (tiered)
-│   ├── project-awareness.md          # Snippet for project CLAUDE.md
 │   └── uploads/                      # Local source files
 │       └── {source_id}/
+├── references/
+│   └── project-awareness.md          # Snippet for project CLAUDE.md
 ├── .source/                          # Git clones (gitignored)
 │   └── {source_id}/
 └── .cache/                           # Web caches (gitignored)
@@ -39,17 +61,24 @@ Resolve paths within corpus structures. Handle the `{source_id}:{relative_path}`
 
 ## Standard Path Resolution
 
-### Get Data Directory
+### Detect Corpus Type
 
 **Algorithm:**
-```
-{corpus_path}/data/
-```
+1. Check if `config.yaml` exists at root → data-only corpus
+2. Check if `data/config.yaml` exists → legacy plugin corpus
+3. Return corpus type and base path for data files
 
 **Using bash:**
 ```bash
-get_data_path() {
-    echo "${1%/}/data"
+detect_corpus_type() {
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "data-only"
+    elif [ -f "$corpus_path/data/config.yaml" ]; then
+        echo "legacy-plugin"
+    else
+        echo "unknown"
+    fi
 }
 ```
 
@@ -59,13 +88,19 @@ get_data_path() {
 
 **Algorithm:**
 ```
-{corpus_path}/data/config.yaml
+Data-only: {corpus_path}/config.yaml
+Legacy:    {corpus_path}/data/config.yaml
 ```
 
 **Using bash:**
 ```bash
 get_config_path() {
-    echo "${1%/}/data/config.yaml"
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/config.yaml"
+    else
+        echo "$corpus_path/data/config.yaml"
+    fi
 }
 ```
 
@@ -75,13 +110,19 @@ get_config_path() {
 
 **Algorithm:**
 ```
-{corpus_path}/data/index.md
+Data-only: {corpus_path}/index.md
+Legacy:    {corpus_path}/data/index.md
 ```
 
 **Using bash:**
 ```bash
 get_index_path() {
-    echo "${1%/}/data/index.md"
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/index.md"
+    else
+        echo "$corpus_path/data/index.md"
+    fi
 }
 ```
 
@@ -91,31 +132,64 @@ get_index_path() {
 
 **Algorithm:**
 ```
-{corpus_path}/data/index-{section}.md
+Data-only: {corpus_path}/index-{section}.md
+Legacy:    {corpus_path}/data/index-{section}.md
 ```
 
 **Using bash:**
 ```bash
 get_subindex_path() {
-    local corpus_path="$1"
+    local corpus_path="${1%/}"
     local section="$2"
-    echo "${corpus_path%/}/data/index-${section}.md"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/index-${section}.md"
+    else
+        echo "$corpus_path/data/index-${section}.md"
+    fi
 }
 ```
 
 ---
 
-### Get Project Awareness Path
+### Get Uploads Path Base
 
 **Algorithm:**
 ```
-{corpus_path}/references/project-awareness.md
+Data-only: {corpus_path}/uploads/
+Legacy:    {corpus_path}/data/uploads/
 ```
 
 **Using bash:**
 ```bash
-get_awareness_path() {
-    echo "${1%/}/references/project-awareness.md"
+get_uploads_base() {
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/uploads"
+    else
+        echo "$corpus_path/data/uploads"
+    fi
+}
+```
+
+---
+
+### Get Logs Path
+
+**Algorithm:**
+```
+Data-only: {corpus_path}/logs/
+Legacy:    {corpus_path}/data/logs/
+```
+
+**Using bash:**
+```bash
+get_logs_path() {
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/logs"
+    else
+        echo "$corpus_path/data/logs"
+    fi
 }
 ```
 
@@ -206,15 +280,20 @@ For local (uploaded) sources.
 
 **Algorithm:**
 ```
-{corpus_path}/data/uploads/{source_id}/
+Data-only: {corpus_path}/uploads/{source_id}/
+Legacy:    {corpus_path}/data/uploads/{source_id}/
 ```
 
 **Using bash:**
 ```bash
 get_uploads_path() {
-    local corpus_path="$1"
+    local corpus_path="${1%/}"
     local source_id="$2"
-    echo "${corpus_path%/}/data/uploads/${source_id}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        echo "$corpus_path/uploads/${source_id}"
+    else
+        echo "$corpus_path/data/uploads/${source_id}"
+    fi
 }
 ```
 
@@ -251,7 +330,7 @@ Given a source reference like `polars:reference/hooks.md`, resolve to actual fil
 2. Look up source in config.yaml
 3. Based on source type:
    - `git`: `{corpus}/.source/{source_id}/{docs_root}/{relative_path}`
-   - `local`: `{corpus}/data/uploads/{source_id}/{relative_path}`
+   - `local`: `{corpus}/uploads/{source_id}/{relative_path}` (data-only) or `{corpus}/data/uploads/{source_id}/{relative_path}` (legacy)
    - `web`: `{corpus}/.cache/web/{source_id}/{filename}`
 
 **Using bash (with yq):**
@@ -264,10 +343,17 @@ resolve_source_ref() {
     local source_id="${source_ref%%:*}"
     local relative_path="${source_ref#*:}"
 
-    # Get source info from config
-    local config_file="$corpus_path/data/config.yaml"
-    local source_type docs_root
+    # Detect corpus type and get config path
+    local config_file
+    local is_data_only=false
+    if [ -f "$corpus_path/config.yaml" ]; then
+        config_file="$corpus_path/config.yaml"
+        is_data_only=true
+    else
+        config_file="$corpus_path/data/config.yaml"
+    fi
 
+    local source_type docs_root
     source_type=$(yq ".sources[] | select(.id == \"$source_id\") | .type" "$config_file")
     docs_root=$(yq ".sources[] | select(.id == \"$source_id\") | .docs_root // \"\"" "$config_file")
 
@@ -280,7 +366,11 @@ resolve_source_ref() {
             fi
             ;;
         local)
-            echo "$corpus_path/data/uploads/$source_id/$relative_path"
+            if $is_data_only; then
+                echo "$corpus_path/uploads/$source_id/$relative_path"
+            else
+                echo "$corpus_path/data/uploads/$source_id/$relative_path"
+            fi
             ;;
         web)
             echo "$corpus_path/.cache/web/$source_id/$relative_path"
@@ -294,12 +384,21 @@ resolve_source_ref() {
 python3 -c "
 import yaml
 import sys
+import os
 
 corpus_path = '$1'.rstrip('/')
 source_ref = '$2'
 source_id, relative_path = source_ref.split(':', 1)
 
-config = yaml.safe_load(open(f'{corpus_path}/data/config.yaml'))
+# Detect corpus type
+if os.path.exists(f'{corpus_path}/config.yaml'):
+    config_file = f'{corpus_path}/config.yaml'
+    uploads_base = f'{corpus_path}/uploads'
+else:
+    config_file = f'{corpus_path}/data/config.yaml'
+    uploads_base = f'{corpus_path}/data/uploads'
+
+config = yaml.safe_load(open(config_file))
 source = next((s for s in config.get('sources', []) if s.get('id') == source_id), {})
 source_type = source.get('type', 'git')
 docs_root = source.get('docs_root', '')
@@ -310,7 +409,7 @@ if source_type == 'git':
     else:
         print(f'{corpus_path}/.source/{source_id}/{relative_path}')
 elif source_type == 'local':
-    print(f'{corpus_path}/data/uploads/{source_id}/{relative_path}')
+    print(f'{uploads_base}/{source_id}/{relative_path}')
 elif source_type == 'web':
     print(f'{corpus_path}/.cache/web/{source_id}/{relative_path}')
 "
@@ -336,7 +435,13 @@ resolve_source_url() {
     local source_id="${source_ref%%:*}"
     local relative_path="${source_ref#*:}"
 
-    local config_file="$corpus_path/data/config.yaml"
+    # Detect corpus type and get config path
+    local config_file
+    if [ -f "$corpus_path/config.yaml" ]; then
+        config_file="$corpus_path/config.yaml"
+    else
+        config_file="$corpus_path/data/config.yaml"
+    fi
 
     local owner repo branch docs_root
     owner=$(yq ".sources[] | select(.id == \"$source_id\") | .repo_owner" "$config_file")
@@ -374,7 +479,8 @@ exists_clone() {
 **Using bash:**
 ```bash
 exists_config() {
-    [ -f "${1%/}/data/config.yaml" ]
+    local corpus_path="${1%/}"
+    [ -f "$corpus_path/config.yaml" ] || [ -f "$corpus_path/data/config.yaml" ]
 }
 ```
 
@@ -385,7 +491,8 @@ exists_config() {
 **Using bash:**
 ```bash
 exists_index() {
-    [ -f "${1%/}/data/index.md" ]
+    local corpus_path="${1%/}"
+    [ -f "$corpus_path/index.md" ] || [ -f "$corpus_path/data/index.md" ]
 }
 ```
 
@@ -396,7 +503,8 @@ exists_index() {
 **Using bash:**
 ```bash
 exists_subindexes() {
-    ls "${1%/}"/data/index-*.md >/dev/null 2>&1
+    local corpus_path="${1%/}"
+    ls "$corpus_path"/index-*.md >/dev/null 2>&1 || ls "$corpus_path"/data/index-*.md >/dev/null 2>&1
 }
 ```
 
@@ -409,7 +517,12 @@ exists_subindexes() {
 **Using bash:**
 ```bash
 list_subindexes() {
-    ls "${1%/}"/data/index-*.md 2>/dev/null | xargs -n1 basename
+    local corpus_path="${1%/}"
+    if [ -f "$corpus_path/config.yaml" ]; then
+        ls "$corpus_path"/index-*.md 2>/dev/null | xargs -n1 basename
+    else
+        ls "$corpus_path"/data/index-*.md 2>/dev/null | xargs -n1 basename
+    fi
 }
 ```
 
@@ -420,7 +533,14 @@ list_subindexes() {
 **Using yq:**
 ```bash
 list_source_ids() {
-    yq '.sources[].id' "${1%/}/data/config.yaml"
+    local corpus_path="${1%/}"
+    local config_file
+    if [ -f "$corpus_path/config.yaml" ]; then
+        config_file="$corpus_path/config.yaml"
+    else
+        config_file="$corpus_path/data/config.yaml"
+    fi
+    yq '.sources[].id' "$config_file"
 }
 ```
 
@@ -428,7 +548,10 @@ list_source_ids() {
 ```bash
 python3 -c "
 import yaml
-for s in yaml.safe_load(open('$1/data/config.yaml')).get('sources', []):
+import os
+corpus_path = '$1'.rstrip('/')
+config_file = f'{corpus_path}/config.yaml' if os.path.exists(f'{corpus_path}/config.yaml') else f'{corpus_path}/data/config.yaml'
+for s in yaml.safe_load(open(config_file)).get('sources', []):
     print(s.get('id', ''))
 "
 ```
@@ -449,7 +572,12 @@ for s in yaml.safe_load(open('$1/data/config.yaml')).get('sources', []):
 ```powershell
 function Get-CorpusConfigPath {
     param([string]$CorpusPath)
-    Join-Path $CorpusPath "data\config.yaml"
+    # Check for data-only corpus first
+    $dataOnlyPath = Join-Path $CorpusPath "config.yaml"
+    if (Test-Path $dataOnlyPath) {
+        return $dataOnlyPath
+    }
+    return Join-Path $CorpusPath "data\config.yaml"
 }
 
 function Resolve-SourceRef {
@@ -536,7 +664,7 @@ Try running hiivmind-corpus-refresh to update the index.
 **Process:**
 1. User asks about API
 2. Read main index, find reference section links to sub-index
-3. Resolve path: `{corpus}/data/index-reference.md`
+3. Resolve path: `{corpus}/index-reference.md` (data-only) or `{corpus}/data/index-reference.md` (legacy)
 4. Read sub-index for detailed entries
 5. Find specific entry and resolve its source path
 

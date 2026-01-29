@@ -2,7 +2,62 @@
 
 Complete checklists for verifying corpus compliance with current hiivmind-corpus standards.
 
-## User-level / Repo-local Skills
+---
+
+## Data-Only Corpus (Recommended)
+
+Minimal structure for documentation corpora. This is the preferred architecture for new corpora.
+
+### Required Files
+
+| File | Purpose | Check |
+|------|---------|-------|
+| `config.yaml` | Corpus configuration | `ls config.yaml` |
+| `index.md` | Documentation index | `ls index.md` |
+
+### Optional Files
+
+| File | Purpose |
+|------|---------|
+| `uploads/` | Local document uploads |
+| `index-*.md` | Tiered sub-indexes |
+| `CLAUDE.md` | Corpus self-awareness |
+| `README.md` | Documentation |
+| `LICENSE` | License file |
+| `.gitignore` | Ignore rules |
+
+### Config Schema Fields
+
+| Field | Required | Check |
+|-------|----------|-------|
+| `corpus.name` | Yes | `grep "name:" config.yaml` |
+| `corpus.display_name` | Yes | `grep "display_name:" config.yaml` |
+| `corpus.keywords` | Yes | `grep "keywords:" config.yaml` |
+| `sources[]` | Yes | `grep "sources:" config.yaml` |
+
+### What's NOT Required
+
+Data-only corpora do NOT need:
+- `.claude-plugin/` directory
+- `skills/` directory
+- `commands/` directory
+- `references/` directory
+- Any navigate skill (handled by hiivmind-corpus plugin)
+
+### Registration
+
+Data-only corpora are registered via `.hiivmind/corpus/registry.yaml`:
+
+```yaml
+corpora:
+  polars:
+    source: "github:hiivmind/hiivmind-corpus-polars"
+    enabled: true
+```
+
+---
+
+## User-level / Repo-local Skills (Legacy)
 
 Simpler structure without plugin manifest.
 
@@ -39,9 +94,9 @@ Simpler structure without plugin manifest.
 
 ---
 
-## Standalone Plugin / Marketplace Plugin
+## Standalone Plugin / Marketplace Plugin (Legacy)
 
-Full plugin structure with manifest and dual navigate implementation.
+Full plugin structure with manifest and dual navigate implementation. **Deprecated:** Use data-only architecture instead.
 
 ### Required Files
 
@@ -186,21 +241,53 @@ For each plugin in the marketplace, run the Standalone Plugin checklist above.
 # Run from corpus root
 echo "=== Corpus Compliance Check ==="
 
-# Detect type
-if [ -f "SKILL.md" ] && [ -d "data" ]; then
-  echo "Type: User-level or Repo-local skill"
+# Detect type (check data-only first as preferred)
+if [ -f "config.yaml" ] && [ -f "index.md" ] && [ ! -d ".claude-plugin" ]; then
+  echo "Type: Data-only corpus (recommended)"
+  TYPE="data-only"
+elif [ -f "SKILL.md" ] && [ -d "data" ]; then
+  echo "Type: User-level or Repo-local skill (legacy)"
   TYPE="skill"
 elif [ -f ".claude-plugin/plugin.json" ]; then
-  echo "Type: Standalone or Marketplace plugin"
+  echo "Type: Standalone or Marketplace plugin (legacy)"
   TYPE="plugin"
 else
   echo "Type: Unknown"
   TYPE="unknown"
 fi
 
-# Check common requirements
+# Data-only corpus checks
+if [ "$TYPE" = "data-only" ]; then
+  echo ""
+  echo "=== Required Files ==="
+  [ -f "config.yaml" ] && echo "✅ config.yaml" || echo "❌ config.yaml"
+  [ -f "index.md" ] && echo "✅ index.md" || echo "❌ index.md"
+
+  echo ""
+  echo "=== Optional Files ==="
+  [ -d "uploads" ] && echo "✅ uploads/" || echo "○ uploads/ (created when needed)"
+  [ -f "CLAUDE.md" ] && echo "✅ CLAUDE.md" || echo "○ CLAUDE.md (optional)"
+  [ -f "README.md" ] && echo "✅ README.md" || echo "○ README.md (optional)"
+
+  echo ""
+  echo "=== Config Fields ==="
+  grep -q "name:" config.yaml 2>/dev/null && echo "✅ corpus.name" || echo "❌ corpus.name"
+  grep -q "display_name:" config.yaml 2>/dev/null && echo "✅ corpus.display_name" || echo "❌ corpus.display_name"
+  grep -q "keywords:" config.yaml 2>/dev/null && echo "✅ corpus.keywords" || echo "❌ corpus.keywords"
+  grep -q "sources:" config.yaml 2>/dev/null && echo "✅ sources" || echo "❌ sources"
+
+  echo ""
+  echo "=== Not Required (Data-only) ==="
+  echo "○ .claude-plugin/ - NOT needed"
+  echo "○ skills/ - NOT needed"
+  echo "○ commands/ - NOT needed"
+  echo "○ references/ - NOT needed"
+  exit 0
+fi
+
+# Legacy: Check common requirements
 echo ""
-echo "=== Required Files ==="
+echo "=== Required Files (Legacy Structure) ==="
 [ -f "data/config.yaml" ] && echo "✅ data/config.yaml" || echo "❌ data/config.yaml"
 [ -f "data/index.md" ] && echo "✅ data/index.md" || echo "❌ data/index.md"
 [ -f "references/project-awareness.md" ] && echo "✅ references/project-awareness.md" || echo "❌ references/project-awareness.md"
@@ -236,8 +323,11 @@ if [ "$TYPE" = "plugin" ]; then
   fi
 fi
 
-# Config fields
+# Config fields (legacy path)
 echo ""
 echo "=== Config Fields ==="
 grep -q "keywords:" data/config.yaml 2>/dev/null && echo "✅ corpus.keywords" || echo "❌ corpus.keywords"
+
+echo ""
+echo "💡 Consider migrating to data-only architecture for simpler maintenance."
 ```

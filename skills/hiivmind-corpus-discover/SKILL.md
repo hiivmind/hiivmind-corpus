@@ -5,32 +5,48 @@ description: This skill should be used when the user asks "what corpora do I hav
 
 # Corpus Discovery
 
-Find and report all installed hiivmind-corpus documentation corpora across user-level skills, repo-local skills, and marketplace plugins.
+Find and report all available documentation corpora, including:
+- **Registered corpora** - Listed in project's `.hiivmind/corpus/registry.yaml`
+- **Legacy plugin-based corpora** - Installed as Claude Code plugins (backward compatibility)
 
 ## When to Use
 
 - **Generic doc queries**: User asks "check the docs" without specifying which documentation
-- **Corpus inventory**: User asks what corpora are installed
+- **Corpus inventory**: User asks what corpora are installed/registered
 - **Before managing**: Find corpora to enhance, refresh, or upgrade
-- **Troubleshooting**: Verify which corpora are installed and their status
+- **Troubleshooting**: Verify which corpora are available and their status
 
 ## Handling Generic Documentation Queries
 
 When triggered by a generic query like "check the docs" or "what do the docs say about X":
 
-1. Discover all installed corpora (see Discovery Process below)
+1. Discover all available corpora (registry + legacy plugins)
 2. List them with their domain keywords
 3. Ask user to pick one or be more specific:
-   > "I found these documentation corpora installed:
-   > - **Polars** - dataframe, lazy, expressions
-   > - **GitHub** - actions, api, graphql, copilot
+   > "I found these documentation corpora:
+   > - **Fly.io** (registered) - flyio, deployment, hosting
+   > - **Polars** (plugin) - dataframe, lazy, expressions
    >
    > Which would you like me to search? Or rephrase your question with a specific domain."
-4. User then invokes the child corpus skill directly
+4. Route to navigate skill for the selected corpus
 
-## Discovery Locations
+## Discovery Sources
 
-Scan these locations in order to find all installed corpora:
+### 1. Project Registry (Primary)
+
+Check `.hiivmind/corpus/registry.yaml` for registered corpora:
+
+```
+Read: .hiivmind/corpus/registry.yaml
+```
+
+Registry corpora are data-only repositories accessed via GitHub or local paths.
+
+**See:** `lib/corpus/patterns/registry-loading.md` for registry schema and loading.
+
+### 2. Legacy Plugin Locations (Backward Compatibility)
+
+Scan these locations for plugin-based corpora:
 
 | Type | Location Pattern | Structure |
 |------|------------------|-----------|
@@ -41,9 +57,36 @@ Scan these locations in order to find all installed corpora:
 
 ## Discovery Process
 
-**See:** `lib/corpus/patterns/discovery.md` for detailed algorithms and implementations.
+### Step 0: Check Project Registry (New Architecture)
 
-### Step 1: Detect Available Tools
+First, check if the project has a corpus registry:
+
+```
+Read: .hiivmind/corpus/registry.yaml
+```
+
+If registry exists, extract registered corpora:
+
+```yaml
+# Registry structure
+corpora:
+  - id: flyio
+    source:
+      type: github
+      repo: hiivmind/hiivmind-corpus-flyio
+      ref: main
+```
+
+For each registered corpus, fetch its config to get keywords:
+
+```
+WebFetch: https://raw.githubusercontent.com/{repo}/{ref}/config.yaml
+prompt: "Extract corpus.name, corpus.display_name, and corpus.keywords"
+```
+
+**See:** `lib/corpus/patterns/registry-loading.md` for detailed registry handling.
+
+### Step 1: Detect Available Tools (Legacy)
 
 Before discovery, check tool availability (see `lib/corpus/patterns/tool-detection.md`):
 - YAML parsing: yq, python+pyyaml, or grep fallback
@@ -115,23 +158,30 @@ Path resolution patterns in `lib/corpus/patterns/paths.md`:
 Present discovered corpora in a structured format:
 
 ```
-## Installed Corpora
+## Available Corpora
 
-### User-level
-(none)
+### Registered (via registry.yaml)
 
-### Repo-local
-(none)
+| ID | Display | Source | Keywords | Status |
+|----|---------|--------|----------|--------|
+| flyio | Fly.io | github:hiivmind/hiivmind-corpus-flyio | flyio, deployment | healthy |
+| polars | Polars | github:hiivmind/hiivmind-corpus-data/.../polars | polars, dataframe | healthy |
 
-### Marketplace
+### Legacy Plugins (backward compatibility)
 
 | Name | Display | Keywords | Status | Sources | Last Indexed |
 |------|---------|----------|--------|---------|--------------|
-| hiivmind-corpus-polars | Polars | polars, dataframe, lazy | built | 1 | 2025-12-10 |
-| hiivmind-corpus-ibis | Ibis | ibis, sql, backend | built | 1 | 2025-12-10 |
-| hiivmind-corpus-github | GitHub | github, actions, api | stale | 2 | 2025-12-01 |
+| hiivmind-corpus-github | GitHub | github, actions, api | built | 2 | 2025-12-01 |
 
-**Total: 3 corpora installed**
+**Total: 3 corpora (2 registered, 1 legacy plugin)**
+
+---
+
+To register a new corpus:
+  /hiivmind-corpus register github:owner/repo
+
+To navigate a corpus:
+  /hiivmind-corpus navigate flyio "your question"
 ```
 
 ## Cache Update (Optional)
@@ -289,8 +339,11 @@ Skip and note in output:
 - `lib/corpus/patterns/paths.md` - Path resolution
 
 **Related skills:**
-- Initialize new corpus: `skills/hiivmind-corpus-init/SKILL.md`
-- Build corpus index: `skills/hiivmind-corpus-build/SKILL.md`
-- Gateway command: `commands/hiivmind-corpus.md`
+- **Navigate:** `skills/hiivmind-corpus-navigate/SKILL.md` - Query corpus documentation
+- **Register:** `skills/hiivmind-corpus-register/SKILL.md` - Add corpus to registry
+- **Status:** `skills/hiivmind-corpus-status/SKILL.md` - Check corpus health
+- **Initialize:** `skills/hiivmind-corpus-init/SKILL.md` - Create new corpus
+- **Build:** `skills/hiivmind-corpus-build/SKILL.md` - Build corpus index
+- **Gateway:** `commands/hiivmind-corpus.md` - Unified entry point
 
-**Note:** Domain-specific navigation is handled by per-corpus navigate skills in child plugins (e.g., `hiivmind-corpus-github-docs/skills/navigate/SKILL.md`).
+**Note:** Navigation is now handled by `hiivmind-corpus-navigate` skill, which works with both registry-based and legacy plugin-based corpora.

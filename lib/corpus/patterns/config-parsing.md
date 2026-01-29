@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Extract fields from corpus `data/config.yaml` files using available YAML parsing tools.
+Extract fields from corpus `config.yaml` files using available YAML parsing tools.
 
 ## When to Use
 
@@ -14,7 +14,31 @@ Extract fields from corpus `data/config.yaml` files using available YAML parsing
 ## Prerequisites
 
 - **Tool detection** (see `tool-detection.md`) - Know which YAML parser is available
-- Config file exists at `{corpus_path}/data/config.yaml`
+- Config file exists at `{corpus_path}/config.yaml` (data-only) or `{corpus_path}/config.yaml` (legacy plugin)
+
+## Path Resolution
+
+**See:** `paths.md` for full path detection logic.
+
+Data-only corpora store config at root level:
+```
+{corpus_path}/config.yaml        # Data-only (preferred)
+{corpus_path}/config.yaml   # Legacy plugin structure
+```
+
+Before parsing, detect the correct path:
+```bash
+# Detect config path
+if [ -f "config.yaml" ]; then
+    CONFIG_PATH="config.yaml"
+elif [ -f "config.yaml" ]; then
+    CONFIG_PATH="config.yaml"
+else
+    echo "No config.yaml found" && exit 1
+fi
+```
+
+**Examples below use `config.yaml` (data-only format). For legacy plugins, substitute `config.yaml`.**
 
 ## Config Schema Reference
 
@@ -63,7 +87,7 @@ Standard git repository with docs in the repo:
 
 ### Local Source
 
-User-uploaded files stored in `data/uploads/`:
+User-uploaded files stored in `uploads/` (data-only) or `data/uploads/` (legacy):
 
 ```yaml
 - id: "team-standards"
@@ -154,17 +178,17 @@ Tracks git for change detection, fetches content live from web.
 
 **Using yq:**
 ```bash
-yq '.corpus.name' data/config.yaml
+yq '.corpus.name' config.yaml
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; print(yaml.safe_load(open('data/config.yaml')).get('corpus', {}).get('name', ''))"
+python3 -c "import yaml; print(yaml.safe_load(open('config.yaml')).get('corpus', {}).get('name', ''))"
 ```
 
 **Using grep (fallback):**
 ```bash
-grep -A1 '^corpus:' data/config.yaml | grep 'name:' | sed 's/.*name: *//' | tr -d '"'
+grep -A1 '^corpus:' config.yaml | grep 'name:' | sed 's/.*name: *//' | tr -d '"'
 ```
 
 ---
@@ -177,12 +201,12 @@ grep -A1 '^corpus:' data/config.yaml | grep 'name:' | sed 's/.*name: *//' | tr -
 
 **Using yq:**
 ```bash
-yq '.corpus.display_name // empty' data/config.yaml
+yq '.corpus.display_name // empty' config.yaml
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; c=yaml.safe_load(open('data/config.yaml')); print(c.get('corpus', {}).get('display_name', ''))"
+python3 -c "import yaml; c=yaml.safe_load(open('config.yaml')); print(c.get('corpus', {}).get('display_name', ''))"
 ```
 
 **Fallback inference:**
@@ -202,12 +226,12 @@ basename "$(pwd)" | sed 's/hiivmind-corpus-//' | sed 's/-/ /g' | sed 's/\b\(.\)/
 
 **Using yq:**
 ```bash
-yq -r '.corpus.keywords // empty | .[]?' data/config.yaml | paste -sd,
+yq -r '.corpus.keywords // empty | .[]?' config.yaml | paste -sd,
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; print(','.join(yaml.safe_load(open('data/config.yaml')).get('corpus', {}).get('keywords', [])))"
+python3 -c "import yaml; print(','.join(yaml.safe_load(open('config.yaml')).get('corpus', {}).get('keywords', [])))"
 ```
 
 **Fallback inference:**
@@ -226,17 +250,17 @@ basename "$(pwd)" | sed 's/hiivmind-corpus-//'
 
 **Using yq:**
 ```bash
-yq '.schema_version // 1' data/config.yaml
+yq '.schema_version // 1' config.yaml
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; print(yaml.safe_load(open('data/config.yaml')).get('schema_version', 1))"
+python3 -c "import yaml; print(yaml.safe_load(open('config.yaml')).get('schema_version', 1))"
 ```
 
 **Using grep:**
 ```bash
-grep '^schema_version:' data/config.yaml | cut -d: -f2 | tr -d ' ' || echo "1"
+grep '^schema_version:' config.yaml | cut -d: -f2 | tr -d ' ' || echo "1"
 ```
 
 ---
@@ -249,17 +273,17 @@ grep '^schema_version:' data/config.yaml | cut -d: -f2 | tr -d ' ' || echo "1"
 
 **Using yq:**
 ```bash
-yq '.sources | length' data/config.yaml
+yq '.sources | length' config.yaml
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; print(len(yaml.safe_load(open('data/config.yaml')).get('sources', [])))"
+python3 -c "import yaml; print(len(yaml.safe_load(open('config.yaml')).get('sources', [])))"
 ```
 
 **Using grep (approximate):**
 ```bash
-grep -c '^ *- id:' data/config.yaml || echo "0"
+grep -c '^ *- id:' config.yaml || echo "0"
 ```
 
 ---
@@ -272,17 +296,17 @@ grep -c '^ *- id:' data/config.yaml || echo "0"
 
 **Using yq:**
 ```bash
-yq '.sources[].id' data/config.yaml
+yq '.sources[].id' config.yaml
 ```
 
 **Using Python:**
 ```bash
-python3 -c "import yaml; [print(s['id']) for s in yaml.safe_load(open('data/config.yaml')).get('sources', [])]"
+python3 -c "import yaml; [print(s['id']) for s in yaml.safe_load(open('config.yaml')).get('sources', [])]"
 ```
 
 **Using grep:**
 ```bash
-grep '^ *- id:' data/config.yaml | sed 's/.*id: *//' | tr -d '"'
+grep '^ *- id:' config.yaml | sed 's/.*id: *//' | tr -d '"'
 ```
 
 ---
@@ -295,14 +319,14 @@ grep '^ *- id:' data/config.yaml | sed 's/.*id: *//' | tr -d '"'
 
 **Using yq:**
 ```bash
-yq '.sources[] | select(.id == "polars")' data/config.yaml
+yq '.sources[] | select(.id == "polars")' config.yaml
 ```
 
 **Using Python:**
 ```bash
 python3 -c "
 import yaml
-sources = yaml.safe_load(open('data/config.yaml')).get('sources', [])
+sources = yaml.safe_load(open('config.yaml')).get('sources', [])
 for s in sources:
     if s.get('id') == 'polars':
         print(yaml.dump(s))
@@ -319,20 +343,20 @@ For a specific source, get any field.
 **Using yq:**
 ```bash
 # Get repo_url for source "polars"
-yq '.sources[] | select(.id == "polars") | .repo_url' data/config.yaml
+yq '.sources[] | select(.id == "polars") | .repo_url' config.yaml
 
 # Get last_commit_sha
-yq '.sources[] | select(.id == "polars") | .last_commit_sha // ""' data/config.yaml
+yq '.sources[] | select(.id == "polars") | .last_commit_sha // ""' config.yaml
 
 # Get branch (with default)
-yq '.sources[] | select(.id == "polars") | .branch // "main"' data/config.yaml
+yq '.sources[] | select(.id == "polars") | .branch // "main"' config.yaml
 ```
 
 **Using Python:**
 ```bash
 python3 -c "
 import yaml
-sources = yaml.safe_load(open('data/config.yaml')).get('sources', [])
+sources = yaml.safe_load(open('config.yaml')).get('sources', [])
 source = next((s for s in sources if s.get('id') == 'polars'), {})
 print(source.get('repo_url', ''))
 "
@@ -341,7 +365,7 @@ print(source.get('repo_url', ''))
 **Using grep (specific fields only):**
 ```bash
 # This is fragile - only works for simple cases
-grep -A20 "id: polars" data/config.yaml | grep 'repo_url:' | head -1 | sed 's/.*repo_url: *//' | tr -d '"'
+grep -A20 "id: polars" config.yaml | grep 'repo_url:' | head -1 | sed 's/.*repo_url: *//' | tr -d '"'
 ```
 
 ---
@@ -355,14 +379,14 @@ grep -A20 "id: polars" data/config.yaml | grep 'repo_url:' | head -1 | sed 's/.*
 **Using yq:**
 ```bash
 # Get id and type for each source
-yq '.sources[] | .id + " " + .type' data/config.yaml
+yq '.sources[] | .id + " " + .type' config.yaml
 ```
 
 **Using Python:**
 ```bash
 python3 -c "
 import yaml
-for s in yaml.safe_load(open('data/config.yaml')).get('sources', []):
+for s in yaml.safe_load(open('config.yaml')).get('sources', []):
     print(f\"{s['id']} {s['type']}\")
 "
 ```
@@ -379,8 +403,8 @@ for s in yaml.safe_load(open('data/config.yaml')).get('sources', []):
 
 **Using yq (in-place):**
 ```bash
-yq -i '(.sources[] | select(.id == "polars")).last_commit_sha = "abc123"' data/config.yaml
-yq -i '(.sources[] | select(.id == "polars")).last_indexed_at = "2025-01-15T10:00:00Z"' data/config.yaml
+yq -i '(.sources[] | select(.id == "polars")).last_commit_sha = "abc123"' config.yaml
+yq -i '(.sources[] | select(.id == "polars")).last_indexed_at = "2025-01-15T10:00:00Z"' config.yaml
 ```
 
 **Using Python:**
@@ -389,7 +413,7 @@ python3 -c "
 import yaml
 from datetime import datetime
 
-with open('data/config.yaml', 'r') as f:
+with open('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 for source in config.get('sources', []):
@@ -397,7 +421,7 @@ for source in config.get('sources', []):
         source['last_commit_sha'] = 'abc123'
         source['last_indexed_at'] = datetime.utcnow().isoformat() + 'Z'
 
-with open('data/config.yaml', 'w') as f:
+with open('config.yaml', 'w') as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 "
 ```
@@ -411,7 +435,7 @@ If no tools available, guide user to edit the file manually.
 
 **Using yq:**
 ```bash
-yq -i '.corpus.keywords = ["polars", "dataframe", "lazy"]' data/config.yaml
+yq -i '.corpus.keywords = ["polars", "dataframe", "lazy"]' config.yaml
 ```
 
 **Using Python:**
@@ -419,12 +443,12 @@ yq -i '.corpus.keywords = ["polars", "dataframe", "lazy"]' data/config.yaml
 python3 -c "
 import yaml
 
-with open('data/config.yaml', 'r') as f:
+with open('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 config.setdefault('corpus', {})['keywords'] = ['polars', 'dataframe', 'lazy']
 
-with open('data/config.yaml', 'w') as f:
+with open('config.yaml', 'w') as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 "
 ```
@@ -435,7 +459,7 @@ with open('data/config.yaml', 'w') as f:
 
 | Operation | Unix | Windows (PowerShell) |
 |-----------|------|---------------------|
-| File path | `data/config.yaml` | `data\config.yaml` (or `/` works) |
+| File path | `config.yaml` | `config.yaml` (forward slashes work) |
 | yq command | Same syntax | Same syntax |
 | python3 | `python3` | `python` (usually) |
 
@@ -444,7 +468,7 @@ with open('data/config.yaml', 'w') as f:
 ### Config File Not Found
 
 ```
-Configuration file not found at data/config.yaml
+Configuration file not found (checked config.yaml and data/config.yaml)
 
 This corpus may not be properly initialized. Try:
 - Running hiivmind-corpus-init to create a new corpus
@@ -461,7 +485,7 @@ Common issues:
 - Missing quotes around strings with special characters
 - Duplicate keys
 
-Try validating with: yq '.' data/config.yaml
+Try validating with: yq '.' config.yaml
 ```
 
 ### Field Not Found

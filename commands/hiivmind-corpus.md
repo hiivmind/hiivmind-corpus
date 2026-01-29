@@ -9,6 +9,21 @@ allowed-tools: ["Read", "Write", "Bash", "Glob", "Grep", "TodoWrite", "AskUserQu
 Execute this workflow deterministically. State persists in conversation context across turns.
 
 > **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/workflow.yaml`
+> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+
+---
+
+## Execution Reference
+
+| Resource | Location |
+|----------|----------|
+| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/workflow.yaml` |
+| Intent Mapping | `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml` |
+| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
+| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
+| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
+| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
+| Execution Model | [execution/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/execution/) |
 
 ---
 
@@ -25,7 +40,7 @@ Execute this workflow deterministically. State persists in conversation context 
 3. **Initialize runtime state**:
    ```yaml
    workflow_name: hiivmind-corpus-gateway
-   workflow_version: "1.0.0"
+   workflow_version: "2.0.0"
    current_node: check_arguments
    previous_node: null
    history: []
@@ -75,7 +90,7 @@ LOOP:
 
      ACTION NODE:
      - FOR each action IN node.actions:
-       - Execute action per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md
+       - Execute action per blueprint-lib consequence definitions
        - Store results in state.computed if store_as specified
      - IF all actions succeed:
        - Set current_node = node.on_success
@@ -84,7 +99,7 @@ LOOP:
      - CONTINUE
 
      CONDITIONAL NODE:
-     - Evaluate node.condition per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md
+     - Evaluate node.condition per blueprint-lib precondition definitions
      - IF result == true:
        - Set current_node = node.branches.true
      - ELSE:
@@ -177,7 +192,7 @@ The gateway uses 3-Valued Logic (3VL) for compound intent handling. This allows 
 
 ## Skill Invocation
 
-**See:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences/core/workflow.md` § invoke_skill
+**See:** blueprint-lib `consequences/core/workflow.yaml` § invoke_skill
 
 This workflow delegates to corpus skills (init, build, refresh, etc.) using the `invoke_skill` consequence. The invoked skill takes over the conversation.
 
@@ -185,9 +200,10 @@ This workflow delegates to corpus skills (init, build, refresh, etc.) using the 
 
 ## Corpus Discovery
 
-**See:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences/extensions/discovery.md` § discover_installed_corpora
+This workflow discovers installed corpora using inline pseudocode in a `compute` consequence. The algorithm scans 4 locations for `config.yaml` files and builds a corpus list.
 
-This workflow discovers installed corpora using the `discover_installed_corpora` consequence. For the full discovery algorithm, see `lib/corpus/patterns/discovery.md`.
+**Discovery Algorithm:** See inline pseudocode in `discover_corpora` node of workflow.yaml
+**Pattern Reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md`
 
 ---
 
@@ -253,24 +269,27 @@ For 3VL semantics (scoring, priorities, winner determination), see the framework
 
 ## Reference Documentation
 
-### Workflow Framework
-- **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
-- **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
-  - Core operations: `consequences/core/workflow.md` (state, evaluation, skill invocation)
-  - Intent detection: `consequences/core/intent-detection.md`
-  - Discovery: `consequences/extensions/discovery.md`
-- **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
-- **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
+### Blueprint Library (Remote)
+- **Type Definitions:** [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0)
+- **Consequences:** `consequences/core/` (state, evaluation, logging, intent) + `consequences/extensions/` (file, git, web)
+- **Preconditions:** `preconditions/` (filesystem, state, source checks)
+- **Execution Model:** `execution/` (traversal, state management, dispatching)
 
 ### Intent Detection
 - **3VL Framework:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/framework.md`
 - **Execution Algorithms:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/execution.md`
 - **Variable Interpolation:** `${CLAUDE_PLUGIN_ROOT}/lib/intent_detection/variables.md`
 
+### Corpus Patterns (Local)
+- **Discovery:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md`
+- **Config Parsing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md`
+- **Sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/`
+
 ---
 
 ## Related Skills
+
+### Build Skills (Create/Maintain Corpora)
 
 | Skill | Purpose |
 |-------|---------|
@@ -280,6 +299,18 @@ For 3VL semantics (scoring, priorities, winner determination), see the framework
 | `hiivmind-corpus-enhance` | Deepen coverage on topics |
 | `hiivmind-corpus-refresh` | Sync with upstream changes |
 | `hiivmind-corpus-upgrade` | Apply latest templates |
-| `hiivmind-corpus-discover` | Find installed corpora |
+
+### Read Skills (Query/Navigate Corpora)
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-navigate` | Search and retrieve documentation |
+| `hiivmind-corpus-register` | Add corpus to project registry |
+| `hiivmind-corpus-status` | Check corpus health/freshness |
+
+### Shared Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-discover` | Find available corpora (registry + plugins) |
 | `hiivmind-corpus-awareness` | Add to CLAUDE.md |
-| `hiivmind-corpus-navigate` | Query across corpora |

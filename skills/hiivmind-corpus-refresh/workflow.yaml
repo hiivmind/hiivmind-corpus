@@ -1,0 +1,2204 @@
+name: refresh
+version: "2.0.0"
+description: >
+  This skill should be used when the user asks to "refresh corpus", "sync documentation",
+  "update corpus index", "check for upstream changes", "corpus is stale", "docs are outdated",
+  or mentions that documentation sources have changed. Triggers on "refresh my [corpus name] corpus",
+  "sync corpus with upstream", "check if docs are current", "update from source repo", or
+  "hiivmind-corpus refresh".
+
+# ===========================================================================
+# TYPE DEFINITIONS
+# ===========================================================================
+# Remote definitions for consequence/precondition types.
+# See: https://github.com/hiivmind/hiivmind-blueprint-lib
+
+definitions:
+  source: hiivmind/hiivmind-blueprint-lib@v2.0.0
+
+entry_preconditions:
+  - type: config_exists
+    error_message: "No config.yaml found. Run hiivmind-corpus-init first."
+
+initial_state:
+  phase: "validate"
+  command_mode: null               # "status" | "update"
+  sources: []                      # All configured sources
+  sources_to_update: []            # Selected for update
+  status_report: []                # Per-source status results
+  current_source: null             # Currently processing source
+  index_structure:
+    is_tiered: false
+    sub_indexes: []
+  computed:
+    source_count: 0
+    all_changes: []                # Accumulated from all sources
+    affected_sections: []          # For tiered indexes
+    current_source_index: 0
+    updated_sources: []            # Successfully updated sources
+    indexed_sha: null
+    upstream_sha: null
+    commit_count: 0
+    file_changes: []
+    log: null                      # Logging state (initialized by init_log)
+    log_file_path: null            # Path to written log file
+    timestamp_slug: null           # Formatted timestamp for filenames
+  flags:
+    config_found: false
+    has_sources: false
+    index_built: false
+    is_multi_source: false
+    is_tiered_index: false
+    auto_approve: false            # Set via entry parameter for CI/automated runs
+    status_only: false             # Set via entry parameter for status-only mode
+    has_stale_sources: false
+    all_sources_current: false
+    # Logging flags (set via entry parameters)
+    no_log: false                  # Skip writing log file
+    log_format: "yaml"             # Log format: yaml | json | markdown
+    log_location: "logs/"          # Log file directory (data-only: logs/, legacy: data/logs/)
+    ci_output: "none"              # CI output: github | plain | json | none
+    log_gitignore: false           # Add log to .gitignore
+
+start_node: read_config
+
+nodes:
+  # ===========================================================================
+  # PHASE 1: VALIDATE
+  # ===========================================================================
+
+  read_config:
+    type: action
+    description: "Read corpus configuration and extract sources"
+    actions:
+      - type: display_message
+        message: "Reading corpus configuration..."
+      - type: read_file
+        path: "config.yaml"
+        store_as: computed.config_raw
+      - type: compute
+        expression: |
+          # Parse config.yaml YAML content
+          # Extract corpus metadata and sources array
+          # parseYaml(computed.config_raw)
+        store_as: config
+      - type: set_flag
+        flag: config_found
+        value: true
+      - type: set_state
+        field: sources
+        value: "${config.sources}"
+      - type: compute
+        expression: "len(config.sources)"
+        store_as: computed.source_count
+      - type: display_message
+        message: |
+          Found corpus: ${config.corpus.name}
+          Sources configured: ${computed.source_count}
+    on_success: init_log
+    on_failure: error_no_config
+
+  init_log:
+    type: action
+    description: "Initialize logging for this workflow execution"
+    actions:
+      - type: compute
+        expression: |
+          # Format current timestamp as YYYY-MM-DD-HHmmss
+          const now = new Date();
+          now.toISOString().replace(/[T:]/g, '-').replace(/\..+/, '').slice(0, 17)
+        store_as: computed.timestamp_slug
+      - type: compute
+        expression: |
+          # Initialize log structure for this workflow execution
+          # {
+          #   metadata: { workflow: "hiivmind-corpus-refresh", version: "2.0.0", skill: "refresh", plugin: "hiivmind-corpus" },
+          #   execution: { started_at: timestamp, nodes: [], events: [] },
+          #   outcome: null
+          # }
+        store_as: computed.log
+      - type: compute
+        expression: |
+          # Log the read_config node completion
+          # computed.log.execution.nodes.push({ node: "read_config", outcome: "success", timestamp })
+        store_as: computed.log
+    on_success: check_has_sources
+    on_failure: check_has_sources
+
+  check_has_sources:
+    type: conditional
+    description: "Verify at least one source is configured"
+    condition:
+      type: evaluate_expression
+      expression: "len(sources) > 0"
+    branches:
+      true: set_has_sources_flag
+      false: error_no_sources
+
+  set_has_sources_flag:
+    type: action
+    description: "Set flag and continue to index check"
+    actions:
+      - type: set_flag
+        flag: has_sources
+        value: true
+      - type: evaluate
+        expression: "len(sources) > 1"
+        set_flag: is_multi_source
+    on_success: check_index_exists
+    on_failure: check_index_exists
+
+  check_index_exists:
+    type: action
+    description: "Read index.md and check if it's built"
+    actions:
+      - type: read_file
+        path: "index.md"
+        store_as: computed.index_content
+    on_success: check_index_built
+    on_failure: error_no_index
+
+  check_index_built:
+    type: conditional
+    description: "Check if index has real content (not placeholder)"
+    condition:
+      type: evaluate_expression
+      expression: "!computed.index_content.includes('Run hiivmind-corpus-build')"
+    branches:
+      true: set_index_built_flag
+      false: error_index_placeholder
+
+  set_index_built_flag:
+    type: action
+    description: "Mark index as built, proceed to detection"
+    actions:
+      - type: set_flag
+        flag: index_built
+        value: true
+    on_success: detect_index_structure
+    on_failure: detect_index_structure
+
+  # ===========================================================================
+  # PHASE 2: DETECT
+  # ===========================================================================
+
+  detect_index_structure:
+    type: action
+    description: "Detect if corpus uses tiered indexing"
+    actions:
+      - type: glob_files
+        pattern: "index-*.md"
+        store_as: computed.sub_index_files
+      - type: evaluate
+        expression: "len(computed.sub_index_files) > 0"
+        set_flag: is_tiered_index
+    on_success: store_tiered_info
+    on_failure: store_tiered_info
+
+  store_tiered_info:
+    type: action
+    description: "Store tiered index structure info"
+    actions:
+      - type: set_state
+        field: index_structure.is_tiered
+        value: "${flags.is_tiered_index}"
+      - type: set_state
+        field: index_structure.sub_indexes
+        value: "${computed.sub_index_files || []}"
+    on_success: check_auto_approve
+    on_failure: check_auto_approve
+
+  # ===========================================================================
+  # PHASE 3: ROUTE (Auto-approve check then user prompt)
+  # ===========================================================================
+
+  check_auto_approve:
+    type: conditional
+    description: "Check if auto-approve mode is enabled"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: check_status_only_flag
+      false: prompt_command_mode
+
+  check_status_only_flag:
+    type: conditional
+    description: "Check if status-only mode"
+    condition:
+      type: flag_set
+      flag: status_only
+    branches:
+      true: auto_set_status_mode
+      false: auto_set_update_mode
+
+  auto_set_status_mode:
+    type: action
+    description: "Auto-approve: set status mode"
+    actions:
+      - type: set_state
+        field: command_mode
+        value: "status"
+      - type: display_message
+        message: "Auto-approve mode: checking status only"
+    on_success: route_status_by_source_count
+    on_failure: route_status_by_source_count
+
+  auto_set_update_mode:
+    type: action
+    description: "Auto-approve: set update mode"
+    actions:
+      - type: set_state
+        field: command_mode
+        value: "update"
+      - type: display_message
+        message: "Auto-approve mode: updating stale sources"
+    on_success: initialize_status_check
+    on_failure: initialize_status_check
+
+  prompt_command_mode:
+    type: user_prompt
+    prompt:
+      question: "What would you like to do?"
+      header: "Mode"
+      options:
+        - id: status
+          label: "Check status"
+          description: "See which sources have updates available"
+        - id: update
+          label: "Update sources"
+          description: "Refresh index from upstream changes"
+    on_response:
+      status:
+        consequence:
+          - type: set_state
+            field: command_mode
+            value: "status"
+          - type: log_node
+            node: "prompt_command_mode"
+            outcome: "response:status"
+        next_node: route_status_by_source_count
+      update:
+        consequence:
+          - type: set_state
+            field: command_mode
+            value: "update"
+          - type: log_node
+            node: "prompt_command_mode"
+            outcome: "response:update"
+        next_node: initialize_status_check
+      other:
+        consequence:
+          - type: set_state
+            field: command_mode
+            value: "status"
+          - type: log_node
+            node: "prompt_command_mode"
+            outcome: "response:other"
+        next_node: route_status_by_source_count
+
+  # ===========================================================================
+  # PHASE 4: STATUS MODE
+  # ===========================================================================
+
+  route_status_by_source_count:
+    type: conditional
+    description: "Route status check based on source count"
+    condition:
+      type: flag_set
+      flag: is_multi_source
+    branches:
+      true: spawn_status_agents
+      false: check_single_source_status
+
+  # ---------------------------------------------------------------------------
+  # SINGLE SOURCE STATUS (DIRECT)
+  # ---------------------------------------------------------------------------
+
+  check_single_source_status:
+    type: action
+    description: "Initialize single source status check"
+    actions:
+      - type: compute
+        expression: "sources[0]"
+        store_as: current_source
+      - type: display_message
+        message: "Checking status for ${current_source.id} (${current_source.type})..."
+    on_success: route_status_by_type
+    on_failure: error_status_check_failed
+
+  route_status_by_type:
+    type: conditional
+    description: "Route status check by source type"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "git"
+    branches:
+      true: status_git_source
+      false: check_status_local
+
+  check_status_local:
+    type: conditional
+    description: "Check if local source"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "local"
+    branches:
+      true: status_local_source
+      false: check_status_web
+
+  check_status_web:
+    type: conditional
+    description: "Check if web source"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "web"
+    branches:
+      true: status_web_source
+      false: check_status_generated_docs
+
+  check_status_generated_docs:
+    type: conditional
+    description: "Check if generated-docs source"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "generated-docs"
+    branches:
+      true: status_generated_docs_source
+      false: status_llms_txt_source
+
+  # ---------------------------------------------------------------------------
+  # STATUS HANDLERS BY TYPE
+  # ---------------------------------------------------------------------------
+
+  status_git_source:
+    type: reference
+    doc: "lib/corpus/patterns/sources/git.md"
+    section: "Fetch Upstream SHA (Remote Check)"
+    context:
+      repo_url: "${current_source.repo_url}"
+      branch: "${current_source.branch || 'main'}"
+      indexed_sha: "${current_source.last_commit_sha}"
+    next_node: store_git_status
+
+  store_git_status:
+    type: action
+    description: "Store git source status result"
+    actions:
+      - type: set_state
+        field: computed.indexed_sha
+        value: "${current_source.last_commit_sha}"
+      - type: evaluate
+        expression: "computed.upstream_sha != computed.indexed_sha"
+        set_flag: has_stale_sources
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "git"
+          indexed_sha: "${current_source.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
+          indexed_at: "${current_source.last_indexed_at}"
+          status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "git"
+          status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
+          indexed_sha: "${current_source.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  status_local_source:
+    type: action
+    description: "Check local source for modified files"
+    actions:
+      - type: compute
+        expression: "'uploads/' + current_source.id"
+        store_as: computed.local_path
+      - type: glob_files
+        pattern: "${computed.local_path}/**/*.md"
+        store_as: computed.local_files
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "local"
+          file_count: "${len(computed.local_files)}"
+          last_indexed_at: "${current_source.last_indexed_at}"
+          status: "check_manually"
+          note: "Compare file modification times against last_indexed_at"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "local"
+          status: "check_manually"
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  status_web_source:
+    type: action
+    description: "Check web source cache age"
+    actions:
+      - type: compute
+        expression: "current_source.urls ? len(current_source.urls) : 0"
+        store_as: computed.url_count
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "web"
+          url_count: "${computed.url_count}"
+          last_indexed_at: "${current_source.last_indexed_at}"
+          status: "cache_check"
+          note: "Re-fetch requires user approval"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "web"
+          status: "cache_check"
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  status_generated_docs_source:
+    type: reference
+    doc: "lib/corpus/patterns/status.md"
+    section: "Check Generated-Docs Freshness"
+    context:
+      source: "${current_source}"
+    next_node: store_generated_docs_status
+
+  store_generated_docs_status:
+    type: action
+    description: "Store generated-docs status result"
+    actions:
+      - type: evaluate
+        expression: "computed.upstream_sha != current_source.source_repo.last_commit_sha"
+        set_flag: has_stale_sources
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "generated-docs"
+          source_repo: "${current_source.source_repo.url}"
+          indexed_sha: "${current_source.source_repo.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
+          status: "${computed.upstream_sha == current_source.source_repo.last_commit_sha ? 'current' : 'stale'}"
+          note: "Source changed - docs may have been regenerated"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "generated-docs"
+          status: "${computed.upstream_sha == current_source.source_repo.last_commit_sha ? 'current' : 'stale'}"
+          indexed_sha: "${current_source.source_repo.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  status_llms_txt_source:
+    type: reference
+    doc: "lib/corpus/patterns/sources/llms-txt.md"
+    section: "Check Freshness"
+    context:
+      base_url: "${current_source.manifest.url}"
+      stored_hash: "${current_source.manifest.last_hash}"
+    next_node: store_llms_txt_status
+
+  store_llms_txt_status:
+    type: action
+    description: "Store llms-txt status result"
+    actions:
+      - type: evaluate
+        expression: "computed.freshness_status == 'stale'"
+        set_flag: has_stale_sources
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "llms-txt"
+          manifest_url: "${current_source.manifest.url}"
+          indexed_hash: "${current_source.manifest.last_hash}"
+          current_hash: "${computed.current_hash}"
+          status: "${computed.freshness_status}"
+      - type: log_event
+        event_type: "source_status"
+        data:
+          source_id: "${current_source.id}"
+          source_type: "llms-txt"
+          status: "${computed.freshness_status}"
+          indexed_hash: "${current_source.manifest.last_hash}"
+          current_hash: "${computed.current_hash}"
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  # ---------------------------------------------------------------------------
+  # MULTI-SOURCE STATUS (PARALLEL AGENTS)
+  # ---------------------------------------------------------------------------
+
+  spawn_status_agents:
+    type: action
+    description: "Spawn parallel agents to check status of all sources"
+    actions:
+      - type: display_message
+        message: "Checking ${computed.source_count} sources in parallel..."
+      - type: compute
+        expression: |
+          # Spawn parallel source-scanner agents for status checking:
+          #
+          # Algorithm:
+          # 1. For each source in sources array:
+          #    - Create a Task tool call with subagent_type="source-scanner"
+          #    - Prompt: Check status of source '{source.id}' (type: {source.type})
+          #    - Include: source config (ID, type, repo_url, branch, last_commit_sha, last_indexed_at)
+          # 2. Include ALL Task calls in a SINGLE response message for parallel execution
+          # 3. Collect YAML results with: source_id, type, status, indexed_sha, upstream_sha, notes
+          #
+          # The caller should invoke Task tool multiple times in parallel
+        store_as: computed.spawn_instruction
+    on_success: aggregate_status_results
+    on_failure: error_status_check_failed
+
+  aggregate_status_results:
+    type: action
+    description: "Aggregate status results from parallel agents"
+    actions:
+      - type: set_state
+        field: status_report
+        value: "${computed.agent_results}"
+      - type: evaluate
+        expression: "computed.agent_results.some(r => r.status === 'stale')"
+        set_flag: has_stale_sources
+      - type: evaluate
+        expression: "computed.agent_results.every(r => r.status === 'current')"
+        set_flag: all_sources_current
+    on_success: present_status_report
+    on_failure: present_status_report
+
+  # ---------------------------------------------------------------------------
+  # STATUS PRESENTATION
+  # ---------------------------------------------------------------------------
+
+  present_status_report:
+    type: action
+    description: "Present status report to user"
+    actions:
+      - type: display_message
+        message: |
+          ## Corpus Status Report
+
+          Index Structure: ${index_structure.is_tiered ? 'Tiered (index.md + ' + len(index_structure.sub_indexes) + ' sub-indexes)' : 'Single'}
+
+          Source Status:
+
+          ${status_report.map((r, i) =>
+            (i+1) + '. **' + r.source_id + '** (' + r.type + ')\n' +
+            '   - Status: ' + (r.status === 'current' ? 'UP TO DATE' : 'UPDATES AVAILABLE') + '\n' +
+            (r.indexed_sha ? '   - Indexed SHA: ' + r.indexed_sha + '\n' : '') +
+            (r.upstream_sha ? '   - Upstream SHA: ' + r.upstream_sha + '\n' : '') +
+            (r.indexed_hash ? '   - Indexed hash: ' + r.indexed_hash + '\n' : '') +
+            (r.note ? '   - Note: ' + r.note : '')
+          ).join('\n\n')}
+    on_success: check_command_mode_after_status
+    on_failure: check_command_mode_after_status
+
+  check_command_mode_after_status:
+    type: conditional
+    description: "Check if we're in status-only mode"
+    condition:
+      type: state_equals
+      field: command_mode
+      value: "status"
+    branches:
+      true: status_complete
+      false: route_to_update_selection
+
+  status_complete:
+    type: conditional
+    description: "Check if any sources need updates"
+    condition:
+      type: flag_set
+      flag: has_stale_sources
+    branches:
+      true: suggest_update
+      false: finalize_log_all_current
+
+  suggest_update:
+    type: user_prompt
+    prompt:
+      question: "Some sources have updates available. Would you like to update them now?"
+      header: "Update"
+      options:
+        - id: yes
+          label: "Yes, update now"
+          description: "Proceed to update stale sources"
+        - id: no
+          label: "No, just checking"
+          description: "Exit without updating"
+    on_response:
+      yes:
+        consequence:
+          - type: set_state
+            field: command_mode
+            value: "update"
+          - type: log_node
+            node: "suggest_update"
+            outcome: "response:yes"
+        next_node: route_to_update_selection
+      no:
+        consequence:
+          - type: log_node
+            node: "suggest_update"
+            outcome: "response:no"
+        next_node: finalize_log_status_only
+      other:
+        consequence:
+          - type: log_node
+            node: "suggest_update"
+            outcome: "response:other"
+        next_node: finalize_log_status_only
+
+  # ===========================================================================
+  # PHASE 5: UPDATE MODE
+  # ===========================================================================
+
+  initialize_status_check:
+    type: action
+    description: "For update mode, first check status to identify stale sources"
+    actions:
+      - type: display_message
+        message: "Checking source status before update..."
+    on_success: route_status_by_source_count_for_update
+    on_failure: error_status_check_failed
+
+  route_status_by_source_count_for_update:
+    type: conditional
+    description: "Route status check for update mode"
+    condition:
+      type: flag_set
+      flag: is_multi_source
+    branches:
+      true: spawn_status_agents_for_update
+      false: check_single_source_for_update
+
+  check_single_source_for_update:
+    type: action
+    description: "Check single source status for update"
+    actions:
+      - type: compute
+        expression: "sources[0]"
+        store_as: current_source
+    on_success: route_status_by_type_for_update
+    on_failure: error_status_check_failed
+
+  route_status_by_type_for_update:
+    type: conditional
+    description: "Route by type for single source update check"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "git"
+    branches:
+      true: status_git_source_for_update
+      false: check_other_types_for_update
+
+  check_other_types_for_update:
+    type: action
+    description: "Handle non-git sources for update status"
+    actions:
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "${current_source.type}"
+          status: "check_manually"
+      - type: set_flag
+        flag: has_stale_sources
+        value: true
+    on_success: route_to_update_selection
+    on_failure: route_to_update_selection
+
+  status_git_source_for_update:
+    type: reference
+    doc: "lib/corpus/patterns/sources/git.md"
+    section: "Fetch Upstream SHA (Remote Check)"
+    context:
+      repo_url: "${current_source.repo_url}"
+      branch: "${current_source.branch || 'main'}"
+    next_node: store_git_status_for_update
+
+  store_git_status_for_update:
+    type: action
+    description: "Store git status for update mode"
+    actions:
+      - type: set_state
+        field: computed.indexed_sha
+        value: "${current_source.last_commit_sha}"
+      - type: evaluate
+        expression: "computed.upstream_sha != computed.indexed_sha"
+        set_flag: has_stale_sources
+      - type: append_state
+        field: status_report
+        value:
+          source_id: "${current_source.id}"
+          type: "git"
+          indexed_sha: "${current_source.last_commit_sha}"
+          upstream_sha: "${computed.upstream_sha}"
+          status: "${computed.upstream_sha == computed.indexed_sha ? 'current' : 'stale'}"
+    on_success: route_to_update_selection
+    on_failure: route_to_update_selection
+
+  spawn_status_agents_for_update:
+    type: action
+    description: "Spawn agents to check status before update"
+    actions:
+      - type: compute
+        expression: |
+          # Spawn parallel source-scanner agents for update status:
+          #
+          # For each source, create Task call with subagent_type="source-scanner"
+          # Prompt: Check status of '{source.id}' ({source.type}) for update.
+          # Compare indexed SHA/hash against upstream.
+          # Return YAML: source_id, type, status (current|stale), indexed_sha, upstream_sha
+          #
+          # Include ALL Task calls in a SINGLE response for parallel execution
+        store_as: computed.spawn_instruction
+    on_success: aggregate_for_update
+    on_failure: error_status_check_failed
+
+  aggregate_for_update:
+    type: action
+    description: "Aggregate status for update selection"
+    actions:
+      - type: set_state
+        field: status_report
+        value: "${computed.agent_results}"
+      - type: evaluate
+        expression: "computed.agent_results.some(r => r.status === 'stale')"
+        set_flag: has_stale_sources
+    on_success: route_to_update_selection
+    on_failure: route_to_update_selection
+
+  route_to_update_selection:
+    type: conditional
+    description: "Check if any sources need updates"
+    condition:
+      type: flag_set
+      flag: has_stale_sources
+    branches:
+      true: check_auto_approve_for_selection
+      false: finalize_log_all_current
+
+  check_auto_approve_for_selection:
+    type: conditional
+    description: "Check auto-approve for source selection"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_select_stale_sources
+      false: prompt_select_sources
+
+  auto_select_stale_sources:
+    type: action
+    description: "Auto-approve: select all stale sources"
+    actions:
+      - type: compute
+        expression: "status_report.filter(r => r.status === 'stale').map(r => r.source_id)"
+        store_as: computed.stale_source_ids
+      - type: compute
+        expression: "sources.filter(s => computed.stale_source_ids.includes(s.id))"
+        store_as: sources_to_update
+      - type: display_message
+        message: "Auto-selecting ${len(sources_to_update)} stale source(s) for update"
+    on_success: start_update_loop
+    on_failure: start_update_loop
+
+  prompt_select_sources:
+    type: user_prompt
+    prompt:
+      question: |
+        Which sources would you like to update?
+
+        Stale sources: ${status_report.filter(r => r.status === 'stale').map(r => r.source_id).join(', ')}
+      header: "Sources"
+      options:
+        - id: all_stale
+          label: "All stale sources (Recommended)"
+          description: "Update all sources with changes"
+        - id: all
+          label: "All sources"
+          description: "Re-check and update everything"
+        - id: specific
+          label: "Specific sources"
+          description: "I'll specify which ones"
+    on_response:
+      all_stale:
+        consequence:
+          - type: compute
+            expression: "sources.filter(s => status_report.find(r => r.source_id === s.id && r.status === 'stale'))"
+            store_as: sources_to_update
+        next_node: start_update_loop
+      all:
+        consequence:
+          - type: set_state
+            field: sources_to_update
+            value: "${sources}"
+        next_node: start_update_loop
+      specific:
+        next_node: collect_specific_sources
+      other:
+        consequence:
+          - type: compute
+            expression: "sources.filter(s => status_report.find(r => r.source_id === s.id && r.status === 'stale'))"
+            store_as: sources_to_update
+        next_node: start_update_loop
+
+  collect_specific_sources:
+    type: user_prompt
+    prompt:
+      question: |
+        Enter source IDs to update (comma-separated):
+
+        Available: ${sources.map(s => s.id).join(', ')}
+      header: "Sources"
+      options:
+        - id: list
+          label: "I'll type the source IDs"
+          description: "Enter comma-separated source names"
+    on_response:
+      list:
+        next_node: collect_specific_sources
+      other:
+        consequence:
+          - type: compute
+            expression: |
+              user_responses.collect_specific_sources.raw.text
+                .split(',')
+                .map(s => s.trim())
+                .filter(id => sources.find(src => src.id === id))
+                .map(id => sources.find(src => src.id === id))
+            store_as: sources_to_update
+        next_node: start_update_loop
+
+  # ---------------------------------------------------------------------------
+  # UPDATE LOOP
+  # ---------------------------------------------------------------------------
+
+  start_update_loop:
+    type: action
+    description: "Initialize update loop"
+    actions:
+      - type: set_state
+        field: computed.current_source_index
+        value: 0
+      - type: set_state
+        field: computed.updated_sources
+        value: []
+      - type: set_state
+        field: computed.all_changes
+        value: []
+      - type: display_message
+        message: "Updating ${len(sources_to_update)} source(s)..."
+    on_success: process_next_update
+    on_failure: error_update_failed
+
+  process_next_update:
+    type: conditional
+    description: "Check if more sources to update"
+    condition:
+      type: evaluate_expression
+      expression: "computed.current_source_index < len(sources_to_update)"
+    branches:
+      true: get_current_update_source
+      false: check_has_changes
+
+  get_current_update_source:
+    type: action
+    description: "Get current source to update"
+    actions:
+      - type: compute
+        expression: "sources_to_update[computed.current_source_index]"
+        store_as: current_source
+      - type: display_message
+        message: |
+          ---
+          Updating: ${current_source.id} (${current_source.type})
+    on_success: route_update_by_type
+    on_failure: error_update_failed
+
+  route_update_by_type:
+    type: conditional
+    description: "Route update handler by source type"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "git"
+    branches:
+      true: update_git_source
+      false: check_update_local
+
+  check_update_local:
+    type: conditional
+    description: "Check if local source for update"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "local"
+    branches:
+      true: update_local_source
+      false: check_update_web
+
+  check_update_web:
+    type: conditional
+    description: "Check if web source for update"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "web"
+    branches:
+      true: update_web_source
+      false: check_update_generated_docs
+
+  check_update_generated_docs:
+    type: conditional
+    description: "Check if generated-docs source for update"
+    condition:
+      type: state_equals
+      field: current_source.type
+      value: "generated-docs"
+    branches:
+      true: update_generated_docs_source
+      false: update_llms_txt_source
+
+  # ---------------------------------------------------------------------------
+  # UPDATE HANDLERS BY TYPE
+  # ---------------------------------------------------------------------------
+
+  # GIT SOURCE UPDATE
+  update_git_source:
+    type: action
+    description: "Check for git clone and prepare update"
+    actions:
+      - type: compute
+        expression: "'.source/' + current_source.id"
+        store_as: computed.clone_path
+      - type: directory_exists_check
+        path: "${computed.clone_path}"
+        store_as: computed.clone_exists
+    on_success: check_git_clone_for_update
+    on_failure: clone_for_update
+
+  check_git_clone_for_update:
+    type: conditional
+    description: "Check if clone exists"
+    condition:
+      type: evaluate_expression
+      expression: "computed.clone_exists == true"
+    branches:
+      true: fetch_git_changes
+      false: clone_for_update
+
+  clone_for_update:
+    type: action
+    description: "Clone repository for update"
+    actions:
+      - type: display_message
+        message: "  Cloning ${current_source.repo_url}..."
+      - type: clone_repo
+        url: "${current_source.repo_url}"
+        dest: "${computed.clone_path}"
+        branch: "${current_source.branch || 'main'}"
+        depth: 1
+    on_success: get_new_sha
+    on_failure: error_clone_failed
+
+  fetch_git_changes:
+    type: action
+    description: "Fetch and pull git changes"
+    actions:
+      - type: display_message
+        message: "  Fetching changes..."
+      - type: git_fetch
+        repo_path: "${computed.clone_path}"
+      - type: git_pull
+        repo_path: "${computed.clone_path}"
+        store_as: computed.pull_result
+    on_success: get_git_diff
+    on_failure: error_fetch_failed
+
+  get_git_diff:
+    type: reference
+    doc: "lib/corpus/patterns/sources/git.md"
+    section: "Get File Changes Between SHAs"
+    context:
+      corpus_path: "${PWD}"
+      source_id: "${current_source.id}"
+      from_sha: "${current_source.last_commit_sha}"
+      to_sha: "HEAD"
+      docs_path: "${current_source.docs_root}"
+    next_node: store_git_changes
+
+  store_git_changes:
+    type: action
+    description: "Store git changes for index update"
+    actions:
+      - type: set_state
+        field: computed.file_changes
+        value: "${computed.diff_result || []}"
+      - type: append_state
+        field: computed.all_changes
+        value:
+          source_id: "${current_source.id}"
+          type: "git"
+          changes: "${computed.file_changes}"
+    on_success: get_new_sha
+    on_failure: get_new_sha
+
+  get_new_sha:
+    type: action
+    description: "Get new HEAD SHA after update"
+    actions:
+      - type: get_sha
+        repo_path: "${computed.clone_path}"
+        store_as: computed.new_sha
+      - type: display_message
+        message: "  Updated to SHA: ${computed.new_sha}"
+      - type: append_state
+        field: computed.updated_sources
+        value:
+          source_id: "${current_source.id}"
+          type: "git"
+          old_sha: "${current_source.last_commit_sha}"
+          new_sha: "${computed.new_sha}"
+      - type: log_event
+        event_type: "source_changes"
+        data:
+          source_id: "${current_source.id}"
+          added_files: "${computed.file_changes.added}"
+          modified_files: "${computed.file_changes.modified}"
+          deleted_files: "${computed.file_changes.deleted}"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  # LOCAL SOURCE UPDATE
+  update_local_source:
+    type: action
+    description: "Check local source for changes"
+    actions:
+      - type: compute
+        expression: "'uploads/' + current_source.id"
+        store_as: computed.local_path
+      - type: glob_files
+        pattern: "${computed.local_path}/**/*.md"
+        store_as: computed.local_files
+      - type: display_message
+        message: "  Found ${len(computed.local_files)} files in local source"
+      - type: append_state
+        field: computed.all_changes
+        value:
+          source_id: "${current_source.id}"
+          type: "local"
+          file_count: "${len(computed.local_files)}"
+      - type: append_state
+        field: computed.updated_sources
+        value:
+          source_id: "${current_source.id}"
+          type: "local"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  # WEB SOURCE UPDATE
+  update_web_source:
+    type: conditional
+    description: "Check auto-approve for web source"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_approve_web_refetch
+      false: prompt_web_refetch
+
+  auto_approve_web_refetch:
+    type: action
+    description: "Auto-approve: refetch web content"
+    actions:
+      - type: display_message
+        message: "  Auto-approving web cache refresh..."
+    on_success: execute_web_refetch
+    on_failure: advance_update_loop
+
+  prompt_web_refetch:
+    type: user_prompt
+    prompt:
+      question: |
+        Web source '${current_source.id}' has ${len(current_source.urls || [])} cached URLs.
+
+        Re-fetch cached content? (This will update the cache)
+      header: "Web"
+      options:
+        - id: yes
+          label: "Yes, refetch"
+          description: "Fetch fresh content for all URLs"
+        - id: no
+          label: "Skip"
+          description: "Keep existing cache"
+    on_response:
+      yes:
+        next_node: execute_web_refetch
+      no:
+        next_node: advance_update_loop
+      other:
+        next_node: advance_update_loop
+
+  execute_web_refetch:
+    type: reference
+    doc: "lib/corpus/patterns/sources/web.md"
+    section: "Refetch Cached URLs"
+    context:
+      source: "${current_source}"
+    next_node: store_web_update
+
+  store_web_update:
+    type: action
+    description: "Store web update result"
+    actions:
+      - type: append_state
+        field: computed.updated_sources
+        value:
+          source_id: "${current_source.id}"
+          type: "web"
+      - type: append_state
+        field: computed.all_changes
+        value:
+          source_id: "${current_source.id}"
+          type: "web"
+          urls_refreshed: "${len(current_source.urls || [])}"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  # GENERATED-DOCS SOURCE UPDATE
+  update_generated_docs_source:
+    type: conditional
+    description: "Check auto-approve for URL re-discovery"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_rediscover_urls
+      false: prompt_rediscover_urls
+
+  auto_rediscover_urls:
+    type: action
+    description: "Auto-approve: re-discover URLs"
+    actions:
+      - type: display_message
+        message: "  Auto-approving URL re-discovery..."
+    on_success: execute_url_rediscovery
+    on_failure: update_generated_docs_sha_only
+
+  prompt_rediscover_urls:
+    type: user_prompt
+    prompt:
+      question: |
+        Source repo has changed for '${current_source.id}'.
+
+        Re-discover URLs from sitemap?
+      header: "Discover"
+      options:
+        - id: yes
+          label: "Yes, re-discover"
+          description: "Fetch sitemap and update URL list"
+        - id: no
+          label: "No, just update SHA"
+          description: "Update tracking only"
+    on_response:
+      yes:
+        next_node: execute_url_rediscovery
+      no:
+        next_node: update_generated_docs_sha_only
+      other:
+        next_node: update_generated_docs_sha_only
+
+  execute_url_rediscovery:
+    type: reference
+    doc: "lib/corpus/patterns/sources/generated-docs.md"
+    section: "Discover URLs from Sitemap"
+    context:
+      source: "${current_source}"
+    next_node: store_generated_docs_update
+
+  update_generated_docs_sha_only:
+    type: action
+    description: "Update generated-docs SHA without URL rediscovery"
+    actions:
+      - type: display_message
+        message: "  Updating source repo tracking SHA only"
+    on_success: store_generated_docs_update
+    on_failure: store_generated_docs_update
+
+  store_generated_docs_update:
+    type: action
+    description: "Store generated-docs update result"
+    actions:
+      - type: append_state
+        field: computed.updated_sources
+        value:
+          source_id: "${current_source.id}"
+          type: "generated-docs"
+          new_sha: "${computed.upstream_sha}"
+      - type: append_state
+        field: computed.all_changes
+        value:
+          source_id: "${current_source.id}"
+          type: "generated-docs"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  # LLMS-TXT SOURCE UPDATE
+  update_llms_txt_source:
+    type: reference
+    doc: "lib/corpus/patterns/sources/llms-txt.md"
+    section: "Fetch Manifest"
+    context:
+      base_url: "${current_source.manifest.url}"
+    next_node: parse_new_manifest
+
+  parse_new_manifest:
+    type: reference
+    doc: "lib/corpus/patterns/sources/llms-txt.md"
+    section: "Parse Manifest"
+    context:
+      content: "${computed.manifest_content}"
+    next_node: diff_manifests
+
+  diff_manifests:
+    type: reference
+    doc: "lib/corpus/patterns/sources/llms-txt.md"
+    section: "Diff Manifests"
+    context:
+      old_content: "${current_source.structure}"
+      new_content: "${computed.new_structure}"
+    next_node: store_llms_txt_update
+
+  store_llms_txt_update:
+    type: action
+    description: "Store llms-txt update result"
+    actions:
+      - type: compute
+        expression: |
+          # Compute SHA-256 hash of manifest content for change detection
+          # crypto.createHash('sha256').update(computed.manifest_content).digest('hex')
+        store_as: computed.new_hash
+      - type: append_state
+        field: computed.updated_sources
+        value:
+          source_id: "${current_source.id}"
+          type: "llms-txt"
+          old_hash: "${current_source.manifest.last_hash}"
+          new_hash: "${computed.new_hash}"
+      - type: append_state
+        field: computed.all_changes
+        value:
+          source_id: "${current_source.id}"
+          type: "llms-txt"
+          manifest_changed: true
+          added_pages: "${computed.added_urls || []}"
+          removed_pages: "${computed.removed_urls || []}"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  # ---------------------------------------------------------------------------
+  # UPDATE LOOP CONTROL
+  # ---------------------------------------------------------------------------
+
+  advance_update_loop:
+    type: action
+    description: "Advance to next source"
+    actions:
+      - type: compute
+        expression: "computed.current_source_index + 1"
+        store_as: computed.current_source_index
+    on_success: process_next_update
+    on_failure: process_next_update
+
+  # ===========================================================================
+  # PHASE 6: INDEX UPDATE
+  # ===========================================================================
+
+  check_has_changes:
+    type: conditional
+    description: "Check if any changes were detected"
+    condition:
+      type: evaluate_expression
+      expression: "len(computed.all_changes) > 0"
+    branches:
+      true: route_index_update_by_structure
+      false: skip_index_update
+
+  skip_index_update:
+    type: action
+    description: "No changes detected, skip index update"
+    actions:
+      - type: display_message
+        message: "No documentation changes detected. Updating tracking metadata only."
+    on_success: update_config_metadata
+    on_failure: update_config_metadata
+
+  route_index_update_by_structure:
+    type: conditional
+    description: "Route index update based on structure"
+    condition:
+      type: flag_set
+      flag: is_tiered_index
+    branches:
+      true: map_changes_to_sub_indexes
+      false: update_single_index
+
+  # ---------------------------------------------------------------------------
+  # SINGLE INDEX UPDATE
+  # ---------------------------------------------------------------------------
+
+  update_single_index:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Refresh Single Index"
+    context:
+      index_path: "index.md"
+      changes: "${computed.all_changes}"
+      preserve_keywords: true
+    next_node: confirm_index_changes
+
+  # ---------------------------------------------------------------------------
+  # TIERED INDEX UPDATE
+  # ---------------------------------------------------------------------------
+
+  map_changes_to_sub_indexes:
+    type: action
+    description: "Map changes to affected sub-indexes"
+    actions:
+      - type: display_message
+        message: "Mapping changes to tiered index structure..."
+      - type: compute
+        expression: |
+          computed.all_changes.flatMap(change =>
+            (change.changes || []).map(file => ({
+              file: file,
+              section: file.path.split('/')[1] || 'main'
+            }))
+          ).reduce((acc, item) => {
+            const section = item.section;
+            if (!acc[section]) acc[section] = [];
+            acc[section].push(item.file);
+            return acc;
+          }, {})
+        store_as: computed.affected_sections
+    on_success: present_affected_sections
+    on_failure: update_single_index
+
+  present_affected_sections:
+    type: conditional
+    description: "Check auto-approve for section selection"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_update_all_sections
+      false: prompt_affected_sections
+
+  auto_update_all_sections:
+    type: action
+    description: "Auto-approve: update all affected sections"
+    actions:
+      - type: compute
+        expression: "Object.keys(computed.affected_sections)"
+        store_as: computed.sections_to_update
+    on_success: start_sub_index_loop
+    on_failure: start_sub_index_loop
+
+  prompt_affected_sections:
+    type: user_prompt
+    prompt:
+      question: |
+        Changes affect these sections:
+        ${Object.entries(computed.affected_sections).map(([section, files]) =>
+          '- ' + section + ': ' + files.length + ' file(s)'
+        ).join('\n')}
+
+        Which sections should I update?
+      header: "Sections"
+      options:
+        - id: all
+          label: "All affected sections"
+          description: "Update all sub-indexes with changes"
+        - id: specific
+          label: "Specific sections"
+          description: "I'll choose which to update"
+    on_response:
+      all:
+        consequence:
+          - type: compute
+            expression: "Object.keys(computed.affected_sections)"
+            store_as: computed.sections_to_update
+        next_node: start_sub_index_loop
+      specific:
+        next_node: collect_sections_to_update
+      other:
+        consequence:
+          - type: compute
+            expression: "Object.keys(computed.affected_sections)"
+            store_as: computed.sections_to_update
+        next_node: start_sub_index_loop
+
+  collect_sections_to_update:
+    type: user_prompt
+    prompt:
+      question: "Enter section names to update (comma-separated):"
+      header: "Sections"
+      options:
+        - id: list
+          label: "I'll type section names"
+          description: "Enter comma-separated names"
+    on_response:
+      list:
+        next_node: collect_sections_to_update
+      other:
+        consequence:
+          - type: compute
+            expression: "user_responses.collect_sections_to_update.raw.text.split(',').map(s => s.trim())"
+            store_as: computed.sections_to_update
+        next_node: start_sub_index_loop
+
+  start_sub_index_loop:
+    type: action
+    description: "Initialize sub-index update loop"
+    actions:
+      - type: set_state
+        field: computed.current_section_index
+        value: 0
+    on_success: process_next_sub_index
+    on_failure: error_index_update_failed
+
+  process_next_sub_index:
+    type: conditional
+    description: "Check if more sub-indexes to update"
+    condition:
+      type: evaluate_expression
+      expression: "computed.current_section_index < len(computed.sections_to_update)"
+    branches:
+      true: update_current_sub_index
+      false: check_main_index_update
+
+  update_current_sub_index:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Refresh Sub-Index"
+    context:
+      section: "${computed.sections_to_update[computed.current_section_index]}"
+      changes: "${computed.affected_sections[computed.sections_to_update[computed.current_section_index]]}"
+      preserve_keywords: true
+    next_node: advance_sub_index_loop
+
+  advance_sub_index_loop:
+    type: action
+    description: "Advance to next sub-index"
+    actions:
+      - type: compute
+        expression: "computed.current_section_index + 1"
+        store_as: computed.current_section_index
+    on_success: process_next_sub_index
+    on_failure: process_next_sub_index
+
+  check_main_index_update:
+    type: conditional
+    description: "Check auto-approve for main index update"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_update_main_index
+      false: prompt_main_index_update
+
+  auto_update_main_index:
+    type: action
+    description: "Auto-approve: update main index"
+    actions:
+      - type: display_message
+        message: "  Updating main index summary..."
+    on_success: update_main_index_summary
+    on_failure: confirm_index_changes
+
+  prompt_main_index_update:
+    type: user_prompt
+    prompt:
+      question: "Sub-indexes updated. Also update the main index.md summary?"
+      header: "Main"
+      options:
+        - id: yes
+          label: "Yes, update main index"
+          description: "Refresh section counts and links"
+        - id: no
+          label: "No, skip"
+          description: "Leave main index as-is"
+    on_response:
+      yes:
+        next_node: update_main_index_summary
+      no:
+        next_node: confirm_index_changes
+      other:
+        next_node: confirm_index_changes
+
+  update_main_index_summary:
+    type: reference
+    doc: "lib/corpus/patterns/index-generation.md"
+    section: "Update Main Index Summary"
+    context:
+      sub_indexes: "${index_structure.sub_indexes}"
+    next_node: confirm_index_changes
+
+  # ---------------------------------------------------------------------------
+  # INDEX CONFIRMATION
+  # ---------------------------------------------------------------------------
+
+  confirm_index_changes:
+    type: conditional
+    description: "Check auto-approve for final confirmation"
+    condition:
+      type: flag_set
+      flag: auto_approve
+    branches:
+      true: auto_save_index
+      false: prompt_confirm_changes
+
+  auto_save_index:
+    type: action
+    description: "Auto-approve: save index changes"
+    actions:
+      - type: display_message
+        message: "Auto-saving index changes..."
+    on_success: save_index_files
+    on_failure: save_index_files
+
+  prompt_confirm_changes:
+    type: user_prompt
+    prompt:
+      question: |
+        Index changes ready. How would you like to proceed?
+
+        ${index_structure.is_tiered ?
+          'Files to update: index.md + ' + len(computed.sections_to_update || []) + ' sub-index(es)' :
+          'File to update: index.md'}
+      header: "Confirm"
+      options:
+        - id: save
+          label: "Save changes"
+          description: "Write updated index file(s)"
+        - id: review
+          label: "Review first"
+          description: "Show me the changes before saving"
+        - id: cancel
+          label: "Cancel"
+          description: "Don't save any changes"
+    on_response:
+      save:
+        next_node: save_index_files
+      review:
+        next_node: show_index_preview
+      cancel:
+        next_node: cancelled
+      other:
+        next_node: save_index_files
+
+  show_index_preview:
+    type: action
+    description: "Show index changes for review"
+    actions:
+      - type: display_message
+        message: |
+          ## Index Preview
+
+          ${computed.index_preview || 'Changes will be applied to index files.'}
+
+          Continue with save?
+    on_success: prompt_after_preview
+    on_failure: prompt_after_preview
+
+  prompt_after_preview:
+    type: user_prompt
+    prompt:
+      question: "Save these changes?"
+      header: "Save"
+      options:
+        - id: yes
+          label: "Yes, save"
+          description: "Write changes to disk"
+        - id: no
+          label: "No, cancel"
+          description: "Discard changes"
+    on_response:
+      yes:
+        next_node: save_index_files
+      no:
+        next_node: cancelled
+      other:
+        next_node: cancelled
+
+  save_index_files:
+    type: action
+    description: "Write index file(s) to disk"
+    actions:
+      - type: write_file
+        path: "index.md"
+        content: "${computed.updated_index_content || computed.index_content}"
+      - type: display_message
+        message: "  Saved index.md"
+      - type: log_event
+        event_type: "index_update"
+        data:
+          files:
+            - "index.md"
+          entries_added: "${computed.entries_added || 0}"
+          entries_removed: "${computed.entries_removed || 0}"
+          keywords_preserved: true
+    on_success: check_sub_indexes_to_save
+    on_failure: error_save_failed
+
+  check_sub_indexes_to_save:
+    type: conditional
+    description: "Check if sub-indexes need saving"
+    condition:
+      type: flag_set
+      flag: is_tiered_index
+    branches:
+      true: save_sub_indexes
+      false: update_config_metadata
+
+  save_sub_indexes:
+    type: action
+    description: "Save updated sub-index files"
+    actions:
+      - type: compute
+        expression: |
+          # Save each sub-index file:
+          # For each section in computed.sections_to_update:
+          #   - Write file at index-{section}.md with computed.sub_index_content[section]
+          #   - Display confirmation message
+          #
+          # Implementation note: The executor should iterate over
+          # computed.sections_to_update and call write_file for each
+        store_as: computed.sub_index_save_instruction
+      - type: display_message
+        message: "Saving ${len(computed.sections_to_update || [])} sub-index files..."
+    on_success: update_config_metadata
+    on_failure: warn_sub_index_save
+
+  warn_sub_index_save:
+    type: action
+    description: "Warn about sub-index save issues"
+    actions:
+      - type: display_message
+        message: "Warning: Some sub-indexes may not have saved correctly."
+    on_success: update_config_metadata
+    on_failure: update_config_metadata
+
+  # ===========================================================================
+  # PHASE 7: CONFIG UPDATE
+  # ===========================================================================
+
+  update_config_metadata:
+    type: action
+    description: "Update config.yaml with new tracking metadata"
+    actions:
+      - type: compute
+        expression: "new Date().toISOString()"
+        store_as: computed.indexed_at
+      - type: display_message
+        message: "Updating config.yaml metadata..."
+    on_success: update_per_source_metadata
+    on_failure: warn_config_update
+
+  update_per_source_metadata:
+    type: action
+    description: "Update per-source tracking fields"
+    actions:
+      - type: compute
+        expression: |
+          # Update per-source tracking for each updated source:
+          # For each item in computed.updated_sources:
+          #   - Find source by item.source_id in config.sources
+          #   - Set source.last_indexed_at = computed.indexed_at
+          #   - Set source.last_commit_sha = item.new_sha || item.old_sha
+          computed.updated_sources.forEach(item => {
+            const source = config.sources.find(s => s.id === item.source_id);
+            if (source) {
+              source.last_indexed_at = computed.indexed_at;
+              if (item.new_sha || item.old_sha) {
+                source.last_commit_sha = item.new_sha || item.old_sha;
+              }
+            }
+          });
+          config
+        store_as: config
+    on_success: save_config
+    on_failure: warn_config_update
+
+  save_config:
+    type: action
+    description: "Write updated config.yaml"
+    actions:
+      - type: compute
+        expression: "serializeYaml(config)"
+        store_as: computed.config_yaml
+      - type: write_file
+        path: "config.yaml"
+        content: "${computed.config_yaml}"
+      - type: display_message
+        message: "  Updated config.yaml"
+    on_success: finalize_log
+    on_failure: warn_config_update
+
+  warn_config_update:
+    type: action
+    description: "Warn about config update failure"
+    actions:
+      - type: display_message
+        message: |
+          Warning: Could not fully update config.yaml.
+          Index was saved. You may need to manually update source tracking.
+      - type: log_warning
+        message: "Could not fully update config.yaml"
+    on_success: finalize_log
+    on_failure: finalize_log
+
+  # ---------------------------------------------------------------------------
+  # STATUS/ALL-CURRENT FINALIZATION (before logging)
+  # ---------------------------------------------------------------------------
+
+  finalize_log_status_only:
+    type: action
+    description: "Finalize log for status-only run"
+    actions:
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success_status_only"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = "Status check only. " + (flags.has_stale_sources ? 'Some sources have updates.' : 'All current.')
+        store_as: computed.log
+    on_success: check_should_log_status
+    on_failure: success_status_only
+
+  finalize_log_all_current:
+    type: action
+    description: "Finalize log for all-current run"
+    actions:
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success_all_current"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = "All sources are up to date. No refresh needed."
+        store_as: computed.log
+    on_success: check_should_log_status
+    on_failure: success_all_current
+
+  check_should_log_status:
+    type: conditional
+    description: "Check if logging is enabled for status runs"
+    condition:
+      type: flag_not_set
+      flag: no_log
+    branches:
+      true: write_log_file_status
+      false: check_ci_output_status
+
+  write_log_file_status:
+    type: action
+    description: "Write log file for status run"
+    actions:
+      - type: compute
+        expression: |
+          const now = new Date();
+          now.toISOString().replace(/[T:]/g, '-').replace(/\..+/, '').slice(0, 17)
+        store_as: computed.timestamp_slug
+      - type: compute
+        expression: |
+          # Determine log filename and path:
+          const format = flags.log_format || 'yaml';
+          const ext = format === 'markdown' ? 'md' : format;
+          const location = flags.log_location || 'logs/';
+          location + 'refresh-' + computed.timestamp_slug + '.' + ext
+        store_as: computed.log_file_path
+      - type: compute
+        expression: |
+          # Serialize log to specified format (yaml/json/markdown):
+          # if format == 'yaml': serializeYaml(computed.log)
+          # if format == 'json': JSON.stringify(computed.log, null, 2)
+          # if format == 'markdown': formatLogAsMarkdown(computed.log)
+        store_as: computed.log_content
+      - type: write_file
+        path: "${computed.log_file_path}"
+        content: "${computed.log_content}"
+      - type: display_message
+        message: "  Log written: ${computed.log_file_path}"
+    on_success: check_ci_output_status
+    on_failure: check_ci_output_status
+
+  check_ci_output_status:
+    type: conditional
+    description: "Check if CI output is requested for status run"
+    condition:
+      type: evaluate_expression
+      expression: "flags.ci_output && flags.ci_output != 'none'"
+    branches:
+      true: output_ci_summary_status
+      false: route_status_ending
+
+  output_ci_summary_status:
+    type: action
+    description: "Output CI summary for status run"
+    actions:
+      - type: compute
+        expression: |
+          # Output CI-formatted summary based on flags.ci_output:
+          # - 'github': Use GitHub Actions annotations (::group::, ::notice::, ::error::)
+          # - 'plain': KEY=VALUE format for shell scripts
+          # - 'json': JSON object for programmatic parsing
+          #
+          # For GitHub Actions, print to stdout with appropriate annotations
+        store_as: computed.ci_output_generated
+    on_success: route_status_ending
+    on_failure: route_status_ending
+
+  route_status_ending:
+    type: conditional
+    description: "Route to appropriate status ending"
+    condition:
+      type: flag_set
+      flag: all_sources_current
+    branches:
+      true: success_all_current
+      false: success_status_only
+
+  # ===========================================================================
+  # PHASE 8: LOGGING (UPDATE PATH)
+  # ===========================================================================
+
+  finalize_log:
+    type: action
+    description: "Finalize log with timing and outcome"
+    actions:
+      - type: compute
+        expression: |
+          index_structure.is_tiered
+            ? 'index.md + ' + (computed.sections_to_update || []).length + ' sub-index(es)'
+            : 'index.md'
+        store_as: computed.files_updated
+      - type: compute
+        expression: |
+          'Updated ' + len(computed.updated_sources) + ' source(s). ' +
+          (len(computed.all_changes) > 0 ? 'Index: ' + (computed.entries_added || 0) + ' added.' : 'Metadata only.')
+        store_as: computed.log_summary
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = computed.log_summary
+        store_as: computed.log
+    on_success: check_should_log
+    on_failure: check_should_log
+
+  check_should_log:
+    type: conditional
+    description: "Check if logging is enabled"
+    condition:
+      type: flag_not_set
+      flag: no_log
+    branches:
+      true: write_log_file
+      false: check_ci_output
+
+  write_log_file:
+    type: action
+    description: "Write log file to disk"
+    actions:
+      - type: compute
+        expression: |
+          # Determine log filename and path:
+          const format = flags.log_format || 'yaml';
+          const ext = format === 'markdown' ? 'md' : format;
+          const location = flags.log_location || 'logs/';
+          location + 'refresh-' + computed.timestamp_slug + '.' + ext
+        store_as: computed.log_file_path
+      - type: compute
+        expression: |
+          # Serialize log to specified format (yaml/json/markdown):
+          # if format == 'yaml': serializeYaml(computed.log)
+          # if format == 'json': JSON.stringify(computed.log, null, 2)
+          # if format == 'markdown': formatLogAsMarkdown(computed.log)
+        store_as: computed.log_content
+      - type: write_file
+        path: "${computed.log_file_path}"
+        content: "${computed.log_content}"
+      - type: display_message
+        message: "  Log written: ${computed.log_file_path}"
+    on_success: check_log_gitignore
+    on_failure: check_ci_output
+
+  check_log_gitignore:
+    type: conditional
+    description: "Check if log should be gitignored"
+    condition:
+      type: flag_set
+      flag: log_gitignore
+    branches:
+      true: add_log_to_gitignore
+      false: apply_retention
+
+  add_log_to_gitignore:
+    type: action
+    description: "Add log file to .gitignore"
+    actions:
+      - type: read_file
+        path: ".gitignore"
+        store_as: computed.gitignore_content
+        on_failure: "create_empty"
+      - type: compute
+        expression: |
+          # Append log file to .gitignore if not already present
+          const content = computed.gitignore_content || '';
+          content + '\n# Refresh log (auto-added)\n' + computed.log_file_path
+        store_as: computed.gitignore_updated
+      - type: write_file
+        path: ".gitignore"
+        content: "${computed.gitignore_updated}"
+      - type: display_message
+        message: "  Added log to .gitignore"
+    on_success: apply_retention
+    on_failure: apply_retention
+
+  apply_retention:
+    type: action
+    description: "Apply log retention policy if configured"
+    actions:
+      - type: compute
+        expression: |
+          # Apply log retention policy if configured:
+          # Strategy options: 'none' (keep all), 'days' (delete older than N days), 'count' (keep last N)
+          #
+          # Algorithm:
+          # 1. Glob: {location}refresh-*.{format} to find all log files
+          # 2. Sort by timestamp (from filename)
+          # 3. If strategy == 'count': delete all but last {count} files
+          # 4. If strategy == 'days': delete files older than {days}
+          # 5. Log deleted files for audit
+          const strategy = config?.logging?.retention?.strategy || 'none';
+          const location = flags.log_location || 'logs/';
+          { strategy, location, applied: strategy !== 'none' }
+        store_as: computed.retention_result
+    on_success: check_ci_output
+    on_failure: check_ci_output
+
+  check_ci_output:
+    type: conditional
+    description: "Check if CI output is requested"
+    condition:
+      type: evaluate_expression
+      expression: "flags.ci_output && flags.ci_output != 'none'"
+    branches:
+      true: output_ci_summary
+      false: present_completion
+
+  output_ci_summary:
+    type: action
+    description: "Output CI-formatted summary"
+    actions:
+      - type: compute
+        expression: |
+          # Output CI-formatted summary based on flags.ci_output:
+          # - 'github': Use GitHub Actions annotations (::group::, ::notice::, ::error::)
+          # - 'plain': KEY=VALUE format for shell scripts
+          # - 'json': JSON object for programmatic parsing
+          #
+          # For GitHub Actions, print to stdout with appropriate annotations
+        store_as: computed.ci_output_generated
+    on_success: present_completion
+    on_failure: present_completion
+
+  # ===========================================================================
+  # PHASE 9: COMPLETION
+  # ===========================================================================
+
+  present_completion:
+    type: action
+    description: "Present completion summary"
+    actions:
+      - type: display_message
+        message: |
+          ## Refresh Complete
+
+          **Corpus:** ${config.corpus.name}
+          **Sources updated:** ${len(computed.updated_sources)}
+          **Index structure:** ${index_structure.is_tiered ? 'Tiered' : 'Single'}
+          **Files updated:** ${computed.files_updated}
+
+          ${len(computed.all_changes) > 0 ? 'Changes applied from ' + computed.all_changes.length + ' source(s).' : 'Metadata updated (no doc changes).'}
+
+          ${!flags.no_log ? '**Log:** ' + computed.log_file_path : ''}
+
+          **To commit:**
+          ```bash
+          git add index.md ${index_structure.is_tiered ? 'index-*.md ' : ''}config.yaml${!flags.no_log && !flags.log_gitignore ? ' logs/' : ''}
+          git commit -m "Refresh ${config.corpus.name} index"
+          ```
+    on_success: success
+    on_failure: success
+
+  # ===========================================================================
+  # ERROR HANDLING
+  # ===========================================================================
+
+  error_fetch_failed:
+    type: action
+    description: "Handle fetch failure"
+    actions:
+      - type: display_message
+        message: |
+          Error: Failed to fetch changes for ${current_source.id}
+          Skipping this source...
+      - type: log_error
+        message: "Failed to fetch changes for source"
+        details:
+          source_id: "${current_source.id}"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  error_clone_failed:
+    type: action
+    description: "Handle clone failure"
+    actions:
+      - type: display_message
+        message: |
+          Error: Failed to clone ${current_source.repo_url}
+          Skipping this source...
+      - type: log_error
+        message: "Failed to clone repository"
+        details:
+          source_id: "${current_source.id}"
+          repo_url: "${current_source.repo_url}"
+    on_success: advance_update_loop
+    on_failure: advance_update_loop
+
+  error_index_update_failed:
+    type: action
+    description: "Handle index update failure"
+    actions:
+      - type: display_message
+        message: "Error: Failed to update index. Changes may be partial."
+      - type: log_error
+        message: "Failed to update index"
+    on_success: update_config_metadata
+    on_failure: error_general
+
+# ===========================================================================
+# ENDINGS
+# ===========================================================================
+
+endings:
+  success:
+    type: success
+    message: |
+      Refresh complete for ${config.corpus.name}.
+
+      Sources updated: ${len(computed.updated_sources)}
+      Index files: ${computed.files_updated}
+
+      To commit: git add index.md index-*.md config.yaml logs/ && git commit -m "Refresh corpus index"
+    summary:
+      corpus_name: "${config.corpus.name}"
+      sources_updated: "${len(computed.updated_sources)}"
+      index_structure: "${index_structure.is_tiered ? 'tiered' : 'single'}"
+
+  success_status_only:
+    type: success
+    message: |
+      Status check complete.
+
+      ${flags.has_stale_sources ?
+        'Some sources have updates. Run refresh again with "update" to apply changes.' :
+        'All sources are up to date.'}
+    summary:
+      mode: "status"
+      stale_sources: "${flags.has_stale_sources}"
+
+  success_all_current:
+    type: success
+    message: |
+      All sources are up to date!
+
+      No refresh needed at this time.
+    summary:
+      mode: "check"
+      all_current: true
+
+  cancelled:
+    type: error
+    message: "Refresh cancelled by user"
+
+  error_no_config:
+    type: error
+    message: "No config.yaml found"
+    recovery: "hiivmind-corpus-init"
+    details: "Run /hiivmind-corpus-init first to create the corpus scaffold."
+
+  error_no_sources:
+    type: error
+    message: "No sources configured"
+    recovery: "hiivmind-corpus-add-source"
+    details: "Run /hiivmind-corpus-add-source to add documentation sources."
+
+  error_no_index:
+    type: error
+    message: "No index.md found"
+    recovery: "hiivmind-corpus-build"
+    details: "Run /hiivmind-corpus-build to create the initial index."
+
+  error_index_placeholder:
+    type: error
+    message: "Index not yet built (contains placeholder)"
+    recovery: "hiivmind-corpus-build"
+    details: |
+      The index.md file only contains placeholder text.
+      Run /hiivmind-corpus-build to create the initial index, then use refresh for future updates.
+
+  error_status_check_failed:
+    type: error
+    message: "Failed to check source status"
+    details: "Could not determine freshness for one or more sources."
+
+  error_update_failed:
+    type: error
+    message: "Update failed"
+    details: "One or more sources could not be updated."
+
+  error_save_failed:
+    type: error
+    message: "Failed to save index"
+    details: "Could not write to index.md. Check file permissions."
+
+  error_general:
+    type: error
+    message: "An error occurred during refresh"
+    details: "Check the output above for details."

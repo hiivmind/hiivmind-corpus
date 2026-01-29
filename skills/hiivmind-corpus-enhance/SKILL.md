@@ -23,8 +23,8 @@ Run from within a corpus skill directory. Valid locations:
 | Multi-corpus plugin | `{marketplace}/{plugin-name}/` |
 
 Requires:
-- `data/config.yaml` with at least one source configured
-- `data/index.md` with real entries (run `hiivmind-corpus-build` first)
+- `config.yaml` with at least one source configured
+- `index.md` with real entries (run `hiivmind-corpus-build` first)
 
 **Note:** This skill enhances index *depth*, not *freshness*. Use `hiivmind-corpus-refresh` to sync with upstream changes.
 
@@ -55,12 +55,12 @@ Requires:
 Before proceeding, verify the corpus is ready for enhancement:
 
 **Check 1: Sources exist**
-Read `data/config.yaml` and check the `sources:` array (see `lib/corpus/patterns/config-parsing.md`):
+Read `config.yaml` and check the `sources:` array (see `lib/corpus/patterns/config-parsing.md`):
 - If `sources:` array is empty → **STOP**: Run `hiivmind-corpus-add-source` to add sources first
 - If sources exist → Continue
 
 **Check 2: Index exists**
-Read `data/index.md` and check content (see `lib/corpus/patterns/status.md`):
+Read `index.md` and check content (see `lib/corpus/patterns/status.md`):
 - If only placeholder text ("Run hiivmind-corpus-build...") → **STOP**: Run `hiivmind-corpus-build` first
 - If index has real entries → Continue
 
@@ -70,7 +70,7 @@ Read `data/index.md` and check content (see `lib/corpus/patterns/status.md`):
 
 **See:** `lib/corpus/patterns/paths.md` for path resolution.
 
-Load the current index to understand existing coverage by reading `data/index.md`.
+Load the current index to understand existing coverage by reading `index.md`.
 
 ### Detect Index Structure
 
@@ -78,11 +78,11 @@ Check if this is a **tiered index** (for large corpora):
 
 **Using Claude tools:**
 ```
-Glob: data/index-*.md
+Glob: index-*.md
 ```
 
-**Single index:** Only `data/index.md` exists
-**Tiered index:** Multiple files like `data/index.md`, `data/index-reference.md`, `data/index-guides.md`
+**Single index:** Only `index.md` exists
+**Tiered index:** Multiple files like `index.md`, `index-reference.md`, `index-guides.md`
 
 For tiered indexes:
 - Main `index.md` contains section summaries and links to sub-indexes
@@ -136,7 +136,7 @@ Search for relevant documentation not yet in the index.
 Based on user's topic, determine which source(s) to explore:
 - Specific source if user mentioned it
 - All sources if topic is cross-cutting
-- Read `data/config.yaml` to see available sources (see `lib/corpus/patterns/config-parsing.md`)
+- Read `config.yaml` to see available sources (see `lib/corpus/patterns/config-parsing.md`)
 
 ### Search by Source Type
 
@@ -156,11 +156,11 @@ If no local clone, use raw GitHub URLs (see `lib/corpus/patterns/paths.md`):
 https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{docs_root}/{path}
 ```
 
-**Local sources** (`data/uploads/{source_id}/`):
+**Local sources** (`uploads/{source_id}/`):
 ```
-Glob: data/uploads/{source_id}/**/*.md
+Glob: uploads/{source_id}/**/*.md
 Grep: {keyword}
-  path: data/uploads/{source_id}
+  path: uploads/{source_id}
   glob: *.md
 ```
 
@@ -219,7 +219,7 @@ Common patterns for large file types:
 
 ## Step 5: Enhance
 
-Update `data/index.md` (or target sub-index file) collaboratively:
+Update `index.md` (or target sub-index file) collaboratively:
 
 ### Enhancement Patterns
 
@@ -322,18 +322,18 @@ Update target index file(s) with enhancements.
 
 ### For Single Index
 ```bash
-git add data/index.md
+git add index.md
 git commit -m "Enhance {topic} section in docs index"
 ```
 
 ### For Tiered Index
 ```bash
 # If enhanced main index
-git add data/index.md
+git add index.md
 # If enhanced sub-index
-git add data/index-{section}.md
+git add index-{section}.md
 # If both
-git add data/index.md data/index-{section}.md
+git add index.md index-{section}.md
 
 git commit -m "Enhance {topic} section in docs index"
 ```
@@ -407,7 +407,7 @@ User: "Perfect"
 **Step 4**: Search across sources:
 - `react` (git): Found 3 testing docs in `.source/react/src/content/learn/`
 - `kent-testing-blog` (web): Found 3 cached articles in `.cache/web/kent-testing-blog/`
-- `team-standards` (local): Found testing.md in `data/uploads/team-standards/`
+- `team-standards` (local): Found testing.md in `uploads/team-standards/`
 
 **Step 5**: Propose cross-source section:
 ```markdown
@@ -438,8 +438,8 @@ User: "Great, but can you add a subsection for mocking?"
 
 **Step 1**: Validate prerequisites - all pass
 **Step 2**: Read index
-- Found `data/index.md` with tiered structure
-- Found `data/index-actions.md` sub-index linked from main index
+- Found `index.md` with tiered structure
+- Found `index-actions.md` sub-index linked from main index
 - Ask user: "This corpus uses tiered indexing. Do you want to enhance the main index Actions summary, or the detailed `index-actions.md`?"
 
 User: "The detailed actions sub-index"
@@ -450,7 +450,7 @@ User: "The detailed actions sub-index"
 **Step 4**: Explore `.source/github/actions/using-workflows/` for reusable workflow docs
 - Found 5 additional files not in current index
 
-**Step 5**: Propose additions to `data/index-actions.md`:
+**Step 5**: Propose additions to `index-actions.md`:
 ```markdown
 ### Reusable Workflows
 - **Creating reusable workflows** `github:actions/using-workflows/reusing-workflows.md` - Build once, use everywhere
@@ -458,7 +458,7 @@ User: "The detailed actions sub-index"
 - **Workflow inputs and outputs** `github:actions/using-workflows/workflow-inputs-outputs.md` - Passing data between workflows
 ```
 
-**Step 6**: Save `data/index-actions.md`, remind to commit
+**Step 6**: Save `index-actions.md`, remind to commit
 
 ---
 

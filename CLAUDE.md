@@ -4,9 +4,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**hiivmind-corpus** is a meta-plugin system for Claude Code that creates reusable documentation corpus skills for any open-source project. It provides a workflow to index, maintain, and navigate project documentation through Claude Code skills.
+**hiivmind-corpus** is a unified plugin for building AND reading documentation corpora in Claude Code. One plugin handles everything:
 
-The core value: Instead of relying on training data, web search, or on-demand fetching, this creates persistent human-curated indexes that track upstream changes.
+- **BUILD**: Create and maintain documentation indexes (init, build, refresh, enhance, upgrade)
+- **READ**: Navigate and query documentation (navigate, register, status, discover)
+
+The core value: Persistent human-curated indexes that track upstream changes, instead of relying on training data or on-demand fetching.
+
+## Ecosystem Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     hiivmind-corpus Ecosystem                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌────────────────────────────────────────────┐                    │
+│   │           hiivmind-corpus (plugin)          │                    │
+│   │                                             │                    │
+│   │   BUILD                    READ             │                    │
+│   │   ─────                    ────             │                    │
+│   │   • init                   • navigate       │                    │
+│   │   • add-source             • register       │                    │
+│   │   • build                  • status         │                    │
+│   │   • refresh                • discover       │                    │
+│   │   • enhance                                 │                    │
+│   │   • upgrade                                 │                    │
+│   │                                             │                    │
+│   └────────────────────┬────────────────────────┘                    │
+│                        │                                             │
+│            PRODUCES    │    CONSUMES                                 │
+│                        ▼                                             │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Data-Only Corpus Repositories               │       │
+│   │                                                          │       │
+│   │  github.com/hiivmind/hiivmind-corpus-flyio              │       │
+│   │  github.com/hiivmind/hiivmind-corpus-polars             │       │
+│   │  github.com/yourorg/internal-api-corpus                 │       │
+│   │                                                          │       │
+│   │  Each contains:                                          │       │
+│   │    • config.yaml  (source definitions + keywords)        │       │
+│   │    • index.md     (main index)                           │       │
+│   │    • index-*.md   (sub-indexes for tiered corpora)       │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Per-Project Configuration                    │       │
+│   │                                                          │       │
+│   │  .hiivmind/corpus/registry.yaml                         │       │
+│   │    - Which corpora are relevant to this project          │       │
+│   │    - Source locations (GitHub refs or local paths)       │       │
+│   │    - Caching preferences (per corpus)                    │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** One plugin does everything. Corpora are just data repositories.
 
 ## Architecture
 
@@ -44,25 +97,10 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
-├── lib/workflow/                     # Workflow framework documentation
-│   ├── consequences.md               # Hub document (links to consequences/)
-│   ├── consequences/                 # Modular consequence documentation
-│   │   ├── README.md                 # Taxonomy and quick reference
-│   │   ├── core/                     # Intrinsic workflow engine (3 files)
-│   │   │   ├── workflow.md           # State, evaluation, user interaction, control flow, skill, utility
-│   │   │   ├── shared.md             # Common patterns: interpolation, parameters, failure handling
-│   │   │   └── intent-detection.md   # 3VL routing system
-│   │   └── extensions/               # Domain-specific corpus extensions (5 files)
-│   │       ├── README.md             # Extension overview
-│   │       ├── file-system.md        # Corpus file operations
-│   │       ├── config.md             # Config.yaml operations
-│   │       ├── git.md                # Git operations
-│   │       ├── web.md                # Web operations
-│   │       └── discovery.md          # Corpus discovery
-│   ├── schema.md                     # Workflow YAML structure
-│   ├── preconditions.md              # Boolean evaluations
-│   ├── execution.md                  # Turn loop
-│   └── state.md                      # Runtime state structure
+├── lib/workflow/                     # DEPRECATED - Local workflow docs (moved to hiivmind-blueprint-lib)
+│   └── [DEPRECATED]                  # All workflows now use remote definitions from:
+│                                     #   hiivmind/hiivmind-blueprint-lib@v2.0.0
+│                                     # See: https://github.com/hiivmind/hiivmind-blueprint-lib
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -214,6 +252,7 @@ Using bash with yq:
 - **Cross-platform**: Works on Linux, macOS, and Windows with appropriate tool fallbacks
 - **Forked context execution**: Navigate skills run in isolated sub-agent (`context: fork`) to keep main conversation clean (ADR-007)
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
+- **Remote blueprint definitions**: All workflows use `hiivmind/hiivmind-blueprint-lib@v2.0.0` for consequence/precondition types (standard types + inline pseudocode for domain-specific operations)
 
 ## Index Format
 
@@ -265,7 +304,11 @@ These features span multiple skills and must stay synchronized:
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
 | Command/skill separation | navigate (template), upgrade | Command is thin wrapper (~30 lines), skill has no maintenance refs |
-| Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
+| Remote blueprint-lib | all workflow-based skills, gateway command | `definitions.source: hiivmind/hiivmind-blueprint-lib@v2.0.0` |
+| Inline pseudocode | all workflow-based skills | Domain-specific ops use `compute` with pseudocode comments |
+| Logging framework | refresh, all workflow-based skills | Inline pseudocode for log init/event/finalize/write |
+| Log event types | refresh | source_status, source_changes, index_update |
+| Session tracking | refresh (optional) | Hook installation, session state file |
 
 ### When Adding New Features
 

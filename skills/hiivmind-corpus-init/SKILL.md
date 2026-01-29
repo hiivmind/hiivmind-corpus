@@ -11,9 +11,62 @@ allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
 
 # Init Workflow
 
+## Architecture Options
+
+When creating a new corpus, choose between:
+
+| Type | Structure | Use Case |
+|------|-----------|----------|
+| **Data-only** (recommended) | Just config.yaml, index.md at root | New corpora, easy maintenance |
+| **Plugin-based** (legacy) | Full .claude-plugin/, skills/, commands/ | Existing plugins, special cases |
+
+**Recommendation:** Use data-only for new corpora. Navigation is handled by `hiivmind-corpus-navigate`.
+
+### Data-Only Structure
+
+```
+hiivmind-corpus-{name}/
+├── config.yaml          # Source definitions, keywords
+├── index.md             # Main documentation index
+├── index-*.md           # Sub-indexes (for large corpora)
+├── uploads/             # Local document uploads
+├── .source/             # Cloned git sources (gitignored)
+└── README.md
+```
+
+Users register this corpus via `/hiivmind-corpus register github:owner/repo`.
+
+### Legacy Plugin Structure
+
+```
+hiivmind-corpus-{name}/
+├── .claude-plugin/plugin.json
+├── skills/navigate/SKILL.md
+├── commands/navigate.md
+├── data/
+│   ├── config.yaml
+│   └── index.md
+└── ...
+```
+
+---
+
 Execute this workflow deterministically. State persists in conversation context across turns.
 
 > **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml`
+> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+
+---
+
+## Execution Reference
+
+| Resource | Location |
+|----------|----------|
+| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml` |
+| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
+| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
+| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
+| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
 
 ---
 
@@ -24,13 +77,13 @@ Execute this workflow deterministically. State persists in conversation context 
 1. **Load workflow.yaml** from this skill directory:
    Read: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml`
 
-2. **Check entry preconditions** (see `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`):
+2. **Check entry preconditions** (see blueprint-lib `preconditions/`):
    - None for init (this skill creates the corpus)
 
 3. **Initialize runtime state**:
    ```yaml
    workflow_name: init
-   workflow_version: "1.0.0"
+   workflow_version: "2.0.0"
    current_node: detect_context
    previous_node: null
    history: []
@@ -84,7 +137,7 @@ LOOP:
 
      ACTION NODE:
      - FOR each action IN node.actions:
-       - Execute action per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md
+       - Execute action per blueprint-lib consequence definitions
        - Store results in state.computed if store_as specified
      - IF all actions succeed:
        - Set current_node = node.on_success
@@ -93,7 +146,7 @@ LOOP:
      - CONTINUE
 
      CONDITIONAL NODE:
-     - Evaluate node.condition per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md
+     - Evaluate node.condition per blueprint-lib precondition definitions
      - IF result == true:
        - Set current_node = node.branches.true
      - ELSE:
@@ -308,14 +361,15 @@ check_has_corpus_plugins              confirm_context_c
 
 ## Reference Documentation
 
-- **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
-- **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
-  - Core operations: `consequences/core/workflow.md` (skill invocation, state, evaluation)
-  - File operations: `consequences/extensions/file-system.md`
-  - Config operations: `consequences/extensions/config.md`
-- **Execution Model:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/execution.md`
-- **State Structure:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/state.md`
+### Blueprint Library (Remote)
+- **Type Definitions:** [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0)
+- **Consequences:** `consequences/core/` (state, evaluation, logging) + `consequences/extensions/` (file, git, web)
+- **Preconditions:** `preconditions/` (filesystem, state checks)
+- **Execution Model:** `execution/` (traversal, state management)
+
+### Corpus Patterns (Local)
+- **Template generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/template-generation.md`
+- **Config parsing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md`
 
 ---
 

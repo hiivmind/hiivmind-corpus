@@ -14,6 +14,19 @@ allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, T
 Execute this workflow deterministically. State persists in conversation context across turns.
 
 > **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml`
+> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+
+---
+
+## Execution Reference
+
+| Resource | Location |
+|----------|----------|
+| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml` |
+| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
+| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
+| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
+| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
 
 ---
 
@@ -24,13 +37,13 @@ Execute this workflow deterministically. State persists in conversation context 
 1. **Load workflow.yaml** from this skill directory:
    Read: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml`
 
-2. **Check entry preconditions** (see `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`):
-   - `config_exists`: Verify `data/config.yaml` exists
+2. **Check entry preconditions** (see blueprint-lib `preconditions/`):
+   - `config_exists`: Verify `config.yaml` exists
 
 3. **Initialize runtime state**:
    ```yaml
    workflow_name: build
-   workflow_version: "1.0.0"
+   workflow_version: "2.0.0"
    current_node: read_config
    previous_node: null
    history: []
@@ -84,7 +97,7 @@ LOOP:
 
      ACTION NODE:
      - FOR each action IN node.actions:
-       - Execute action per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md
+       - Execute action per blueprint-lib consequence definitions
        - Store results in state.computed if store_as specified
      - IF all actions succeed:
        - Set current_node = node.on_success
@@ -93,7 +106,7 @@ LOOP:
      - CONTINUE
 
      CONDITIONAL NODE:
-     - Evaluate node.condition per ${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md
+     - Evaluate node.condition per blueprint-lib precondition definitions
      - IF result == true:
        - Set current_node = node.branches.true
      - ELSE:
@@ -343,12 +356,13 @@ All file paths in the index use the format: `{source_id}:{relative_path}`
 
 ## Reference Documentation
 
-- **Workflow Schema:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/schema.md`
-- **Preconditions:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/preconditions.md`
-- **Consequences:** `${CLAUDE_PLUGIN_ROOT}/lib/workflow/consequences.md` (modular: `consequences/`)
-  - Core operations: `consequences/core/workflow.md` (spawn_agent, state, evaluation)
-  - Config operations: `consequences/extensions/config.md`
-  - File operations: `consequences/extensions/file-system.md`
+### Blueprint Library (Remote)
+- **Type Definitions:** [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0)
+- **Consequences:** `consequences/core/` (state, evaluation, logging) + `consequences/extensions/` (file, git, web)
+- **Preconditions:** `preconditions/` (filesystem, state checks)
+- **Execution Model:** `execution/` (traversal, state management)
+
+### Corpus Patterns (Local)
 - **Parallel Scanning:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/parallel-scanning.md`
 - **Index Generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-generation.md`
 

@@ -2,14 +2,59 @@
 
 Ready-to-use templates for adding missing sections during corpus upgrades.
 
-## Report Format
+---
 
-Use this format when presenting upgrade findings to the user:
+## Report Format: Data-Only Corpus (Recommended)
+
+Use this format for data-only corpora:
 
 ```markdown
 ## Upgrade Report: {corpus_name}
 
-**Corpus Type:** {User-level skill | Repo-local skill | Standalone plugin | Marketplace plugin}
+**Corpus Type:** Data-only corpus (recommended)
+**Location:** {path}
+
+### Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| config.yaml | ✅ Present | |
+| index.md | ✅ Present | |
+| corpus.keywords | ⚠️ Missing field | Will add |
+
+### Optional Components
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| CLAUDE.md | ○ Not present | Optional |
+| README.md | ○ Not present | Optional |
+| uploads/ | ○ Not present | Created when needed |
+
+### Recommended Actions
+
+1. Add `corpus.keywords` to config.yaml
+
+Would you like to apply these upgrades?
+```
+
+### What's NOT Checked for Data-Only
+
+Data-only corpora do not need:
+- `.claude-plugin/` directory
+- `skills/` or `commands/` directories
+- `references/project-awareness.md`
+- ADR-005 compliance (navigation handled by hiivmind-corpus)
+
+---
+
+## Report Format: Legacy Structures
+
+Use this format for legacy plugin-based corpora:
+
+```markdown
+## Upgrade Report: {corpus_name}
+
+**Corpus Type:** {User-level skill | Repo-local skill | Standalone plugin | Marketplace plugin} (Legacy)
 **Location:** {path}
 
 ### Status
@@ -26,9 +71,11 @@ Use this format when presenting upgrade findings to the user:
 ### Recommended Actions
 
 1. Create `references/project-awareness.md`
-2. Add `corpus.keywords` to config.yaml
+2. Add `corpus.keywords` to data/config.yaml
 3. Create `skills/navigate/SKILL.md` (ADR-005)
 4. Remove routing table from `commands/navigate.md`
+
+💡 Consider migrating to data-only architecture for simpler maintenance.
 
 Would you like to apply these upgrades?
 ```
@@ -79,6 +126,35 @@ For corpus maintenance, use the parent plugin:
 ### Tiered Index Navigation Section
 
 Append if corpus uses tiered indexes:
+
+#### Data-Only Corpus (root-level paths)
+
+```markdown
+---
+
+## Tiered Index Navigation
+
+This corpus uses a tiered index structure for large documentation sets.
+
+### Index Structure
+
+```
+{corpus_root}/
+├── index.md           # Top-level index (always check first)
+├── index-core.md      # Core concepts index
+├── index-api.md       # API reference index
+└── index-guides.md    # Guides and tutorials index
+```
+
+### Navigation Strategy
+
+1. **Start with top-level index**: Read `index.md` first
+2. **Check section pointers**: Top-level index points to sub-indexes (`index-*.md`)
+3. **Drill into relevant section**: Read the appropriate sub-index
+4. **Access source file**: Use path from sub-index entry
+```
+
+#### Legacy Corpus (`data/` directory)
 
 ```markdown
 ---
@@ -197,7 +273,10 @@ For corpus maintenance, use the parent plugin:
 
 ### Adding Keywords Field
 
-Add to `data/config.yaml` under `corpus:`:
+**Data-only corpus:** Add to `config.yaml` (root level)
+**Legacy corpus:** Add to `data/config.yaml`
+
+Add under `corpus:`:
 
 ```yaml
 corpus:

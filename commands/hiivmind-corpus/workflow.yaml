@@ -1,9 +1,18 @@
 name: hiivmind-corpus-gateway
-version: "1.0.0"
+version: "2.0.0"
 description: >
   Unified entry point for all corpus operations. Routes natural language
   requests to appropriate skills: init, add-source, build, navigate, refresh,
   enhance, upgrade, discover, awareness.
+
+# ===========================================================================
+# TYPE DEFINITIONS
+# ===========================================================================
+# Remote definitions for consequence/precondition types.
+# See: https://github.com/hiivmind/hiivmind-blueprint-lib
+
+definitions:
+  source: hiivmind/hiivmind-blueprint-lib@v2.0.0
 
 entry_preconditions: []  # Gateway is always available
 
@@ -571,7 +580,32 @@ nodes:
     actions:
       - type: display_message
         message: "Discovering installed corpora..."
-      - type: discover_installed_corpora
+      - type: compute
+        expression: |
+          # Scan 4 locations for corpora:
+          # 1. User-level: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+          # 2. Repo-local: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
+          # 3. Marketplace cache: ~/.claude/plugins/cache/**/hiivmind-corpus-*/data/config.yaml
+          # 4. Current directory: data/config.yaml (if in corpus dir)
+          #
+          # For each found corpus:
+          # - Read config.yaml to get corpus.name, corpus.keywords
+          # - Check data/index.md exists and is not placeholder
+          # - Determine status: 'built' (has index), 'placeholder' (no index), 'missing' (no config)
+          # - Return: { name, path, status, keywords, description }
+          #
+          # Algorithm:
+          # 1. Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
+          # 2. Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
+          # 3. Glob: ~/.claude/plugins/cache/**/hiivmind-corpus-*/data/config.yaml
+          # 4. Check: data/config.yaml in current directory
+          # 5. For each config.yaml found:
+          #    - Read and parse YAML
+          #    - Extract corpus.name, corpus.keywords
+          #    - Check if sibling index.md exists and has content
+          #    - Build corpus entry with { name, path, status, keywords }
+          # 6. Deduplicate by name (prefer repo-local over user-level)
+          # 7. Return array sorted by name
         store_as: computed.available_corpora
       - type: evaluate
         expression: "computed.available_corpora && computed.available_corpora.length > 0"
