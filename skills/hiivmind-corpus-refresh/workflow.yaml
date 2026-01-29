@@ -1,11 +1,20 @@
 name: refresh
-version: "1.0.0"
+version: "2.0.0"
 description: >
   This skill should be used when the user asks to "refresh corpus", "sync documentation",
   "update corpus index", "check for upstream changes", "corpus is stale", "docs are outdated",
   or mentions that documentation sources have changed. Triggers on "refresh my [corpus name] corpus",
   "sync corpus with upstream", "check if docs are current", "update from source repo", or
   "hiivmind-corpus refresh".
+
+# ===========================================================================
+# TYPE DEFINITIONS
+# ===========================================================================
+# Remote definitions for consequence/precondition types.
+# See: https://github.com/hiivmind/hiivmind-blueprint-lib
+
+definitions:
+  source: hiivmind/hiivmind-blueprint-lib@v2.0.0
 
 entry_preconditions:
   - type: config_exists
@@ -64,7 +73,14 @@ nodes:
     actions:
       - type: display_message
         message: "Reading corpus configuration..."
-      - type: read_config
+      - type: read_file
+        path: "config.yaml"
+        store_as: computed.config_raw
+      - type: compute
+        expression: |
+          # Parse config.yaml YAML content
+          # Extract corpus metadata and sources array
+          # parseYaml(computed.config_raw)
         store_as: config
       - type: set_flag
         flag: config_found
@@ -86,17 +102,26 @@ nodes:
     type: action
     description: "Initialize logging for this workflow execution"
     actions:
-      - type: set_timestamp
+      - type: compute
+        expression: |
+          # Format current timestamp as YYYY-MM-DD-HHmmss
+          const now = new Date();
+          now.toISOString().replace(/[T:]/g, '-').replace(/\..+/, '').slice(0, 17)
         store_as: computed.timestamp_slug
-        format: "YYYY-MM-DD-HHmmss"
-      - type: init_log
-        workflow_name: "hiivmind-corpus-refresh"
-        workflow_version: "1.0.0"
-        skill_name: "refresh"
-        plugin_name: "hiivmind-corpus"
-      - type: log_node
-        node: "read_config"
-        outcome: "success"
+      - type: compute
+        expression: |
+          # Initialize log structure for this workflow execution
+          # {
+          #   metadata: { workflow: "hiivmind-corpus-refresh", version: "2.0.0", skill: "refresh", plugin: "hiivmind-corpus" },
+          #   execution: { started_at: timestamp, nodes: [], events: [] },
+          #   outcome: null
+          # }
+        store_as: computed.log
+      - type: compute
+        expression: |
+          # Log the read_config node completion
+          # computed.log.execution.nodes.push({ node: "read_config", outcome: "success", timestamp })
+        store_as: computed.log
     on_success: check_has_sources
     on_failure: check_has_sources
 
@@ -525,34 +550,20 @@ nodes:
     actions:
       - type: display_message
         message: "Checking ${computed.source_count} sources in parallel..."
-      - type: spawn_agents_parallel
-        agent_type: "source-scanner"
-        foreach: "sources"
-        prompt_template: |
-          Check the status of source '${item.id}' (type: ${item.type}).
-
-          Source config:
-          - ID: ${item.id}
-          - Type: ${item.type}
-          - Repo URL: ${item.repo_url}
-          - Branch: ${item.branch}
-          - Last commit SHA: ${item.last_commit_sha}
-          - Last indexed at: ${item.last_indexed_at}
-
-          For git sources: Compare last_commit_sha against upstream HEAD
-          For local sources: Check file modification times
-          For web sources: Report cache age
-          For generated-docs: Check source_repo SHA
-          For llms-txt: Check manifest hash
-
-          Return YAML with:
-          - source_id: the source identifier
-          - type: source type
-          - status: current|stale|unknown
-          - indexed_sha/hash: what's in config
-          - upstream_sha/hash: current upstream value
-          - notes: any observations
-        collect_as: computed.agent_results
+      - type: compute
+        expression: |
+          # Spawn parallel source-scanner agents for status checking:
+          #
+          # Algorithm:
+          # 1. For each source in sources array:
+          #    - Create a Task tool call with subagent_type="source-scanner"
+          #    - Prompt: Check status of source '{source.id}' (type: {source.type})
+          #    - Include: source config (ID, type, repo_url, branch, last_commit_sha, last_indexed_at)
+          # 2. Include ALL Task calls in a SINGLE response message for parallel execution
+          # 3. Collect YAML results with: source_id, type, status, indexed_sha, upstream_sha, notes
+          #
+          # The caller should invoke Task tool multiple times in parallel
+        store_as: computed.spawn_instruction
     on_success: aggregate_status_results
     on_failure: error_status_check_failed
 
@@ -749,14 +760,17 @@ nodes:
     type: action
     description: "Spawn agents to check status before update"
     actions:
-      - type: spawn_agents_parallel
-        agent_type: "source-scanner"
-        foreach: "sources"
-        prompt_template: |
-          Check status of '${item.id}' (${item.type}) for update.
-          Compare indexed SHA/hash against upstream.
-          Return YAML: source_id, type, status (current|stale), indexed_sha, upstream_sha
-        collect_as: computed.agent_results
+      - type: compute
+        expression: |
+          # Spawn parallel source-scanner agents for update status:
+          #
+          # For each source, create Task call with subagent_type="source-scanner"
+          # Prompt: Check status of '{source.id}' ({source.type}) for update.
+          # Compare indexed SHA/hash against upstream.
+          # Return YAML: source_id, type, status (current|stale), indexed_sha, upstream_sha
+          #
+          # Include ALL Task calls in a SINGLE response for parallel execution
+        store_as: computed.spawn_instruction
     on_success: aggregate_for_update
     on_failure: error_status_check_failed
 
@@ -1279,8 +1293,10 @@ nodes:
     type: action
     description: "Store llms-txt update result"
     actions:
-      - type: compute_hash
-        content: "${computed.manifest_content}"
+      - type: compute
+        expression: |
+          # Compute SHA-256 hash of manifest content for change detection
+          # crypto.createHash('sha256').update(computed.manifest_content).digest('hex')
         store_as: computed.new_hash
       - type: append_state
         field: computed.updated_sources
@@ -1669,14 +1685,18 @@ nodes:
     type: action
     description: "Save updated sub-index files"
     actions:
-      - type: foreach
-        items: "${computed.sections_to_update || []}"
-        actions:
-          - type: write_file
-            path: "index-${item}.md"
-            content: "${computed.sub_index_content[item]}"
-          - type: display_message
-            message: "  Saved index-${item}.md"
+      - type: compute
+        expression: |
+          # Save each sub-index file:
+          # For each section in computed.sections_to_update:
+          #   - Write file at index-{section}.md with computed.sub_index_content[section]
+          #   - Display confirmation message
+          #
+          # Implementation note: The executor should iterate over
+          # computed.sections_to_update and call write_file for each
+        store_as: computed.sub_index_save_instruction
+      - type: display_message
+        message: "Saving ${len(computed.sections_to_update || [])} sub-index files..."
     on_success: update_config_metadata
     on_failure: warn_sub_index_save
 
@@ -1697,7 +1717,8 @@ nodes:
     type: action
     description: "Update config.yaml with new tracking metadata"
     actions:
-      - type: set_timestamp
+      - type: compute
+        expression: "new Date().toISOString()"
         store_as: computed.indexed_at
       - type: display_message
         message: "Updating config.yaml metadata..."
@@ -1708,14 +1729,24 @@ nodes:
     type: action
     description: "Update per-source tracking fields"
     actions:
-      - type: foreach
-        items: "${computed.updated_sources}"
-        actions:
-          - type: update_source
-            id: "${item.source_id}"
-            fields:
-              last_indexed_at: "${computed.indexed_at}"
-              last_commit_sha: "${item.new_sha || item.old_sha}"
+      - type: compute
+        expression: |
+          # Update per-source tracking for each updated source:
+          # For each item in computed.updated_sources:
+          #   - Find source by item.source_id in config.sources
+          #   - Set source.last_indexed_at = computed.indexed_at
+          #   - Set source.last_commit_sha = item.new_sha || item.old_sha
+          computed.updated_sources.forEach(item => {
+            const source = config.sources.find(s => s.id === item.source_id);
+            if (source) {
+              source.last_indexed_at = computed.indexed_at;
+              if (item.new_sha || item.old_sha) {
+                source.last_commit_sha = item.new_sha || item.old_sha;
+              }
+            }
+          });
+          config
+        store_as: config
     on_success: save_config
     on_failure: warn_config_update
 
@@ -1723,7 +1754,12 @@ nodes:
     type: action
     description: "Write updated config.yaml"
     actions:
-      - type: write_config
+      - type: compute
+        expression: "serializeYaml(config)"
+        store_as: computed.config_yaml
+      - type: write_file
+        path: "config.yaml"
+        content: "${computed.config_yaml}"
       - type: display_message
         message: "  Updated config.yaml"
     on_success: finalize_log
@@ -1750,10 +1786,14 @@ nodes:
     type: action
     description: "Finalize log for status-only run"
     actions:
-      - type: finalize_log
-        outcome: "success"
-        ending_node: "success_status_only"
-        summary: "Status check only. ${flags.has_stale_sources ? 'Some sources have updates available.' : 'All sources current.'}"
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success_status_only"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = "Status check only. " + (flags.has_stale_sources ? 'Some sources have updates.' : 'All current.')
+        store_as: computed.log
     on_success: check_should_log_status
     on_failure: success_status_only
 
@@ -1761,10 +1801,14 @@ nodes:
     type: action
     description: "Finalize log for all-current run"
     actions:
-      - type: finalize_log
-        outcome: "success"
-        ending_node: "success_all_current"
-        summary: "All sources are up to date. No refresh needed."
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success_all_current"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = "All sources are up to date. No refresh needed."
+        store_as: computed.log
     on_success: check_should_log_status
     on_failure: success_all_current
 
@@ -1782,13 +1826,29 @@ nodes:
     type: action
     description: "Write log file for status run"
     actions:
-      - type: set_timestamp
+      - type: compute
+        expression: |
+          const now = new Date();
+          now.toISOString().replace(/[T:]/g, '-').replace(/\..+/, '').slice(0, 17)
         store_as: computed.timestamp_slug
-        format: "YYYY-MM-DD-HHmmss"
-      - type: write_log
-        format: "${flags.log_format || 'yaml'}"
-        location: "${flags.log_location || 'logs/'}"
-        filename: "refresh-${computed.timestamp_slug}.${flags.log_format == 'markdown' ? 'md' : flags.log_format || 'yaml'}"
+      - type: compute
+        expression: |
+          # Determine log filename and path:
+          const format = flags.log_format || 'yaml';
+          const ext = format === 'markdown' ? 'md' : format;
+          const location = flags.log_location || 'logs/';
+          location + 'refresh-' + computed.timestamp_slug + '.' + ext
+        store_as: computed.log_file_path
+      - type: compute
+        expression: |
+          # Serialize log to specified format (yaml/json/markdown):
+          # if format == 'yaml': serializeYaml(computed.log)
+          # if format == 'json': JSON.stringify(computed.log, null, 2)
+          # if format == 'markdown': formatLogAsMarkdown(computed.log)
+        store_as: computed.log_content
+      - type: write_file
+        path: "${computed.log_file_path}"
+        content: "${computed.log_content}"
       - type: display_message
         message: "  Log written: ${computed.log_file_path}"
     on_success: check_ci_output_status
@@ -1808,8 +1868,15 @@ nodes:
     type: action
     description: "Output CI summary for status run"
     actions:
-      - type: output_ci_summary
-        format: "${flags.ci_output}"
+      - type: compute
+        expression: |
+          # Output CI-formatted summary based on flags.ci_output:
+          # - 'github': Use GitHub Actions annotations (::group::, ::notice::, ::error::)
+          # - 'plain': KEY=VALUE format for shell scripts
+          # - 'json': JSON object for programmatic parsing
+          #
+          # For GitHub Actions, print to stdout with appropriate annotations
+        store_as: computed.ci_output_generated
     on_success: route_status_ending
     on_failure: route_status_ending
 
@@ -1842,10 +1909,14 @@ nodes:
           'Updated ' + len(computed.updated_sources) + ' source(s). ' +
           (len(computed.all_changes) > 0 ? 'Index: ' + (computed.entries_added || 0) + ' added.' : 'Metadata only.')
         store_as: computed.log_summary
-      - type: finalize_log
-        outcome: "success"
-        ending_node: "success"
-        summary: "${computed.log_summary}"
+      - type: compute
+        expression: |
+          # Finalize log with outcome and summary:
+          # computed.log.outcome = "success"
+          # computed.log.ending_node = "success"
+          # computed.log.execution.ended_at = timestamp
+          # computed.log.summary = computed.log_summary
+        store_as: computed.log
     on_success: check_should_log
     on_failure: check_should_log
 
@@ -1863,10 +1934,24 @@ nodes:
     type: action
     description: "Write log file to disk"
     actions:
-      - type: write_log
-        format: "${flags.log_format || 'yaml'}"
-        location: "${flags.log_location || 'logs/'}"
-        filename: "refresh-${computed.timestamp_slug}.${flags.log_format == 'markdown' ? 'md' : flags.log_format || 'yaml'}"
+      - type: compute
+        expression: |
+          # Determine log filename and path:
+          const format = flags.log_format || 'yaml';
+          const ext = format === 'markdown' ? 'md' : format;
+          const location = flags.log_location || 'logs/';
+          location + 'refresh-' + computed.timestamp_slug + '.' + ext
+        store_as: computed.log_file_path
+      - type: compute
+        expression: |
+          # Serialize log to specified format (yaml/json/markdown):
+          # if format == 'yaml': serializeYaml(computed.log)
+          # if format == 'json': JSON.stringify(computed.log, null, 2)
+          # if format == 'markdown': formatLogAsMarkdown(computed.log)
+        store_as: computed.log_content
+      - type: write_file
+        path: "${computed.log_file_path}"
+        content: "${computed.log_content}"
       - type: display_message
         message: "  Log written: ${computed.log_file_path}"
     on_success: check_log_gitignore
@@ -1886,9 +1971,19 @@ nodes:
     type: action
     description: "Add log file to .gitignore"
     actions:
-      - type: append_to_file
+      - type: read_file
         path: ".gitignore"
-        content: "\n# Refresh log (auto-added)\n${computed.log_file_path}"
+        store_as: computed.gitignore_content
+        on_failure: "create_empty"
+      - type: compute
+        expression: |
+          # Append log file to .gitignore if not already present
+          const content = computed.gitignore_content || '';
+          content + '\n# Refresh log (auto-added)\n' + computed.log_file_path
+        store_as: computed.gitignore_updated
+      - type: write_file
+        path: ".gitignore"
+        content: "${computed.gitignore_updated}"
       - type: display_message
         message: "  Added log to .gitignore"
     on_success: apply_retention
@@ -1898,11 +1993,21 @@ nodes:
     type: action
     description: "Apply log retention policy if configured"
     actions:
-      - type: apply_log_retention
-        strategy: "${config.logging.retention.strategy || 'none'}"
-        days: "${config.logging.retention.days}"
-        count: "${config.logging.retention.count}"
-        location: "${flags.log_location || 'logs/'}"
+      - type: compute
+        expression: |
+          # Apply log retention policy if configured:
+          # Strategy options: 'none' (keep all), 'days' (delete older than N days), 'count' (keep last N)
+          #
+          # Algorithm:
+          # 1. Glob: {location}refresh-*.{format} to find all log files
+          # 2. Sort by timestamp (from filename)
+          # 3. If strategy == 'count': delete all but last {count} files
+          # 4. If strategy == 'days': delete files older than {days}
+          # 5. Log deleted files for audit
+          const strategy = config?.logging?.retention?.strategy || 'none';
+          const location = flags.log_location || 'logs/';
+          { strategy, location, applied: strategy !== 'none' }
+        store_as: computed.retention_result
     on_success: check_ci_output
     on_failure: check_ci_output
 
@@ -1920,8 +2025,15 @@ nodes:
     type: action
     description: "Output CI-formatted summary"
     actions:
-      - type: output_ci_summary
-        format: "${flags.ci_output}"
+      - type: compute
+        expression: |
+          # Output CI-formatted summary based on flags.ci_output:
+          # - 'github': Use GitHub Actions annotations (::group::, ::notice::, ::error::)
+          # - 'plain': KEY=VALUE format for shell scripts
+          # - 'json': JSON object for programmatic parsing
+          #
+          # For GitHub Actions, print to stdout with appropriate annotations
+        store_as: computed.ci_output_generated
     on_success: present_completion
     on_failure: present_completion
 

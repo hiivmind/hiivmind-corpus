@@ -1,9 +1,18 @@
 name: build
-version: "1.0.0"
+version: "2.0.0"
 description: >
   Build the documentation corpus index. Prepares all sources, scans for content,
   consults user on organization, generates index.md, and updates config metadata.
   Supports single and multi-source corpora, with tiered indexing for large (500+) corpora.
+
+# ===========================================================================
+# TYPE DEFINITIONS
+# ===========================================================================
+# Remote definitions for consequence/precondition types.
+# See: https://github.com/hiivmind/hiivmind-blueprint-lib
+
+definitions:
+  source: hiivmind/hiivmind-blueprint-lib@v2.0.0
 
 entry_preconditions:
   - type: config_exists
@@ -46,7 +55,14 @@ nodes:
     actions:
       - type: display_message
         message: "Reading corpus configuration..."
-      - type: read_config
+      - type: read_file
+        path: "config.yaml"
+        store_as: computed.config_raw
+      - type: compute
+        expression: |
+          # Parse config.yaml YAML content
+          # Extract corpus metadata and sources array
+          # parseYaml(computed.config_raw)
         store_as: config
       - type: set_flag
         flag: config_found
@@ -457,30 +473,26 @@ nodes:
     actions:
       - type: display_message
         message: "Spawning ${computed.source_count} scanner agents in parallel..."
-      - type: spawn_agents_parallel
-        agent_type: "source-scanner"
-        foreach: "sources"
-        prompt_template: |
-          Scan source '${item.id}' (type: ${item.type}) at corpus path '${PWD}'.
-
-          Source config:
-          - ID: ${item.id}
-          - Type: ${item.type}
-          - Repo URL: ${item.repo_url}
-          - Docs root: ${item.docs_root}
-          - Branch: ${item.branch}
-
-          Return YAML with:
-          - source_id: the source identifier
-          - type: source type
-          - status: ready|missing|error
-          - file_count: total doc files found
-          - sections: array with name, path, file_count
-          - large_files: files over 1000 lines with suggested_grep
-          - framework: detected doc framework
-          - frontmatter_type: yaml|toml|none
-          - notes: any observations
-        collect_as: computed.agent_results
+      - type: compute
+        expression: |
+          # Spawn parallel source-scanner agents for each source:
+          #
+          # Algorithm:
+          # 1. For each source in sources array:
+          #    - Create a Task tool call with subagent_type="source-scanner"
+          #    - Use prompt template with source config interpolated
+          # 2. Include ALL Task calls in a SINGLE response message
+          #    - This ensures parallel execution
+          # 3. Wait for all agents to complete
+          # 4. Collect results into computed.agent_results array
+          #
+          # Prompt template for each source:
+          # Scan source '{source.id}' (type: {source.type}) at corpus path '{PWD}'.
+          # Source config: ID, Type, Repo URL, Docs root, Branch
+          # Return YAML with: source_id, type, status, file_count, sections, large_files, framework, notes
+          #
+          # The caller should invoke Task tool multiple times in parallel
+        store_as: computed.spawn_instruction
     on_success: aggregate_scan_results
     on_failure: error_scan_failed
 
@@ -1200,14 +1212,18 @@ nodes:
     type: action
     description: "Save sub-index files for tiered strategy"
     actions:
-      - type: foreach
-        items: "${index.sub_indexes}"
-        actions:
-          - type: write_file
-            path: "${item.filename}"
-            content: "${item.content}"
-          - type: display_message
-            message: "  Saved ${item.filename}"
+      - type: compute
+        expression: |
+          # Save each sub-index file:
+          # For each item in index.sub_indexes:
+          #   - Write file at item.filename with item.content
+          #   - Display confirmation message
+          #
+          # Implementation note: The executor should iterate over
+          # index.sub_indexes and call write_file for each
+        store_as: computed.sub_index_save_instruction
+      - type: display_message
+        message: "Saving ${len(index.sub_indexes)} sub-index files..."
     on_success: update_config_metadata
     on_failure: warn_sub_index_save_failed
 
@@ -1226,11 +1242,20 @@ nodes:
     actions:
       - type: display_message
         message: "Updating config.yaml metadata..."
-      - type: set_timestamp
+      - type: compute
+        expression: "new Date().toISOString()"
         store_as: computed.indexed_at
-      - type: update_config_index_metadata
-        last_updated_at: "${computed.indexed_at}"
-        format: "markdown"
+      - type: compute
+        expression: |
+          # Update config.corpus.index metadata:
+          # - Set last_updated_at to computed.indexed_at
+          # - Set format to "markdown"
+          if (!config.corpus) config.corpus = {};
+          if (!config.corpus.index) config.corpus.index = {};
+          config.corpus.index.last_updated_at = computed.indexed_at;
+          config.corpus.index.format = "markdown";
+          config
+        store_as: config
     on_success: update_per_source_metadata
     on_failure: warn_config_update_failed
 
@@ -1238,13 +1263,21 @@ nodes:
     type: action
     description: "Update per-source tracking fields"
     actions:
-      - type: foreach
-        items: "${sources}"
-        actions:
-          - type: update_source_metadata
-            id: "${item.id}"
-            fields:
-              last_indexed_at: "${computed.indexed_at}"
+      - type: compute
+        expression: |
+          # Update last_indexed_at for each source in config.sources:
+          # For each source, set source.last_indexed_at = computed.indexed_at
+          config.sources.forEach(source => {
+            source.last_indexed_at = computed.indexed_at;
+          });
+          config
+        store_as: config
+      - type: compute
+        expression: "serializeYaml(config)"
+        store_as: computed.config_yaml
+      - type: write_file
+        path: "config.yaml"
+        content: "${computed.config_yaml}"
       - type: display_message
         message: "Updated tracking metadata for ${len(sources)} source(s)"
     on_success: present_completion

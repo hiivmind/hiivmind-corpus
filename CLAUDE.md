@@ -97,28 +97,10 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
-├── lib/workflow/                     # Workflow framework documentation
-│   ├── consequences.md               # Hub document (links to consequences/)
-│   ├── consequences/                 # Modular consequence documentation
-│   │   ├── README.md                 # Taxonomy and quick reference
-│   │   ├── core/                     # Intrinsic workflow engine (4 files)
-│   │   │   ├── workflow.md           # State, evaluation, user interaction, control flow, skill, utility
-│   │   │   ├── shared.md             # Common patterns: interpolation, parameters, failure handling
-│   │   │   ├── intent-detection.md   # 3VL routing system
-│   │   │   └── logging.md            # Core logging (10 consequences)
-│   │   └── extensions/               # Domain-specific corpus extensions (6 files)
-│   │       ├── README.md             # Extension overview
-│   │       ├── file-system.md        # Corpus file operations
-│   │       ├── config.md             # Config.yaml operations
-│   │       ├── git.md                # Git operations
-│   │       ├── web.md                # Web operations
-│   │       ├── discovery.md          # Corpus discovery
-│   │       └── logging.md            # Deprecated corpus logging (use core/logging.md)
-│   ├── schema.md                     # Workflow YAML structure
-│   ├── logging-schema.md             # Log structure definition
-│   ├── preconditions.md              # Boolean evaluations
-│   ├── execution.md                  # Turn loop
-│   └── state.md                      # Runtime state structure
+├── lib/workflow/                     # DEPRECATED - Local workflow docs (moved to hiivmind-blueprint-lib)
+│   └── [DEPRECATED]                  # All workflows now use remote definitions from:
+│                                     #   hiivmind/hiivmind-blueprint-lib@v2.0.0
+│                                     # See: https://github.com/hiivmind/hiivmind-blueprint-lib
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -270,6 +252,7 @@ Using bash with yq:
 - **Cross-platform**: Works on Linux, macOS, and Windows with appropriate tool fallbacks
 - **Forked context execution**: Navigate skills run in isolated sub-agent (`context: fork`) to keep main conversation clean (ADR-007)
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
+- **Remote blueprint definitions**: All workflows use `hiivmind/hiivmind-blueprint-lib@v2.0.0` for consequence/precondition types (standard types + inline pseudocode for domain-specific operations)
 
 ## Index Format
 
@@ -321,8 +304,9 @@ These features span multiple skills and must stay synchronized:
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
 | Command/skill separation | navigate (template), upgrade | Command is thin wrapper (~30 lines), skill has no maintenance refs |
-| Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
-| Logging framework | refresh, all workflow-based skills | core/logging.md (10 consequences), log_event for domain events |
+| Remote blueprint-lib | all workflow-based skills, gateway command | `definitions.source: hiivmind/hiivmind-blueprint-lib@v2.0.0` |
+| Inline pseudocode | all workflow-based skills | Domain-specific ops use `compute` with pseudocode comments |
+| Logging framework | refresh, all workflow-based skills | Inline pseudocode for log init/event/finalize/write |
 | Log event types | refresh | source_status, source_changes, index_update |
 | Session tracking | refresh (optional) | Hook installation, session state file |
 

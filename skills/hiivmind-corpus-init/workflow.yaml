@@ -1,9 +1,18 @@
 name: init
-version: "1.0.0"
+version: "2.0.0"
 description: >
   Initialize a new documentation corpus. Detects context (established repo,
   fresh directory, or existing marketplace), selects destination, scaffolds
   directory structure, and delegates to add-source for initial content.
+
+# ===========================================================================
+# TYPE DEFINITIONS
+# ===========================================================================
+# Remote definitions for consequence/precondition types.
+# See: https://github.com/hiivmind/hiivmind-blueprint-lib
+
+definitions:
+  source: hiivmind/hiivmind-blueprint-lib@v2.0.0
 
 entry_preconditions: []  # None - init creates the corpus
 
@@ -560,8 +569,15 @@ nodes:
     type: action
     description: "Create checkpoint before scaffold creation"
     actions:
-      - type: create_checkpoint
-        name: "before_scaffold"
+      - type: compute
+        expression: |
+          # Create a checkpoint to enable rollback if scaffold fails.
+          # Store current state snapshot in checkpoints.before_scaffold:
+          # - Copy relevant state fields (corpus_name, destination_type, computed paths)
+          # - Record timestamp
+          # - This allows partial recovery if scaffold creation fails mid-way
+          { timestamp: Date.now(), state_snapshot: { corpus_name, destination_type, computed } }
+        store_as: checkpoints.before_scaffold
     on_success: route_scaffold_by_destination
     on_failure: route_scaffold_by_destination
 
@@ -849,10 +865,32 @@ nodes:
     actions:
       - type: display_message
         message: "Updating marketplace registry..."
-      - type: update_marketplace_json
-        marketplace_path: "${computed.marketplace_root}/.claude-plugin/marketplace.json"
-        plugin_name: "${placeholders.plugin_name}"
-        plugin_path: "${placeholders.plugin_name}"
+      - type: read_file
+        path: "${computed.marketplace_root}/.claude-plugin/marketplace.json"
+        store_as: computed.marketplace_json_raw
+      - type: compute
+        expression: |
+          # Parse existing marketplace.json
+          # Add new plugin entry to the plugins array:
+          # {
+          #   "name": "${placeholders.plugin_name}",
+          #   "path": "${placeholders.plugin_name}"
+          # }
+          # Serialize back to JSON with 2-space indentation
+          JSON.parse(computed.marketplace_json_raw)
+        store_as: computed.marketplace_data
+      - type: compute
+        expression: |
+          # Append the new plugin to the plugins array
+          computed.marketplace_data.plugins.push({
+            name: placeholders.plugin_name,
+            path: placeholders.plugin_name
+          });
+          JSON.stringify(computed.marketplace_data, null, 2)
+        store_as: computed.marketplace_json_updated
+      - type: write_file
+        path: "${computed.marketplace_root}/.claude-plugin/marketplace.json"
+        content: "${computed.marketplace_json_updated}"
     on_success: check_source_delegation
     on_failure: warn_marketplace_update
 
