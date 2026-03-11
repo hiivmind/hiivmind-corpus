@@ -114,19 +114,9 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
    - `source_id` is not already in config.sources
 6. Clone: `git clone --depth 1 --branch {branch} {url} .source/{source_id}`
 7. Get SHA: `git -C .source/{source_id} rev-parse HEAD`
-8. Add to config.yaml:
+8. Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Git Source Entry"
 
-```yaml
-- id: "{source_id}"
-  type: "git"
-  repo_url: "{url}"
-  repo_owner: "{owner}"
-  repo_name: "{repo_name}"
-  branch: "{branch}"
-  docs_root: "{docs_root}"
-  last_commit_sha: "{sha}"
-  last_indexed_at: null
-```
+   Substitute collected values: `source_id`, `url`, `owner`, `repo_name`, `branch`, `docs_root`, `sha`.
 
 ### Local Source
 
@@ -135,16 +125,9 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 1. Ask: "What should this local source be called? (used as ID)"
 2. Ask: "Brief description of this source:"
 3. Create directory: `mkdir -p uploads/{source_id}`
-4. Add to config.yaml:
+4. Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Local Source Entry"
 
-```yaml
-- id: "{source_id}"
-  type: "local"
-  path: "uploads/{source_id}/"
-  description: "{description}"
-  files: []
-  last_indexed_at: null
-```
+   Substitute collected values: `source_id`, `description`.
 
 5. Display: "Place your documents in uploads/{source_id}/. Supported formats: .md, .mdx, .pdf"
 
@@ -160,20 +143,9 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 5. Fetch the URL content using WebFetch
 6. Show preview (first ~500 chars) and ask: "Save this content to cache?"
 7. If yes, save to `.cache/web/{source_id}/{filename}.md`
-8. Add to config.yaml:
+8. Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Web Source Entry"
 
-```yaml
-- id: "{source_id}"
-  type: "web"
-  description: "{description}"
-  cache_dir: ".cache/web/{source_id}/"
-  urls:
-    - url: "{url}"
-      title: "Fetched article"
-      cached_file: "{filename}"
-      fetched_at: "{timestamp}"
-  last_indexed_at: null
-```
+   Substitute collected values: `source_id`, `description`, `url`, `filename`, `timestamp`.
 
 ### llms-txt Source
 
@@ -186,24 +158,9 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 4. Ask caching strategy: Selective (recommended) / Full / On-demand
 5. Create directory: `mkdir -p .cache/llms-txt/{source_id}`
 6. Hash manifest content for change detection
-7. Add to config.yaml:
+7. Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "llms-txt Source Entry"
 
-```yaml
-- id: "{source_id}"
-  type: "llms-txt"
-  manifest:
-    url: "{manifest_url}"
-    last_hash: "{sha256_hash}"
-    last_fetched_at: "{timestamp}"
-  urls:
-    base_url: "{base_url}"
-    suffix: ".md"
-  cache:
-    enabled: true
-    dir: ".cache/llms-txt/{source_id}/"
-    strategy: "{strategy}"
-  last_indexed_at: null
-```
+   Substitute collected values: `source_id`, `manifest_url`, `sha256_hash`, `timestamp`, `base_url`, `strategy`.
 
 ### Generated-Docs Source
 
@@ -214,24 +171,9 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 3. Derive `source_id` from repo name
 4. Clone source repo for SHA tracking: `git clone --depth 1 {url} .source/{source_id}`
 5. Get SHA: `git -C .source/{source_id} rev-parse HEAD`
-6. Add to config.yaml:
+6. Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Generated-Docs Source Entry"
 
-```yaml
-- id: "{source_id}"
-  type: "generated-docs"
-  source_repo:
-    url: "{source_repo_url}"
-    branch: "main"
-    docs_root: "docs"
-    last_commit_sha: "{sha}"
-  web_output:
-    base_url: "{web_base_url}"
-    discovered_urls: []
-  cache:
-    enabled: false
-    dir: ".cache/web/{source_id}/"
-  last_indexed_at: null
-```
+   Substitute collected values: `source_id`, `source_repo_url`, `sha`, `web_base_url`.
 
 ---
 
@@ -280,6 +222,7 @@ Location: {.source/ or uploads/ or .cache/}{source_id}
 
 Source-specific operations referenced by this skill:
 
+- **Config formatting:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md`
 - **Git sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/git.md`
 - **Local sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/local.md`
 - **Web sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/web.md`

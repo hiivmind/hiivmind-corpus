@@ -130,121 +130,68 @@ mkdir -p ./hiivmind-corpus-{name}/uploads
 
 ### 4a: config.yaml
 
-**For git sources:**
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Full Config Schema"
 
-```yaml
-schema_version: 2
+Write config.yaml using the full schema from the pattern doc. Substitute:
 
-corpus:
-  name: "{name}"
-  display_name: "{Display Name}"
-  keywords:
-    - "{keyword1}"
-    - "{keyword2}"
+| Placeholder | Value |
+|-------------|-------|
+| `{name}` | `computed.corpus_name` |
+| `{Display Name}` | `computed.display_name` |
+| `{keyword1}`, `{keyword2}`, ... | `computed.keywords` |
 
-sources:
-  - id: "{name}"
-    type: "git"
-    repo_url: "{url}"
-    repo_owner: "{owner}"
-    repo_name: "{repo}"
-    branch: "main"
-    docs_root: "."
-    last_commit_sha: null
-    last_indexed_at: null
-
-index:
-  format: "markdown"
-  last_updated_at: null
-
-settings:
-  include_patterns:
-    - "**/*.md"
-    - "**/*.mdx"
-  exclude_patterns:
-    - "**/_*.md"
-    - "**/_snippets/**"
-```
-
-**For web sources:** Use `type: "web"` and `base_url` field instead of repo fields.
-
-**For local sources:** Use `type: "local"` and `path` field instead of repo fields.
+Leave `sources: []` empty — add-source populates this.
 
 ### 4b: index.md
 
-```markdown
-# {Display Name} Documentation Corpus
+**Template:** `${CLAUDE_PLUGIN_ROOT}/templates/index.md.template`
 
-> Run `/hiivmind-corpus build` to build this index.
-
-This corpus is not yet populated. Add documentation sources and build the index.
-```
+Substitute `{{project_display_name}}` with `computed.display_name`.
 
 ### 4c: CLAUDE.md
 
-Write a CLAUDE.md parameterized with the corpus name and keywords. Content should match
-the data-only corpus pattern:
+**Template:** `${CLAUDE_PLUGIN_ROOT}/templates/claude-data-only.md.template`
 
-- State that this is a data-only documentation corpus (not a plugin)
-- Show how to register it (`/hiivmind-corpus register github:hiivmind/hiivmind-corpus-{name}`)
-- Show how to navigate it
-- Document the directory structure
-- List key files and their purposes
-- List maintenance skills (build, refresh, enhance, add-source)
-- List the routing keywords from `computed.keywords`
+Substitute placeholders:
 
-Use `hiivmind-corpus-flyio/CLAUDE.md` as the reference template, substituting the project
-name and keywords.
+| Placeholder | Value |
+|-------------|-------|
+| `{{project_display_name}}` | `computed.display_name` |
+| `{{project_name}}` | `computed.corpus_name` |
+| `{{author_name}}` | `"hiivmind"` (default) |
+| `{{example_questions}}` | Generate 2-3 example questions based on the corpus topic |
+| `{{keywords_list}}` | Bullet list from `computed.keywords` |
 
 ### 4d: README.md
 
-```markdown
-# hiivmind-corpus-{name}
+**Template:** `${CLAUDE_PLUGIN_ROOT}/templates/readme-data-only.md.template`
 
-Documentation corpus for {Display Name}.
+Substitute placeholders:
 
-## Usage
-
-Register this corpus with your project:
-
-```
-/hiivmind-corpus register github:hiivmind/hiivmind-corpus-{name}
-```
-
-Then ask questions about {Display Name} — the navigate skill will find relevant documentation.
-
-## Maintenance
-
-| Skill | Purpose |
-|-------|---------|
-| `hiivmind-corpus-build` | Build the documentation index |
-| `hiivmind-corpus-refresh` | Update from upstream changes |
-| `hiivmind-corpus-enhance` | Deepen coverage on topics |
-| `hiivmind-corpus-add-source` | Add documentation sources |
-```
+| Placeholder | Value |
+|-------------|-------|
+| `{{project_display_name}}` | `computed.display_name` |
+| `{{project_name}}` | `computed.corpus_name` |
+| `{{author_name}}` | `"hiivmind"` (default) |
+| `{{example_questions}}` | Same as CLAUDE.md |
+| `{{keywords}}` | Mustache loop from `computed.keywords` |
 
 ### 4e: .gitignore
 
-```
-# Cloned documentation repositories
-.source/
+**Template:** `${CLAUDE_PLUGIN_ROOT}/templates/gitignore.template`
 
-# Cached web content
-.cache/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor files
-*.swp
-*.swo
-*~
-```
+No placeholders — copy verbatim.
 
 ### 4f: LICENSE
 
-MIT License with `Copyright (c) {current_year} hiivmind`. Use the standard MIT text.
+**Template:** `${CLAUDE_PLUGIN_ROOT}/templates/license.template`
+
+Substitute placeholders:
+
+| Placeholder | Value |
+|-------------|-------|
+| `{{year}}` | Current year |
+| `{{author_name}}` | `"hiivmind"` |
 
 ### 4g: Verify Scaffold
 
