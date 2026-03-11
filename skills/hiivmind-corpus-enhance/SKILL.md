@@ -5,6 +5,23 @@ description: >
   "expand section in index", "need more depth on [topic]", "corpus is too shallow", "add entries for [topic]",
   or wants deeper coverage of specific topics in an existing corpus. Triggers on "enhance [topic] section",
   "more detail on [feature]", "expand the index", "add depth to corpus", or "hiivmind-corpus enhance".
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
+inputs:
+  - name: topic
+    type: string
+    required: false
+    description: Topic or section to enhance (prompted if not provided)
+  - name: corpus_path
+    type: string
+    required: false
+    description: Path to corpus skill directory (defaults to current directory)
+outputs:
+  - name: updated_index
+    type: boolean
+    description: Whether index.md (or sub-index) was modified
+  - name: entries_added
+    type: number
+    description: Count of new entries added to the index
 ---
 
 # Corpus Index Enhancement
@@ -40,6 +57,17 @@ Requires:
 | Corpus has no sources yet | ❌ No | `hiivmind-corpus-add-source` |
 | First-time index building | ❌ No | `hiivmind-corpus-build` |
 
+## State Flow
+
+```
+Step 1              Step 2                Step 3             Step 4               Step 5              Step 6
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+computed.sources -> computed.index     -> computed.topic  -> computed.findings -> computed.proposed -> computed
+computed.config     computed.index_type   computed.goal      computed.sources     _changes             .entries
+                    computed.sections     computed.depth      _searched           computed              _added
+                                          computed.keywords  computed.new_docs    .keywords_applied
+```
+
 ## Process
 
 ```
@@ -50,36 +78,74 @@ Requires:
 
 ## Step 1: Validate Prerequisites
 
+**Inputs:** invocation args (topic, corpus_path)
+**Outputs:** `computed.config`, `computed.sources`
 **See:** `lib/corpus/patterns/config-parsing.md` and `lib/corpus/patterns/status.md`
 
 Before proceeding, verify the corpus is ready for enhancement:
 
-**Check 1: Sources exist**
-Read `config.yaml` and check the `sources:` array (see `lib/corpus/patterns/config-parsing.md`):
-- If `sources:` array is empty → **STOP**: Run `hiivmind-corpus-add-source` to add sources first
-- If sources exist → Continue
+```pseudocode
+VALIDATE_PREREQUISITES():
+  computed.config = Read("config.yaml")
+  IF computed.config IS error:
+    DISPLAY "No config.yaml found. Are you in a corpus skill directory?"
+    DISPLAY "Valid locations: ~/.claude/skills/{name}/, {repo}/.claude-plugin/skills/{name}/"
+    EXIT
 
-**Check 2: Index exists**
-Read `index.md` and check content (see `lib/corpus/patterns/status.md`):
-- If only placeholder text ("Run hiivmind-corpus-build...") → **STOP**: Run `hiivmind-corpus-build` first
-- If index has real entries → Continue
+  computed.sources = extract_sources(computed.config)
+  IF len(computed.sources) == 0:
+    DISPLAY "No sources configured. Run hiivmind-corpus-add-source first."
+    EXIT
+
+  index_content = Read("index.md")
+  IF index_content IS error:
+    DISPLAY "No index.md found. Run hiivmind-corpus-build first."
+    EXIT
+  IF index_content matches /Run hiivmind-corpus-build/:
+    DISPLAY "Index is a placeholder. Run hiivmind-corpus-build first."
+    EXIT
+
+  computed.index_raw = index_content
+```
 
 ---
 
 ## Step 2: Read Index
 
+**Inputs:** `computed.index_raw` (from Step 1)
+**Outputs:** `computed.index`, `computed.index_type`, `computed.sections`
 **See:** `lib/corpus/patterns/paths.md` for path resolution.
 
-Load the current index to understand existing coverage by reading `index.md`.
+```pseudocode
+GUARD_STEP_2():
+  IF computed.index_raw IS null:
+    DISPLAY "Cannot proceed: Step 1 (Validate) has not completed."
+    EXIT
+```
+
+Load the current index to understand existing coverage.
+
+```pseudocode
+DETECT_INDEX_STRUCTURE():
+  sub_indexes = Glob("index-*.md")
+  IF sub_indexes IS error:
+    DISPLAY "Failed to scan for sub-index files: " + sub_indexes.message
+    # Non-fatal — assume single index
+    sub_indexes = []
+
+  IF len(sub_indexes) > 0:
+    computed.index_type = "tiered"
+    computed.sub_indexes = sub_indexes
+    # Ask user which index to target
+  ELSE:
+    computed.index_type = "single"
+    computed.sub_indexes = []
+
+  computed.index = computed.index_raw
+  computed.sections = extract_sections(computed.index)
+```
 
 ### Detect Index Structure
-
-Check if this is a **tiered index** (for large corpora):
-
-**Using Claude tools:**
-```
-Glob: index-*.md
-```
 
 **Single index:** Only `index.md` exists
 **Tiered index:** Multiple files like `index.md`, `index-reference.md`, `index-guides.md`
@@ -101,6 +167,16 @@ Ask user: "This corpus uses tiered indexing. Do you want to enhance the main ind
 ---
 
 ## Step 3: Ask User
+
+**Inputs:** `computed.sections`, `computed.index_type` (from Step 2)
+**Outputs:** `computed.topic`, `computed.goal`, `computed.depth`, `computed.keywords`
+
+```pseudocode
+GUARD_STEP_3():
+  IF computed.sections IS null:
+    DISPLAY "Cannot proceed: Step 2 (Read Index) has not completed."
+    EXIT
+```
 
 Present the current structure and ask:
 
@@ -127,49 +203,96 @@ Present the current structure and ask:
 
 ## Step 4: Explore
 
+**Inputs:** `computed.topic`, `computed.goal`, `computed.sources` (from Steps 1, 3)
+**Outputs:** `computed.findings`, `computed.sources_searched`, `computed.new_docs`
 **See:** `lib/corpus/patterns/scanning.md` and `lib/corpus/patterns/sources/README.md`
+
+```pseudocode
+GUARD_STEP_4():
+  IF computed.topic IS null:
+    DISPLAY "Cannot proceed: Step 3 (Ask User) has not completed."
+    EXIT
+  IF computed.sources IS null OR len(computed.sources) == 0:
+    DISPLAY "Cannot proceed: no sources available."
+    EXIT
+```
 
 Search for relevant documentation not yet in the index.
 
 ### Identify Target Sources
 
-Based on user's topic, determine which source(s) to explore:
-- Specific source if user mentioned it
-- All sources if topic is cross-cutting
-- Read `config.yaml` to see available sources (see `lib/corpus/patterns/config-parsing.md`)
+```pseudocode
+IDENTIFY_TARGETS():
+  computed.sources_searched = []
+  computed.findings = []
+  computed.new_docs = []
+
+  IF user specified a source name:
+    targets = [s for s in computed.sources if s.id == user_source]
+    IF len(targets) == 0:
+      DISPLAY "Source '" + user_source + "' not found in config.yaml."
+      DISPLAY "Available sources: " + join(s.id for s in computed.sources, ", ")
+      EXIT
+  ELSE:
+    targets = computed.sources  # search all
+```
 
 ### Search by Source Type
 
-**Git sources** (`.source/{source_id}/`):
+```pseudocode
+SEARCH_SOURCES(targets, topic):
+  FOR source IN targets:
+    computed.sources_searched.append(source.id)
 
-Using Claude tools:
+    SWITCH source.type:
+      CASE "git":
+        base = ".source/" + source.id + "/" + source.docs_root
+        results = Glob(base + "/**/*.md")
+        IF results IS error:
+          DISPLAY "Warning: could not scan " + base + " — " + results.message
+          CONTINUE
+        keyword_hits = Grep(topic, path=base, glob="*.md", output_mode="files_with_matches")
+
+      CASE "local":
+        base = "uploads/" + source.id
+        results = Glob(base + "/**/*.md")
+        keyword_hits = Grep(topic, path=base, glob="*.md", output_mode="files_with_matches")
+
+      CASE "web":
+        base = ".cache/web/" + source.id
+        results = Glob(base + "/*.md")
+        keyword_hits = Grep(topic, path=base, glob="*.md", output_mode="files_with_matches")
+
+    # Filter to docs not already in the index
+    FOR hit IN keyword_hits:
+      entry_path = source.id + ":" + relative_path(hit, base)
+      IF entry_path NOT IN computed.index:
+        computed.new_docs.append({
+          source: source.id,
+          source_type: source.type,
+          path: entry_path,
+          file: hit
+        })
+
+    computed.findings.append({
+      source: source.id,
+      type: source.type,
+      total_files: len(results),
+      keyword_hits: len(keyword_hits),
+      new_docs: len([d for d in computed.new_docs if d.source == source.id])
+    })
 ```
-Glob: .source/{source_id}/{docs_root}/{topic_path}/**/*.md
-Grep: {keyword}
-  path: .source/{source_id}/{docs_root}
-  glob: *.md
-  output_mode: files_with_matches
-```
+
+**Git sources** (`.source/{source_id}/`):
 
 If no local clone, use raw GitHub URLs (see `lib/corpus/patterns/paths.md`):
 ```
 https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{docs_root}/{path}
 ```
 
-**Local sources** (`uploads/{source_id}/`):
-```
-Glob: uploads/{source_id}/**/*.md
-Grep: {keyword}
-  path: uploads/{source_id}
-  glob: *.md
-```
+**Local sources** (`uploads/{source_id}/`)
 
-**Web sources** (`.cache/web/{source_id}/`):
-```
-Glob: .cache/web/{source_id}/*.md
-Grep: {keyword}
-  path: .cache/web/{source_id}
-```
+**Web sources** (`.cache/web/{source_id}/`)
 
 ### Cross-Source Discovery
 
@@ -218,6 +341,24 @@ Common patterns for large file types:
 ---
 
 ## Step 5: Enhance
+
+**Inputs:** `computed.new_docs`, `computed.findings`, `computed.topic` (from Steps 3, 4)
+**Outputs:** `computed.proposed_changes`, `computed.keywords_applied`
+
+```pseudocode
+GUARD_STEP_5():
+  IF computed.new_docs IS null OR computed.findings IS null:
+    DISPLAY "Cannot proceed: Step 4 (Explore) has not completed."
+    EXIT
+
+  IF len(computed.new_docs) == 0:
+    DISPLAY "No new documentation found for topic '" + computed.topic + "'."
+    DISPLAY "All relevant docs are already in the index, or try different search terms."
+    EXIT
+
+  computed.proposed_changes = []
+  computed.keywords_applied = false
+```
 
 Update `index.md` (or target sub-index file) collaboratively:
 
@@ -315,6 +456,33 @@ If user has a routing guide, cross-reference keywords:
 ---
 
 ## Step 6: Save
+
+**Inputs:** `computed.proposed_changes`, `computed.index_type`, `computed.topic` (from Steps 3, 5)
+**Outputs:** `computed.entries_added`
+
+```pseudocode
+GUARD_STEP_6():
+  IF computed.proposed_changes IS null OR len(computed.proposed_changes) == 0:
+    DISPLAY "Cannot proceed: Step 5 (Enhance) produced no changes."
+    EXIT
+
+SAVE_INDEX():
+  # Apply changes via Edit tool
+  FOR change IN computed.proposed_changes:
+    result = Edit(change.file, old_string=change.old, new_string=change.new)
+    IF result IS error:
+      DISPLAY "Failed to apply change to " + change.file + ": " + result.message
+      DISPLAY "You may need to apply this change manually."
+      CONTINUE
+
+  computed.entries_added = count_new_entries(computed.proposed_changes)
+
+  # Stage appropriate files
+  IF computed.index_type == "tiered":
+    DISPLAY "Updated files: index.md and/or index-{section}.md"
+  ELSE:
+    DISPLAY "Updated file: index.md"
+```
 
 Update target index file(s) with enhancements.
 
@@ -490,7 +658,6 @@ User: "The detailed actions sub-index"
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`
-- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`
 - Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`

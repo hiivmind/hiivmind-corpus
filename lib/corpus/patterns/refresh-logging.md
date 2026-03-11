@@ -12,7 +12,7 @@ The refresh workflow produces detailed execution logs that:
 - Enable CI/CD integration with structured output
 - Track changes across refresh operations
 
-**Framework:** This document uses the generic logging framework from `lib/workflow/consequences/core/logging.md`. Corpus-specific events use `log_event` with domain-specific event types.
+**Framework:** This document uses the generic logging framework from [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib). Corpus-specific events use `log_event` with domain-specific event types.
 
 ---
 
@@ -592,11 +592,9 @@ else:
 
 ## Related Documentation
 
-- **Core logging consequences:** `lib/workflow/consequences/core/logging.md`
-- **Logging schema:** `lib/workflow/logging-schema.md`
+- **Workflow Framework:** [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib) — logging consequences, schema
 - **Logging configuration:** `lib/corpus/patterns/logging-configuration.md`
 - **Session tracking:** `lib/corpus/patterns/session-tracking.md`
-- **Deprecated logging:** `lib/workflow/consequences/extensions/logging.md` (migration guide)
 - **Refresh workflow:** `skills/hiivmind-corpus-refresh/workflow.yaml`
 - **Refresh skill:** `skills/hiivmind-corpus-refresh/SKILL.md`
 - **Status patterns:** `lib/corpus/patterns/status.md`

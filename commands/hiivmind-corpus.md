@@ -1,117 +1,115 @@
 ---
-description: Unified entry point for all corpus operations - describe what you need in natural language
-argument-hint: Describe your goal (e.g., "index React docs", "refresh my polars corpus", or just a corpus name)
-allowed-tools: ["Read", "Write", "Bash", "Glob", "Grep", "TodoWrite", "AskUserQuestion", "Skill", "Task", "WebFetch"]
+name: hiivmind-corpus
+description: >
+  Unified entry point for managing documentation corpora. Routes requests to:
+  init, add-source, build, navigate, refresh, enhance, discover, register, status.
+arguments:
+  - name: request
+    description: What you want to do (optional - shows menu if omitted)
+    required: false
 ---
 
-# Corpus Gateway Workflow
+# hiivmind-corpus Gateway
 
-Execute this workflow deterministically. State persists in conversation context across turns.
+Route natural language requests to corpus management skills. This is a **router** —
+it detects intent and immediately dispatches to the matched skill.
 
-> **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/workflow.yaml`
-> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+## Dispatch Protocol
 
----
+**CRITICAL:** This gateway is a ROUTER, not an executor.
 
-## Execution Reference
-
-| Resource | Location |
-|----------|----------|
-| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/workflow.yaml` |
-| Intent Mapping | `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml` |
-| Core loop | [traversal.yaml](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/execution/traversal.yaml) |
-| State | [state.yaml](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/execution/state.yaml) |
-| Execution Model | [execution/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/execution/) |
-| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
-| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
-| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
-| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
+1. **DO NOT answer the user's request yourself** — your job is routing
+2. **DO NOT pre-validate or gather information** — let the skill handle its own context
+3. **Detect intent** from the user's input using the routing table below
+4. **IMMEDIATELY invoke the matched skill** using the Skill tool
+5. **Let the skill take over** — it will load its own SKILL.md and execute
 
 ---
 
-## Usage
+## Routing Table
 
-Describe your goal in natural language:
+Match the user's input against these keywords to determine the target skill.
+If multiple skills match, prefer the one with the most specific keyword match.
 
-- "index the polars documentation" → Creates new corpus
-- "what is lazy evaluation?" → Navigates installed corpora
-- "is my polars corpus up to date?" → Checks freshness
-- "more detail on authentication" → Enhances topic coverage
+| Skill | Keywords | Example Input |
+|-------|----------|---------------|
+| `hiivmind-corpus-init` | create, new, set up, scaffold, initialize, start corpus | "create react docs" |
+| `hiivmind-corpus-add-source` | add source, include, import, extend with, add docs | "add source from github" |
+| `hiivmind-corpus-build` | build, analyze, scan, create index, finish setup, index now | "build my corpus" |
+| `hiivmind-corpus-navigate` | navigate, query, ask, search docs, find in docs, documentation for | "polars lazy evaluation" |
+| `hiivmind-corpus-refresh` | update, refresh, sync, stale, behind, upstream, is up to date | "refresh polars" |
+| `hiivmind-corpus-enhance` | expand, deepen, more detail, enhance, elaborate, deeper coverage | "enhance authentication topic" |
+| `hiivmind-corpus-discover` | list, available, installed, discover, what/which/show corpora | "list available corpora" |
+| `hiivmind-corpus-register` | register, add corpus, connect corpus, enable corpus, add to registry | "register polars corpus" |
+| `hiivmind-corpus-status` | status, health, check, diagnose, info | "check corpus health" |
 
----
+### Disambiguation
 
-## Quick Examples
+If no clear match, or if multiple skills match equally, present the interactive menu (see below).
 
-| Input | Result |
-|-------|--------|
-| `/hiivmind-corpus` | Show interactive menu |
-| `/hiivmind-corpus polars lazy evaluation` | Navigate polars corpus |
-| `/hiivmind-corpus create react docs` | Initialize new corpus |
-| `/hiivmind-corpus refresh polars` | Check for upstream changes |
-| `/hiivmind-corpus enhance polars lazy api` | Deepen coverage on topic |
-| `/hiivmind-corpus list` | List installed corpora |
+### Query fallback
 
----
-
-## Context Types
-
-| Context | Detection | Valid Operations |
-|---------|-----------|------------------|
-| corpus-dir | `data/config.yaml` exists | add-source, build, enhance, refresh, upgrade, navigate |
-| marketplace | `.claude-plugin/marketplace.json` exists | init (add), batch refresh, batch upgrade |
-| fresh | Neither of above | init |
+If the input doesn't match any action keyword but contains what looks like a documentation
+question (e.g., "polars lazy evaluation", "how do I deploy to fly.io"), route to
+`hiivmind-corpus-navigate`.
 
 ---
 
-## Intent Detection
+## Interactive Menu (no input)
 
-The gateway uses 3-Valued Logic (3VL) for compound intent handling. This allows inputs like "help me initialize" to correctly route to init rather than help.
+If invoked with no arguments or no keywords matched, present:
 
-**Intent Mapping:** `${CLAUDE_PLUGIN_ROOT}/commands/hiivmind-corpus/intent-mapping.yaml`
+```
+What would you like to do?
 
-This file defines:
-- **11 intent flags** - Keywords that detect user intents
-- **19 intent rules** - Flag combinations mapped to actions with priorities
+1. Navigate documentation — Search and query corpus content
+2. Create a corpus — Initialize a new documentation corpus
+3. Add a source — Add documentation source to existing corpus
+4. Build index — Analyze sources and generate index
+5. Refresh — Check for upstream changes and update
+6. Enhance — Deepen coverage on specific topics
+7. Discover — List available corpora
+8. Register — Connect a corpus to this project
+9. Status — Check corpus health and freshness
+```
 
-For 3VL semantics and algorithms, see [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0).
-
----
-
-## Reference Documentation
-
-| Resource | Location |
-|----------|----------|
-| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
-| Execution Model | [execution/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/execution/) |
-| Discovery Pattern | `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md` |
-| Config Parsing | `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md` |
+Route to the selected skill.
 
 ---
 
-## Related Skills
+## Skill Invocation
 
-### Build Skills (Create/Maintain Corpora)
+When dispatching, pass the user's original arguments (minus the routing keywords) to the skill:
+
+```
+Skill(
+  skill: "hiivmind-corpus-{matched_skill}",
+  args: "{remaining_arguments}"
+)
+```
+
+**Examples:**
+
+| User Input | Matched Skill | Args Passed |
+|------------|---------------|-------------|
+| `/hiivmind-corpus create react docs` | hiivmind-corpus-init | "react docs" |
+| `/hiivmind-corpus polars lazy evaluation` | hiivmind-corpus-navigate | "polars lazy evaluation" |
+| `/hiivmind-corpus refresh polars` | hiivmind-corpus-refresh | "polars" |
+| `/hiivmind-corpus register github:hiivmind/hiivmind-corpus-flyio` | hiivmind-corpus-register | "github:hiivmind/hiivmind-corpus-flyio" |
+| `/hiivmind-corpus` | (show menu) | |
+
+---
+
+## Available Skills
 
 | Skill | Purpose |
 |-------|---------|
 | `hiivmind-corpus-init` | Create new corpus scaffold |
 | `hiivmind-corpus-add-source` | Add documentation sources |
 | `hiivmind-corpus-build` | Build/rebuild the index |
-| `hiivmind-corpus-enhance` | Deepen coverage on topics |
+| `hiivmind-corpus-navigate` | Query documentation |
 | `hiivmind-corpus-refresh` | Sync with upstream changes |
-| `hiivmind-corpus-upgrade` | Apply latest templates |
-
-### Read Skills (Query/Navigate Corpora)
-
-| Skill | Purpose |
-|-------|---------|
-| `hiivmind-corpus-navigate` | Search and retrieve documentation |
-| `hiivmind-corpus-register` | Add corpus to project registry |
+| `hiivmind-corpus-enhance` | Deepen coverage on topics |
+| `hiivmind-corpus-discover` | List available corpora |
+| `hiivmind-corpus-register` | Register corpus with project |
 | `hiivmind-corpus-status` | Check corpus health/freshness |
-
-### Shared Skills
-
-| Skill | Purpose |
-|-------|---------|
-| `hiivmind-corpus-discover` | Find available corpora (registry + plugins) |
-| `hiivmind-corpus-awareness` | Add to CLAUDE.md |

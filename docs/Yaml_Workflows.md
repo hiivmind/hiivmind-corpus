@@ -1,3 +1,8 @@
+> **ARCHIVED:** This design doc references `lib/workflow/` and `lib/intent_detection/` which have been
+> removed. Workflow and intent detection definitions now live in
+> [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib).
+> Paths below are historical and no longer resolve.
+
 # Plan: YAML Workflow System for hiivmind-corpus Skills
 
 ## Goal

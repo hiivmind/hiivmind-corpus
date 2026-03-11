@@ -13,7 +13,7 @@ Find and report all available documentation corpora, including:
 
 - **Generic doc queries**: User asks "check the docs" without specifying which documentation
 - **Corpus inventory**: User asks what corpora are installed/registered
-- **Before managing**: Find corpora to enhance, refresh, or upgrade
+- **Before managing**: Find corpora to enhance or refresh
 - **Troubleshooting**: Verify which corpora are available and their status
 
 ## Handling Generic Documentation Queries

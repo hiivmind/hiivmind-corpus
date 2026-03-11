@@ -367,8 +367,5 @@ logging:
 
 ## Related Documentation
 
-- **Consequences:** `lib/workflow/consequences/core/logging.md`
-- **Schema:** `lib/workflow/logging-schema.md`
-- **Preconditions:** `lib/workflow/preconditions.md` - log_initialized, log_level_enabled
-- **State:** `lib/workflow/state.md` - Runtime state structure
+- **Workflow Framework:** [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib) — logging consequences, schema, preconditions, state
 - **Session Tracking:** `lib/corpus/patterns/session-tracking.md` - Hook setup

@@ -3,390 +3,290 @@ name: hiivmind-corpus-init
 description: >
   This skill should be used when the user asks to "create a corpus", "initialize documentation",
   "set up docs for a library", "index this project's docs", "create documentation corpus",
-  "scaffold corpus skill", or mentions wanting to create a new documentation corpus for any
-  open source project. Also triggers on "new corpus", "corpus for [library name]", or
-  "hiivmind-corpus init".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
+  or mentions wanting to create a new documentation corpus. Also triggers on "new corpus",
+  "corpus for [library name]", or "hiivmind-corpus init".
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash
+inputs:
+  - name: source_url
+    type: string
+    required: false
+    description: GitHub repo URL, docs site URL, or local path (prompted if not provided)
+  - name: corpus_name
+    type: string
+    required: false
+    description: Corpus identifier (derived from URL or prompted if not provided)
+outputs:
+  - name: corpus_root
+    type: string
+    description: Path to the created corpus directory
+  - name: delegated_to_add_source
+    type: boolean
+    description: Whether the skill delegated to add-source for initial content
 ---
 
-# Init Workflow
+# Corpus Init
 
-## Architecture Options
+Initialize a new data-only documentation corpus. Collects project info, scaffolds a flat
+repository structure, and delegates to `hiivmind-corpus-add-source` for source acquisition.
 
-When creating a new corpus, choose between:
+> **HARD STOP:** This skill MUST NOT fetch, clone, scan, explore, or read any external content.
+> It writes local files only. All source acquisition is the exclusive responsibility of
+> `hiivmind-corpus-add-source`.
 
-| Type | Structure | Use Case |
-|------|-----------|----------|
-| **Data-only** (recommended) | Just config.yaml, index.md at root | New corpora, easy maintenance |
-| **Plugin-based** (legacy) | Full .claude-plugin/, skills/, commands/ | Existing plugins, special cases |
+## Corpus Structure
 
-**Recommendation:** Use data-only for new corpora. Navigation is handled by `hiivmind-corpus-navigate`.
-
-### Data-Only Structure
+Every corpus created by this skill has this structure:
 
 ```
 hiivmind-corpus-{name}/
-├── config.yaml          # Source definitions, keywords
-├── index.md             # Main documentation index
-├── index-*.md           # Sub-indexes (for large corpora)
-├── uploads/             # Local document uploads
-├── .source/             # Cloned git sources (gitignored)
-└── README.md
-```
-
-Users register this corpus via `/hiivmind-corpus register github:owner/repo`.
-
-### Legacy Plugin Structure
-
-```
-hiivmind-corpus-{name}/
-├── .claude-plugin/plugin.json
-├── skills/navigate/SKILL.md
-├── commands/navigate.md
-├── data/
-│   ├── config.yaml
-│   └── index.md
-└── ...
+├── config.yaml          # schema_version: 2, corpus metadata, source stub
+├── index.md             # Placeholder until build runs
+├── CLAUDE.md            # Data-only corpus guidance
+├── README.md            # Brief description
+├── .gitignore           # .source/, .cache/, OS files
+├── LICENSE              # MIT
+└── uploads/             # For local document uploads
 ```
 
 ---
 
-Execute this workflow deterministically. State persists in conversation context across turns.
+## Phase 1: Collect Project Name
 
-> **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml`
-> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+**Inputs:** invocation arguments (optional `source_url`, optional `corpus_name`)
+**Outputs:** `computed.corpus_name`, `computed.display_name`
 
----
+If `corpus_name` was provided as an input argument, use it directly.
 
-## Execution Reference
+If `source_url` was provided, derive the name:
 
-| Resource | Location |
-|----------|----------|
-| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml` |
-| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
-| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
-| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
-| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
-
----
-
-## Execution Instructions
-
-### Phase 1: Initialize
-
-1. **Load workflow.yaml** from this skill directory:
-   Read: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/workflow.yaml`
-
-2. **Check entry preconditions** (see blueprint-lib `preconditions/`):
-   - None for init (this skill creates the corpus)
-
-3. **Initialize runtime state**:
-   ```yaml
-   workflow_name: init
-   workflow_version: "2.0.0"
-   current_node: detect_context
-   previous_node: null
-   history: []
-   user_responses: {}
-   computed: {}
-   flags:
-     is_git_repo: false
-     has_marketplace: false
-     has_corpus_plugins: false
-     is_established_project: false
-     user_wants_source: false
-     start_empty: false
-   checkpoints: {}
-   phase: "detect"
-   context_type: null
-   destination_type: null
-   corpus_name: null
-   source_url: null
-   keywords: []
-   placeholders:
-     plugin_name: null
-     project_name: null
-     project_display_name: null
-     corpus_short_name: null
-     keyword_list: null
-     keywords_sentence: null
-   ```
-
----
-
-### Phase 2: Execution Loop
-
-Execute nodes until an ending is reached:
-
-```
-LOOP:
-  1. Get current node from workflow.nodes[current_node]
-
-  2. Check for ending:
-     - IF current_node is in workflow.endings:
-       - Display ending.message with ${} interpolation
-       - IF ending.type == "error" AND ending.recovery:
-         - Display recovery instructions
-       - IF ending.type == "success" AND ending.summary:
-         - Display summary fields
-       - IF ending.delegate:
-         - Inform user about delegation to next skill
-       - STOP
-
-  3. Execute based on node.type:
-
-     ACTION NODE:
-     - FOR each action IN node.actions:
-       - Execute action per blueprint-lib consequence definitions
-       - Store results in state.computed if store_as specified
-     - IF all actions succeed:
-       - Set current_node = node.on_success
-     - ELSE:
-       - Set current_node = node.on_failure
-     - CONTINUE
-
-     CONDITIONAL NODE:
-     - Evaluate node.condition per blueprint-lib precondition definitions
-     - IF result == true:
-       - Set current_node = node.branches.true
-     - ELSE:
-       - Set current_node = node.branches.false
-     - CONTINUE
-
-     USER_PROMPT NODE:
-     - Build AskUserQuestion from node.prompt:
-       '```json
-       {
-         "questions": [{
-           "question": "[interpolated node.prompt.question]",
-           "header": "[node.prompt.header]",
-           "multiSelect": false,
-           "options": [map node.prompt.options to {label, description}]
-         }]
-       }
-       ```'
-     - Present via AskUserQuestion tool
-     - Wait for user response
-     - Find matching handler in node.on_response:
-       - If user selected an option: use that option's id
-       - If user typed custom text: use "other"
-     - Store response in state.user_responses[current_node]
-     - Apply handler.consequence if present (execute each consequence)
-     - Set current_node = handler.next_node
-     - CONTINUE
-
-     VALIDATION_GATE NODE:
-     - FOR each validation IN node.validations:
-       - Evaluate validation (precondition with error_message)
-       - IF fails: collect validation.error_message
-     - IF any validations failed:
-       - Store errors in state.computed.validation_errors
-       - Set current_node = node.on_invalid
-     - ELSE:
-       - Set current_node = node.on_valid
-     - CONTINUE
-
-     REFERENCE NODE:
-     - Load document: Read ${CLAUDE_PLUGIN_ROOT}/{node.doc}
-     - IF node.section: extract only that section
-     - Build context object from node.context with ${} interpolation
-     - Execute the document section with context available
-     - Set current_node = node.next_node
-     - CONTINUE
-
-  4. Record in history:
-     '```yaml
-     history.append({
-       node: previous_node_name,
-       outcome: { success: true/false, branch: "true"/"false", response: "id" },
-       timestamp: now()
-     })
-     ```'
-
-  5. Update position:
-     - previous_node = current_node (before update)
-     - current_node = next_node (from step 3)
-
-UNTIL ending reached
+```pseudocode
+DERIVE_NAME(url):
+  IF url contains "github.com":
+    name = url, remove trailing ".git", take last path segment, lowercase
+  ELSE IF url starts with "http":
+    name = url, strip protocol, take first domain segment,
+           remove "docs." prefix, take before first ".", lowercase
+  ELSE:
+    # Local path
+    name = basename of path, lowercase
+  RETURN name
 ```
 
----
+Confirm with user: "Corpus name derived as '{name}'. Is this correct?"
 
-## Variable Interpolation
+If neither argument was provided, ask: "What project are you creating a corpus for?"
 
-Replace `${...}` patterns in strings:
-
-| Pattern | Resolution |
-|---------|------------|
-| `${corpus_name}` | `state.corpus_name` |
-| `${destination_type}` | `state.destination_type` |
-| `${context_type}` | `state.context_type` |
-| `${source_url}` | `state.source_url` |
-| `${computed.skill_root}` | `state.computed.skill_root` |
-| `${computed.plugin_root}` | `state.computed.plugin_root` |
-| `${placeholders.plugin_name}` | `state.placeholders.plugin_name` |
-| `${flags.is_git_repo}` | `state.flags.is_git_repo` |
-| `${user_responses.node_name.id}` | Selected option id |
-| `${user_responses.node_name.raw.text}` | Custom text input |
-
-**Resolution order:**
-1. `state.computed.{path}`
-2. `state.flags.{path}`
-3. `state.placeholders.{path}`
-4. `state.user_responses.{path}`
-5. `state.{path}`
+Derive `display_name` by capitalizing the first letter of each word in the name.
 
 ---
 
-## Workflow Graph Overview
+## Phase 2: Collect Source URL
 
-```
-detect_context
-    │
-    ▼
-route_context ─────── has_marketplace? ─────┐
-    │ no                                    │ yes
-    ▼                                       ▼
-check_has_corpus_plugins              confirm_context_c
-    │                                       │
-    ├─► yes ─► confirm_context_c            │
-    │                                       │
-    └─► no ─► check_established_project     │
-              │                             │
-              ├─► yes ─► confirm_context_a  │
-              │              │              │
-              │              ▼              │
-              │         choose_dest_a       │
-              │              │              │
-              │         ┌────┴────┐         │
-              │         │         │         │
-              │    user-level  repo-local   │
-              │         │         │         │
-              │         └────┬────┘         │
-              │              │              │
-              └─► no ─► confirm_context_b   │
-                             │              │
-                             ▼              │
-                        choose_dest_b       │
-                             │              │
-                    ┌────────┼────────┐     │
-                    │        │        │     │
-               user-level single  multi     │
-                    │        │        │     │
-                    └────────┴────────┘     │
-                             │              │
-                             └──────────────┴─────────────────────┐
-                                                                  │
-                                                                  ▼
-                                                        collect_source_url
-                                                                  │
-                                                ┌─────────────────┼─────────────────┐
-                                                │                 │                 │
-                                           github URL         docs URL          start empty
-                                                │                 │                 │
-                                         collect_github_url  collect_docs_url      │
-                                                │                 │                 │
-                                                └────────┬────────┘                 │
-                                                         │                          │
-                                                  derive_corpus_name                │
-                                                         │                          │
-                                                  confirm_corpus_name  ◄────────────┤
-                                                         │                          │
-                                                         │     collect_corpus_name_manual
-                                                         │                          │
-                                                         └──────────┬───────────────┘
-                                                                    │
-                                                          compute_placeholders
-                                                                    │
-                                                              collect_keywords
-                                                                    │
-                                                           compute_skill_root
-                                                                    │
-                                            ┌───────────────────────┴───────────────────────┐
-                                            │                                               │
-                                    skill (user/repo-local)                          plugin types
-                                            │                                               │
-                                   compute_skill_path                            compute_plugin_path
-                                            │                                               │
-                                            │                    ┌──────────────────────────┤
-                                            │                    │                          │
-                                            │             single-corpus               multi-corpus
-                                            │                    │                          │
-                                            │          compute_single_corpus_path   compute_multi_corpus_path
-                                            │                    │                          │
-                                            └────────────────────┴────────────┬─────────────┘
-                                                                              │
-                                                              create_checkpoint_before_scaffold
-                                                                              │
-                                                              route_scaffold_by_destination
-                                                                              │
-                                            ┌─────────────────────────────────┴─────────────────────────────────┐
-                                            │                       │                       │                   │
-                                     skill scaffold           single-corpus          multi-corpus-new    multi-corpus-existing
-                                            │                       │                       │                   │
-                                   scaffold_skill_directories  scaffold_single_corpus  scaffold_multi_corpus_new  scaffold_multi_corpus_existing
-                                            │                       │                       │                   │
-                                   generate_skill_files       generate_single_corpus_files  generate_multi_corpus_new_files  generate_multi_corpus_existing_files
-                                            │                       │                       │                   │
-                                   verify_skill_structure     verify_single_corpus_structure  verify_multi_corpus_new_structure  verify_multi_corpus_existing_structure
-                                            │                       │                       │                   │
-                                            │                       │                       │       update_marketplace_registry
-                                            │                       │                       │                   │
-                                            └───────────────────────┴───────────────────────┴───────────────────┘
-                                                                              │
-                                                                  check_source_delegation
-                                                                              │
-                                                              ┌───────────────┴───────────────┐
-                                                              │                               │
-                                                        user_wants_source               start_empty
-                                                              │                               │
-                                                   prepare_add_source_delegation              │
-                                                              │                               │
-                                                       success_with_source            success_empty
-                                                              │
-                                                  (delegate to add-source)
+**Inputs:** invocation arguments (optional `source_url`)
+**Outputs:** `computed.source_url`, `computed.source_type`
+
+If `source_url` was provided as an input argument, skip the prompt.
+
+Otherwise ask: "Where are the docs? (GitHub repo URL, docs site URL, or local path)"
+
+Determine source type from URL shape:
+
+| URL Pattern | Source Type |
+|-------------|-------------|
+| Contains `github.com` | `git` |
+| Starts with `http` | `web` |
+| Filesystem path | `local` |
+
+For git sources, also extract `repo_owner` and `repo_name` from the URL path segments.
+
+Store the URL string and type. **Do not fetch, clone, or read the source.**
+
+---
+
+## Phase 3: Collect Keywords
+
+**Inputs:** `computed.corpus_name`
+**Outputs:** `computed.keywords`
+
+Suggest default keywords based on the project name. Ask: "What keywords should route
+documentation questions to this corpus? (comma-separated, or press enter for defaults)"
+
+Default keywords: the corpus name itself plus common variations (e.g., for "flyio":
+`flyio, fly.io, fly`).
+
+---
+
+## Phase 4: Scaffold
+
+**Inputs:** `computed.corpus_name`, `computed.display_name`, `computed.source_url`,
+`computed.source_type`, `computed.keywords`
+**Outputs:** `computed.corpus_root`, files on disk
+
+Create the corpus directory and all files at `./hiivmind-corpus-{name}/`.
+
+```bash
+mkdir -p ./hiivmind-corpus-{name}/uploads
 ```
 
+### 4a: config.yaml
+
+**For git sources:**
+
+```yaml
+schema_version: 2
+
+corpus:
+  name: "{name}"
+  display_name: "{Display Name}"
+  keywords:
+    - "{keyword1}"
+    - "{keyword2}"
+
+sources:
+  - id: "{name}"
+    type: "git"
+    repo_url: "{url}"
+    repo_owner: "{owner}"
+    repo_name: "{repo}"
+    branch: "main"
+    docs_root: "."
+    last_commit_sha: null
+    last_indexed_at: null
+
+index:
+  format: "markdown"
+  last_updated_at: null
+
+settings:
+  include_patterns:
+    - "**/*.md"
+    - "**/*.mdx"
+  exclude_patterns:
+    - "**/_*.md"
+    - "**/_snippets/**"
+```
+
+**For web sources:** Use `type: "web"` and `base_url` field instead of repo fields.
+
+**For local sources:** Use `type: "local"` and `path` field instead of repo fields.
+
+### 4b: index.md
+
+```markdown
+# {Display Name} Documentation Corpus
+
+> Run `/hiivmind-corpus build` to build this index.
+
+This corpus is not yet populated. Add documentation sources and build the index.
+```
+
+### 4c: CLAUDE.md
+
+Write a CLAUDE.md parameterized with the corpus name and keywords. Content should match
+the data-only corpus pattern:
+
+- State that this is a data-only documentation corpus (not a plugin)
+- Show how to register it (`/hiivmind-corpus register github:hiivmind/hiivmind-corpus-{name}`)
+- Show how to navigate it
+- Document the directory structure
+- List key files and their purposes
+- List maintenance skills (build, refresh, enhance, add-source)
+- List the routing keywords from `computed.keywords`
+
+Use `hiivmind-corpus-flyio/CLAUDE.md` as the reference template, substituting the project
+name and keywords.
+
+### 4d: README.md
+
+```markdown
+# hiivmind-corpus-{name}
+
+Documentation corpus for {Display Name}.
+
+## Usage
+
+Register this corpus with your project:
+
+```
+/hiivmind-corpus register github:hiivmind/hiivmind-corpus-{name}
+```
+
+Then ask questions about {Display Name} — the navigate skill will find relevant documentation.
+
+## Maintenance
+
+| Skill | Purpose |
+|-------|---------|
+| `hiivmind-corpus-build` | Build the documentation index |
+| `hiivmind-corpus-refresh` | Update from upstream changes |
+| `hiivmind-corpus-enhance` | Deepen coverage on topics |
+| `hiivmind-corpus-add-source` | Add documentation sources |
+```
+
+### 4e: .gitignore
+
+```
+# Cloned documentation repositories
+.source/
+
+# Cached web content
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+```
+
+### 4f: LICENSE
+
+MIT License with `Copyright (c) {current_year} hiivmind`. Use the standard MIT text.
+
+### 4g: Verify Scaffold
+
+After writing all files, verify these exist:
+- `{root}/config.yaml`
+- `{root}/index.md`
+- `{root}/CLAUDE.md`
+- `{root}/README.md`
+- `{root}/.gitignore`
+- `{root}/LICENSE`
+- `{root}/uploads/` (directory)
+
+If any file is missing, report it and check file system permissions.
+
 ---
 
-## Context Detection Matrix
+## Phase 5: Delegate to add-source
 
-| Flags | Context | Destination Options |
-|-------|---------|---------------------|
-| `has_marketplace` OR `has_corpus_plugins` | C: Existing marketplace | multi-corpus-existing |
-| `is_established_project` | A: Established project | user-level, repo-local |
-| Neither | B: Fresh directory | user-level, single-corpus, multi-corpus-new |
+**Inputs:** `computed.source_url`, `computed.corpus_root`
+**Outputs:** `computed.delegated_to_add_source`
 
----
+Display a summary of what was created:
 
-## Reference Documentation
+```
+Corpus '{name}' initialized at {corpus_root}
 
-### Blueprint Library (Remote)
-- **Type Definitions:** [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0)
-- **Consequences:** `consequences/core/` (state, evaluation, logging) + `consequences/extensions/` (file, git, web)
-- **Preconditions:** `preconditions/` (filesystem, state checks)
-- **Execution Model:** `execution/` (traversal, state management)
+Files created:
+  config.yaml, index.md, CLAUDE.md, README.md, .gitignore, LICENSE, uploads/
 
-### Corpus Patterns (Local)
-- **Template generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/template-generation.md`
-- **Config parsing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md`
+Delegating to add-source for source acquisition...
+```
 
----
+Immediately invoke `hiivmind-corpus-add-source` with:
+- `source_url`: `computed.source_url`
+- `working_directory`: `computed.corpus_root`
 
-## Pattern Documentation
-
-Template generation operations referenced by this workflow:
-
-- **Template generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/template-generation.md`
-- **Template placeholders:** `${CLAUDE_PLUGIN_ROOT}/references/template-placeholders.md`
-- **Marketplace templates:** `${CLAUDE_PLUGIN_ROOT}/references/marketplace-templates.md`
+Set `computed.delegated_to_add_source = true`. Init is complete.
 
 ---
 
 ## Related Skills
 
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
-- Build full index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
-- Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`
+- Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
 - Refresh sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
-- Discover corpora: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-discover/SKILL.md`

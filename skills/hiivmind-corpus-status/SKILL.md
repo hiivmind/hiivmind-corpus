@@ -17,7 +17,7 @@ index status, source availability, and cache state.
 - User asks about corpus status or health
 - User wants to know if corpora need updating
 - Diagnosing navigation or fetch issues
-- Before bulk operations (upgrade, refresh)
+- Before bulk operations (refresh)
 
 ## Workflow
 
@@ -188,7 +188,7 @@ flyio, fly.io, deployment, hosting, edge, cloud
 |--------|---------|--------|
 | `healthy` | Index exists, sources current | None needed |
 | `stale` | Upstream has new commits | Run `/hiivmind-corpus refresh` |
-| `outdated` | Schema version is old | Run `/hiivmind-corpus upgrade` |
+| `outdated` | Schema version is old | Update config.yaml manually |
 | `no-index` | Config exists but no index | Run `/hiivmind-corpus build` |
 | `unreachable` | Cannot fetch from source | Check network/URL |
 | `invalid` | Config is malformed | Check config.yaml |

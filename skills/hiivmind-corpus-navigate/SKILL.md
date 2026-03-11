@@ -115,7 +115,7 @@ Search the index for relevant entries:
 
 For matched entry `source_id:relative_path`:
 
-1. Get source config from corpus config.yaml
+1. Read source config from corpus config.yaml:  CRITICAL. You MUST read config.yaml FIRST to resolve source_id: prefixes to actual repository URLs. Never guess repository names.
 2. Build gh api command or local path to documentation
 3. Fetch content
 

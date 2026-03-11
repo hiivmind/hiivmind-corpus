@@ -407,6 +407,5 @@ cat .logs/.session-state.yaml
 ## Related Documentation
 
 - **Hook Template:** `templates/hooks/session-capture.sh`
-- **Logging Schema:** `lib/workflow/logging-schema.md`
-- **Logging Consequences:** `lib/workflow/consequences/core/logging.md`
+- **Workflow Framework:** [hiivmind-blueprint-lib](https://github.com/hiivmind/hiivmind-blueprint-lib) — logging schema, consequences
 - **Logging Configuration:** `lib/corpus/patterns/logging-configuration.md`

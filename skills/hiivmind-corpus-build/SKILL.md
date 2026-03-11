@@ -7,377 +7,287 @@ description: >
   "create the index.md", "finish setting up corpus", "hiivmind-corpus build", or when a corpus
   has placeholder index.md that says "Run hiivmind-corpus-build".
 allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, Task
+inputs:
+  - name: corpus_name
+    type: string
+    required: false
+    description: Name of the corpus to build (uses current directory if not provided)
+outputs:
+  - name: index_path
+    type: string
+    description: Path to the generated index.md
+  - name: segmentation_strategy
+    type: string
+    description: Strategy used (single, tiered, by-section, by-source)
+  - name: entry_count
+    type: number
+    description: Total index entries created
 ---
 
-# Build Workflow
+# Corpus Build
 
-Execute this workflow deterministically. State persists in conversation context across turns.
+Build the documentation corpus index. Prepares all sources, scans for content, consults
+the user on organization preferences, generates `index.md`, and updates config metadata.
+Supports single and multi-source corpora with tiered indexing for large (500+ file) corpora.
 
-> **Workflow Definition:** `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml`
-> **Blueprint Library:** `hiivmind/hiivmind-blueprint-lib@v2.0.0`
+## Precondition
 
----
-
-## Execution Reference
-
-| Resource | Location |
-|----------|----------|
-| Workflow Definition | `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml` |
-| Type Definitions | [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0) |
-| Consequences (core) | [consequences/core/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/core/) |
-| Consequences (extensions) | [consequences/extensions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/consequences/extensions/) |
-| Preconditions | [preconditions/](https://raw.githubusercontent.com/hiivmind/hiivmind-blueprint-lib/v2.0.0/preconditions/) |
-
----
-
-## Execution Instructions
-
-### Phase 1: Initialize
-
-1. **Load workflow.yaml** from this skill directory:
-   Read: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/workflow.yaml`
-
-2. **Check entry preconditions** (see blueprint-lib `preconditions/`):
-   - `config_exists`: Verify `config.yaml` exists
-
-3. **Initialize runtime state**:
-   ```yaml
-   workflow_name: build
-   workflow_version: "2.0.0"
-   current_node: read_config
-   previous_node: null
-   history: []
-   user_responses: {}
-   computed: {}
-   phase: "prepare"
-   sources: []
-   scan_results: {}
-   user_preferences:
-     use_case: null
-     priority_sources: []
-     skip_sections: []
-     organization: null
-   segmentation:
-     strategy: null
-     sections: []
-   index:
-     content: null
-     sub_indexes: []
-   flags:
-     config_found: false
-     is_multi_source: false
-     is_large_corpus: false
-     needs_segmentation: false
-     user_satisfied: false
-     sources_prepared: false
-     scan_completed: false
-   checkpoints: {}
-   ```
+A `config.yaml` must exist with at least one source configured.
+If not found, suggest running `hiivmind-corpus-init` and `hiivmind-corpus-add-source`.
 
 ---
 
-### Phase 2: Execution Loop
+## Phase 1: Prepare Sources
 
-Execute nodes until an ending is reached:
+**Inputs:** working directory
+**Outputs:** `computed.config`, `computed.sources`, all sources verified ready
 
-```
-LOOP:
-  1. Get current node from workflow.nodes[current_node]
+1. Read and parse `config.yaml`
+2. Verify at least one source exists
+3. For each source, verify it's ready for scanning:
 
-  2. Check for ending:
-     - IF current_node is in workflow.endings:
-       - Display ending.message with ${} interpolation
-       - IF ending.type == "error" AND ending.recovery:
-         - Display recovery instructions
-       - IF ending.type == "success" AND ending.summary:
-         - Display summary fields
-       - STOP
+### Per-source preparation by type
 
-  3. Execute based on node.type:
+**Git source:**
+- Check if `.source/{source_id}/` clone exists
+- If exists, verify it's a valid git repo
+- If missing, clone: `git clone --depth 1 --branch {branch} {url} .source/{source_id}`
 
-     ACTION NODE:
-     - FOR each action IN node.actions:
-       - Execute action per blueprint-lib consequence definitions
-       - Store results in state.computed if store_as specified
-     - IF all actions succeed:
-       - Set current_node = node.on_success
-     - ELSE:
-       - Set current_node = node.on_failure
-     - CONTINUE
+**Local source:**
+- Check if `uploads/{source_id}/` directory exists
+- Verify it contains at least one file (`.md`, `.mdx`, or `.pdf`)
+- If empty, warn user and ask whether to continue or skip this source
 
-     CONDITIONAL NODE:
-     - Evaluate node.condition per blueprint-lib precondition definitions
-     - IF result == true:
-       - Set current_node = node.branches.true
-     - ELSE:
-       - Set current_node = node.branches.false
-     - CONTINUE
+**Web source:**
+- Check if `.cache/web/{source_id}/` directory exists
+- Verify it contains cached content files
+- If missing, warn: "Web cache is empty. Run add-source to fetch content first."
 
-     USER_PROMPT NODE:
-     - Build AskUserQuestion from node.prompt:
-       '```json
-       {
-         "questions": [{
-           "question": "[interpolated node.prompt.question]",
-           "header": "[node.prompt.header]",
-           "multiSelect": false,
-           "options": [map node.prompt.options to {label, description}]
-         }]
-       }
-       ```'
-     - Present via AskUserQuestion tool
-     - Wait for user response
-     - Find matching handler in node.on_response:
-       - If user selected an option: use that option's id
-       - If user typed custom text: use "other"
-     - Store response in state.user_responses[current_node]
-     - Apply handler.consequence if present (execute each consequence)
-     - Set current_node = handler.next_node
-     - CONTINUE
+**llms-txt source:**
+- Check if `.cache/llms-txt/{source_id}/` exists
+- Verify cached pages are present
+- If empty, suggest fetching content first
 
-     VALIDATION_GATE NODE:
-     - FOR each validation IN node.validations:
-       - Evaluate validation (precondition with error_message)
-       - IF fails: collect validation.error_message
-     - IF any validations failed:
-       - Store errors in state.computed.validation_errors
-       - Set current_node = node.on_invalid
-     - ELSE:
-       - Set current_node = node.on_valid
-     - CONTINUE
-
-     REFERENCE NODE:
-     - Load document: Read ${CLAUDE_PLUGIN_ROOT}/{node.doc}
-     - IF node.section: extract only that section
-     - Build context object from node.context with ${} interpolation
-     - Execute the document section with context available
-     - Set current_node = node.next_node
-     - CONTINUE
-
-  4. Record in history:
-     '```yaml
-     history.append({
-       node: previous_node_name,
-       outcome: { success: true/false, branch: "true"/"false", response: "id" },
-       timestamp: now()
-     })
-     ```'
-
-  5. Update position:
-     - previous_node = current_node (before update)
-     - current_node = next_node (from step 3)
-
-UNTIL ending reached
-```
+Display: "Sources prepared: {count} ready, {skipped} skipped"
 
 ---
 
-## Parallel Agent Spawning
+## Phase 2: Scan Sources
 
-For multi-source corpora (2+ sources), the workflow spawns `source-scanner` agents in parallel.
+**Inputs:** prepared sources
+**Outputs:** `computed.scan_results`
 
-**Agent invocation** (at `spawn_scanner_agents` node):
-1. For each source in config.sources, create a Task tool call with `subagent_type="source-scanner"`
-2. Include ALL Task calls in a single response message for parallel execution
-3. Collect results and aggregate into `scan_results`
+**See:** `lib/corpus/patterns/scanning.md`
 
-**Prompt template:**
+### Single source
+
+If only one source, scan directly:
+- Read all documentation files under the source path
+- For each file: extract title, section headings, size, frontmatter type
+- Identify documentation framework (MkDocs, Docusaurus, Sphinx, etc.) if detectable
+- Count total files and identify large files (> 1000 lines)
+- Group files by directory into logical sections
+
+### Multi-source (parallel agents)
+
+If 2+ sources, spawn parallel `source-scanner` agents:
+
+**See:** `agents/source-scanner.md`
+
+For each source, create a Task with prompt:
 ```
 Scan source '{source_id}' (type: {type}) at corpus path '{corpus_path}'.
-
-Source config:
-- ID: {id}
-- Type: {type}
-- Repo URL: {repo_url}
-- Docs root: {docs_root}
-- Branch: {branch}
-
-Return YAML with:
-- source_id, type, status
-- file_count: total doc files
-- sections: array with name, path, file_count
-- large_files: files over 1000 lines
-- framework: detected doc framework
-- frontmatter_type: yaml|toml|none
-- notes: observations
+Return YAML with: source_id, type, status, file_count, sections (name/path/file_count),
+large_files, framework, frontmatter_type, notes.
 ```
 
-**Agent definition:** `${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md`
+Launch ALL tasks in a single response for parallel execution. Aggregate results.
 
----
+### Present scan summary
 
-## Variable Interpolation
-
-Replace `${...}` patterns in strings:
-
-| Pattern | Resolution |
-|---------|------------|
-| `${config.corpus.name}` | Corpus name from config |
-| `${sources}` | Array of source configurations |
-| `${scan_results}` | Object of scan results by source ID |
-| `${computed.total_files}` | Total file count across sources |
-| `${segmentation.strategy}` | Selected segmentation strategy |
-| `${user_preferences.organization}` | User's organization preference |
-| `${index.content}` | Generated index markdown content |
-| `${flags.is_multi_source}` | Boolean: more than 1 source |
-| `${flags.is_large_corpus}` | Boolean: 500+ total files |
-
-**Resolution order:**
-1. `state.computed.{path}`
-2. `state.flags.{path}`
-3. `state.user_responses.{path}`
-4. `state.{path}`
-5. `config.{path}`
-
----
-
-## Workflow Graph Overview
+Display results table:
 
 ```
-read_config
-    │
-    ▼
-count_sources
-    │
-    ▼
-check_has_sources ─── no sources? ──► error_no_sources
-    │
-    │ has sources
-    ▼
-prepare_sources_start
-    │
-    ▼
-[LOOP: prepare each source by type]
-    │
-    ├─► git: verify clone exists or clone repo
-    ├─► local: verify uploads directory has files
-    ├─► web: verify cache exists
-    └─► llms-txt: verify cache exists
-    │
-    ▼
-sources_prepared_complete
-    │
-    ▼
-route_scanning ─────── multi-source? ─────┐
-    │ single                              │ yes
-    ▼                                     ▼
-scan_single_source               spawn_scanner_agents
-    │                                     │
-    ▼                                     ▼
-store_single_scan_result         aggregate_scan_results
-    │                                     │
-    └─────────────┬───────────────────────┘
-                  │
-                  ▼
-          present_scan_summary
-                  │
-                  ▼
-          check_corpus_size ─── >= 500 files? ──► present_segmentation_options
-                  │                                       │
-                  │ < 500                                 │
-                  ▼                                       │
-          check_moderate_corpus ─► suggest_segmentation   │
-                  │                       │               │
-                  │ < 200                 └───────────────┤
-                  ▼                                       │
-            ask_use_case ◄────────────────────────────────┘
-                  │
-                  ▼
-      [if multi-source: ask_source_priorities]
-                  │
-                  ▼
-            ask_organization
-                  │
-                  ▼
-            ask_skip_sections
-                  │
-                  ▼
-         generate_index_draft
-                  │
-                  ▼
-         show_draft_to_user
-                  │
-          ┌───────┴───────┐
-          │               │
-      satisfied       refine
-          │               │
-          │       ┌───────┴───────┐
-          │       │       │       │
-          │    expand  reorg   add_docs
-          │       │       │       │
-          │       └───────┼───────┘
-          │               │
-          │       ◄───────┘ (loop back to show_draft)
-          │
-          ▼
-    save_index_file
-          │
-          ▼
-    [if tiered: save_sub_indexes]
-          │
-          ▼
-    update_config_metadata
-          │
-          ▼
-    update_per_source_metadata
-          │
-          ▼
-    present_completion
-          │
-          ▼
-        success
+Scan Results
+──────────────────────────────────
+| Source       | Type | Files | Sections | Framework    |
+|-------------|------|-------|----------|--------------|
+| {id}        | git  | 142   | 8        | Docusaurus   |
+| {id}        | local| 12    | 1        | none         |
+
+Total: {total_files} files across {source_count} sources
 ```
 
 ---
 
-## Index Path Format
+## Phase 3: Determine Segmentation Strategy
 
-All file paths in the index use the format: `{source_id}:{relative_path}`
+**Inputs:** `computed.scan_results`, total file count
+**Outputs:** `computed.segmentation`
 
-| Source Type | Path Format | Example |
-|-------------|-------------|---------|
-| git | `{source_id}:{relative_path}` | `react:reference/hooks.md` |
-| local | `local:{source_id}/{filename}` | `local:team-standards/guidelines.md` |
-| web | `web:{source_id}/{cached_file}` | `web:kent-blog/article.md` |
+### Large corpus (500+ files)
+
+Present segmentation options:
+
+| Strategy | Description |
+|----------|-------------|
+| **Tiered (recommended)** | Main index.md with section summaries, detailed index-{section}.md files |
+| **By source** | One sub-index per source |
+| **By section** | Main index covers top 20-30% only, link to sources for rest |
+| **Single file** | Everything in one index.md (not recommended for large corpora) |
+
+If tiered or by-source selected, collect section definitions from user.
+
+### Moderate corpus (200-500 files)
+
+Suggest segmentation but don't require it: "This corpus has {n} files. A tiered index
+is optional but can improve navigation. Use tiered indexing?"
+
+### Small corpus (< 200 files)
+
+Default to single file. No segmentation prompt needed.
+
+---
+
+## Phase 4: Collect User Preferences
+
+**Inputs:** `computed.scan_results`
+**Outputs:** `computed.user_preferences`
+
+### Use case
+
+Ask: "What's the primary use case for this corpus?"
+
+| Option | Description |
+|--------|-------------|
+| **Reference** | API docs, configuration reference |
+| **Learning** | Tutorials, getting started guides |
+| **Troubleshooting** | Error handling, debugging guides |
+| **Mixed** | General purpose documentation |
+
+### Source priorities (multi-source only)
+
+If multiple sources, ask: "Which sources should be prioritized in the index?"
+Present sources for ordering. Higher priority sources get more detailed entries.
+
+### Organization
+
+Ask: "How should the index be organized?"
+
+| Option | Description |
+|--------|-------------|
+| **By topic** | Group entries by subject area across sources |
+| **By source** | Group entries by documentation source |
+| **Mixed** | Topics first, source attribution inline |
+
+### Skip sections
+
+Ask: "Are there sections to exclude? (e.g., changelog, internal docs)"
+Allow comma-separated section names or "none".
+
+---
+
+## Phase 5: Generate Index
+
+**Inputs:** `computed.scan_results`, `computed.user_preferences`, `computed.segmentation`
+**Outputs:** `computed.index`
+
+### Index path format
+
+All file paths in the index use: `{source_id}:{relative_path}`
+
+| Source Type | Format | Example |
+|-------------|--------|---------|
+| git | `{source_id}:{path}` | `react:reference/hooks.md` |
+| local | `local:{source_id}/{file}` | `local:team-docs/guidelines.md` |
+| web | `web:{source_id}/{file}` | `web:blog/article.md` |
 | llms-txt | `llms-txt:{source_id}/{path}` | `llms-txt:claude-code/skills.md` |
 
+### Generate draft
+
+Read the documentation files, analyze their content, and generate an index organized
+per user preferences. Each entry should include:
+
+- **Title** and source path reference
+- **Brief summary** (1-2 sentences describing the content)
+- **Key topics** covered
+
+For tiered indexes, generate the main `index.md` with section summaries and separate
+`index-{section}.md` files with detailed entries.
+
+**See:** `lib/corpus/patterns/index-generation.md`
+
+### Show draft and refine
+
+Present the draft to the user and ask: "How does this look?"
+
+| Option | Action |
+|--------|--------|
+| **Looks good** | Proceed to save |
+| **Expand sections** | Ask which sections to expand, regenerate with more detail |
+| **Reorganize** | Ask for new organization preference, regenerate |
+| **Missing coverage** | Ask what topics are missing, add entries |
+| **Custom feedback** | Apply user's specific feedback |
+
+Loop back to showing the draft after each refinement until the user is satisfied.
+
 ---
 
-## Segmentation Strategies
+## Phase 6: Save and Complete
 
-| Strategy | When Used | Output Files |
-|----------|-----------|--------------|
-| `single` | < 500 files, or user preference | `data/index.md` only |
-| `tiered` | >= 500 files (recommended) | `data/index.md` + `data/index-{section}.md` |
-| `by-section` | Large but curated | `data/index.md` (top 20-30% only) |
-| `by-source` | Multi-source, organized by source | `data/index.md` + `data/index-{source}.md` |
+**Inputs:** `computed.index`, `computed.segmentation`
+
+### Save index files
+
+1. Write `index.md` with the generated content
+2. If tiered: write each `index-{section}.md` sub-index file
+
+### Update config metadata
+
+1. Set `index.last_updated_at` to current timestamp
+2. For each source, update `last_indexed_at` to current timestamp
+3. If git source: update `last_commit_sha` to current clone HEAD
+4. Save `config.yaml`
+
+### Completion
+
+Display summary:
+
+```
+Build complete!
+
+Index: index.md ({entry_count} entries)
+{if tiered: Sub-indexes: {count} files}
+Strategy: {segmentation_strategy}
+Sources indexed: {source_count}
+```
 
 ---
 
-## Reference Documentation
+## Error Handling
 
-### Blueprint Library (Remote)
-- **Type Definitions:** [hiivmind-blueprint-lib@v2.0.0](https://github.com/hiivmind/hiivmind-blueprint-lib/tree/v2.0.0)
-- **Consequences:** `consequences/core/` (state, evaluation, logging) + `consequences/extensions/` (file, git, web)
-- **Preconditions:** `preconditions/` (filesystem, state checks)
-- **Execution Model:** `execution/` (traversal, state management)
-
-### Corpus Patterns (Local)
-- **Parallel Scanning:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/parallel-scanning.md`
-- **Index Generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-generation.md`
+| Error | Message | Recovery |
+|-------|---------|----------|
+| No config.yaml | "No config.yaml found" | Run hiivmind-corpus-init |
+| No sources | "No sources configured" | Run hiivmind-corpus-add-source |
+| Clone failed | "Failed to clone {url}" | Check URL and network |
+| Local source empty | "No files in uploads/{id}/" | Add documents or skip source |
+| Scan failed | "Failed to scan source" | Check source accessibility |
+| Save failed | "Failed to write index" | Check file permissions |
 
 ---
 
 ## Pattern Documentation
 
-Operations referenced by this workflow:
-
-- **Source patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/` (git.md, local.md, web.md)
 - **Scanning:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/scanning.md`
+- **Parallel scanning:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/parallel-scanning.md`
 - **Index generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-generation.md`
 - **Config parsing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md`
+- **Source patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/`
 
----
+## Agent
+
+- **Source scanner:** `${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md`
 
 ## Related Skills
 
@@ -385,10 +295,3 @@ Operations referenced by this workflow:
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`
 - Refresh sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
-- Discover corpora: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-discover/SKILL.md`
-
----
-
-## Agent
-
-- **Source scanner:** `${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md` - Parallel scanning for multi-source corpora
