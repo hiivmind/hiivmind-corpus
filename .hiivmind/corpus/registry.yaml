@@ -1,0 +1,16 @@
+# Corpus Registry
+# Registered documentation corpora for this project
+schema_version: 1
+
+corpora:
+  - id: flyio
+    source:
+      type: github
+      repo: hiivmind/hiivmind-corpus-flyio
+      ref: main
+      path: null
+    cache:
+      strategy: fetch      # clone | fetch | none
+      path: null           # local cache path (for clone strategy)
+      ttl: 7d
+    registered_at: "2026-01-29T00:00:00Z"
