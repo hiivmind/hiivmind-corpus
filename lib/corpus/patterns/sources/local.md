@@ -76,7 +76,28 @@ For large PDF files with chapters, see `pdf.md` for splitting into smaller files
 
 Split chapters are stored in `data/uploads/{source_id}/` just like other local files.
 
+---
+
+### Extraction Support
+
+Local sources can opt into the extraction pipeline for markdown files.
+
+**Default extraction config:**
+
+```yaml
+extraction:
+  wikilinks: false      # Standard markdown links extracted; Obsidian-style [[wikilinks]] not expected
+  frontmatter: true     # YAML frontmatter commonly present in local documentation
+  tags: true            # Hashtags extracted as concept candidates
+  dataview: false       # Not applicable
+```
+
+To enable: add `extraction:` block to the source entry in config.yaml. Extraction runs during `build` and `refresh` via the source-scanner agent.
+
+**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+
 ## Related Patterns
 
 - `shared.md` - Existence checks
 - `../scanning.md` - File discovery
+- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline

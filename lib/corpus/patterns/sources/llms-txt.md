@@ -449,8 +449,29 @@ get_page_cache_age() {
 - Section structure can inform index organization
 - Cache can be cleared with `rm -rf .cache/llms-txt/{source_id}/`
 
+---
+
+### Extraction Support
+
+llms-txt sources have limited extraction support. Content is fetched from structured manifests and typically lacks internal linking or metadata.
+
+**Default extraction config:**
+
+```yaml
+extraction:
+  wikilinks: false      # llms-txt pages do not use wikilinks
+  frontmatter: false    # llms-txt pages are plain markdown without frontmatter
+  tags: false           # No tag convention in llms-txt content
+  dataview: false       # Not applicable
+```
+
+To override defaults: add `extraction:` block to the source entry in config.yaml.
+
+**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+
 ## Related Patterns
 
 - `web.md` - Similar caching operations
 - `shared.md` - URL parsing, existence checks
 - `../status.md` - Freshness checking
+- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline

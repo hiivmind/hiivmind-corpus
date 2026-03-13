@@ -244,9 +244,30 @@ When source repo changes, sitemap may have new pages.
 
 ---
 
+---
+
+### Extraction Support
+
+Generated-docs sources can benefit from frontmatter extraction, as the underlying source repo often contains YAML metadata in its documentation files.
+
+**Default extraction config:**
+
+```yaml
+extraction:
+  wikilinks: false      # Generated docs use standard markdown links, not wikilinks
+  frontmatter: true     # Source repo docs commonly have YAML frontmatter
+  tags: false           # Tags are uncommon in generated documentation
+  dataview: false       # Not applicable
+```
+
+To override defaults: add `extraction:` block to the source entry in config.yaml.
+
+**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+
 ## Related Patterns
 
 - `git.md` - Clone operations, SHA tracking
 - `web.md` - Cache operations
 - `../status.md` - Source freshness checking
 - `../config-parsing.md` - Reading source_repo/web_output config
+- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline
