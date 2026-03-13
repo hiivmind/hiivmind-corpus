@@ -4,22 +4,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**hiivmind-corpus** is a meta-plugin system for Claude Code that creates reusable documentation corpus skills for any open-source project. It provides a workflow to index, maintain, and navigate project documentation through Claude Code skills.
+**hiivmind-corpus** is a unified plugin for building AND reading documentation corpora in Claude Code. One plugin handles everything:
 
-The core value: Instead of relying on training data, web search, or on-demand fetching, this creates persistent human-curated indexes that track upstream changes.
+- **BUILD**: Create and maintain documentation indexes (init, add-source, build, refresh, enhance)
+- **READ**: Navigate and query documentation (navigate, register, status, discover)
+
+The core value: Persistent human-curated indexes that track upstream changes, instead of relying on training data or on-demand fetching.
+
+## Ecosystem Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     hiivmind-corpus Ecosystem                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌────────────────────────────────────────────┐                    │
+│   │           hiivmind-corpus (plugin)          │                    │
+│   │                                             │                    │
+│   │   BUILD                    READ             │                    │
+│   │   ─────                    ────             │                    │
+│   │   • init                   • navigate       │                    │
+│   │   • add-source             • register       │                    │
+│   │   • build                  • status         │                    │
+│   │   • refresh                • discover       │                    │
+│   │   • enhance                                 │                    │
+│   │                                             │                    │
+│   └────────────────────┬────────────────────────┘                    │
+│                        │                                             │
+│            PRODUCES    │    CONSUMES                                 │
+│                        ▼                                             │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Data-Only Corpus Repositories               │       │
+│   │                                                          │       │
+│   │  github.com/hiivmind/hiivmind-corpus-flyio              │       │
+│   │  github.com/hiivmind/hiivmind-corpus-polars             │       │
+│   │  github.com/yourorg/internal-api-corpus                 │       │
+│   │                                                          │       │
+│   │  Each contains:                                          │       │
+│   │    • config.yaml  (source definitions + keywords)        │       │
+│   │    • index.md     (main index)                           │       │
+│   │    • index-*.md   (sub-indexes for tiered corpora)       │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+│   ┌─────────────────────────────────────────────────────────┐       │
+│   │              Per-Project Configuration                    │       │
+│   │                                                          │       │
+│   │  .hiivmind/corpus/registry.yaml                         │       │
+│   │    - Which corpora are relevant to this project          │       │
+│   │    - Source locations (GitHub refs or local paths)       │       │
+│   │    - Caching preferences (per corpus)                    │       │
+│   └─────────────────────────────────────────────────────────┘       │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight:** One plugin does everything. Corpora are just data repositories.
 
 ## Architecture
 
 ```
-├── skills/                           # Eight core skills (the meta-plugin)
-│   ├── hiivmind-corpus-init/         # Step 1: Create skill structure from template
-│   ├── hiivmind-corpus-build/        # Step 2: Analyze docs, build index with user
+├── skills/                           # Core skills
+│   ├── hiivmind-corpus-init/         # Create new corpus scaffold
 │   ├── hiivmind-corpus-add-source/   # Add git repos, local docs, or web pages
+│   ├── hiivmind-corpus-build/        # Analyze docs, build index with user
 │   ├── hiivmind-corpus-enhance/      # Deepen coverage on specific topics
 │   ├── hiivmind-corpus-refresh/      # Refresh index from upstream changes
-│   ├── hiivmind-corpus-upgrade/      # Upgrade existing corpora to latest standards
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
-│   └── hiivmind-corpus-navigate/     # Global navigation across all corpora
+│   ├── hiivmind-corpus-navigate/     # Global navigation across all corpora
+│   ├── hiivmind-corpus-register/     # Register corpus with project
+│   └── hiivmind-corpus-status/       # Check corpus health and freshness
 │
 ├── agents/                           # Agent definitions for parallel operations
 │   └── source-scanner.md             # Parallel scanning of documentation sources
@@ -44,26 +97,6 @@ The core value: Instead of relying on training data, web search, or on-demand fe
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
 │
-├── lib/workflow/                     # Workflow framework documentation
-│   ├── consequences.md               # Hub document (links to consequences/)
-│   ├── consequences/                 # Modular consequence documentation
-│   │   ├── README.md                 # Taxonomy and quick reference
-│   │   ├── core/                     # Intrinsic workflow engine (3 files)
-│   │   │   ├── workflow.md           # State, evaluation, user interaction, control flow, skill, utility
-│   │   │   ├── shared.md             # Common patterns: interpolation, parameters, failure handling
-│   │   │   └── intent-detection.md   # 3VL routing system
-│   │   └── extensions/               # Domain-specific corpus extensions (5 files)
-│   │       ├── README.md             # Extension overview
-│   │       ├── file-system.md        # Corpus file operations
-│   │       ├── config.md             # Config.yaml operations
-│   │       ├── git.md                # Git operations
-│   │       ├── web.md                # Web operations
-│   │       └── discovery.md          # Corpus discovery
-│   ├── schema.md                     # Workflow YAML structure
-│   ├── preconditions.md              # Boolean evaluations
-│   ├── execution.md                  # Turn loop
-│   └── state.md                      # Runtime state structure
-│
 ├── templates/                        # Templates for generating new corpus skills
 │
 └── docs/                             # Specifications and design docs
@@ -84,25 +117,20 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
                                  ↓
                         hiivmind-corpus-enhance
                             (as needed)
-                                 ↓
-                        hiivmind-corpus-upgrade
-                      (when meta-plugin updates)
 ```
 
 **Creation & Maintenance Skills:**
-1. **hiivmind-corpus-init**: Clones target repo, analyzes structure, generates skill directory
+1. **hiivmind-corpus-init**: Scaffolds a new data-only corpus repository
 2. **hiivmind-corpus-add-source**: Adds git repos, local documents, or web pages to existing corpus
 3. **hiivmind-corpus-build**: Analyzes docs, builds `index.md` collaboratively with user
 4. **hiivmind-corpus-enhance**: Deepens coverage on specific topics (runs on existing index)
 5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
-6. **hiivmind-corpus-upgrade**: Updates existing corpora to latest template standards
 
 **Discovery & Navigation Skills:**
-7. **hiivmind-corpus-discover**: Scans for installed corpora across user-level, repo-local, and marketplace locations
-8. **hiivmind-corpus-navigate**: Global navigator that routes queries to appropriate per-corpus navigate skills
-
-**Setup & Configuration Skills:**
-9. **hiivmind-corpus-awareness**: Adds plugin awareness to CLAUDE.md, teaches Claude when to use corpus skills
+6. **hiivmind-corpus-discover**: Scans for installed corpora
+7. **hiivmind-corpus-navigate**: Global navigator that routes queries to appropriate corpora
+8. **hiivmind-corpus-register**: Connects a corpus to the current project
+9. **hiivmind-corpus-status**: Checks corpus health and freshness
 
 **Gateway Command:**
 - **/hiivmind-corpus**: Interactive entry point for discovering and interacting with installed corpora
@@ -115,53 +143,32 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 
 Agents enable parallel processing of multi-source corpora. When a corpus has 2+ sources, skills spawn multiple `source-scanner` agents concurrently to analyze each source, then aggregate results. This provides 40-60% speedup for corpora with 3+ sources.
 
-## Four Destination Types
+## Corpus Repository Structure
 
-`hiivmind-corpus-init` detects context and offers appropriate destinations:
+`hiivmind-corpus-init` creates data-only repositories:
 
-| Type | Location | Best For |
-|------|----------|----------|
-| **User-level** | `~/.claude/skills/hiivmind-corpus-{lib}/` | Personal use everywhere |
-| **Repo-local** | `{repo}/.claude-plugin/skills/hiivmind-corpus-{lib}/` | Team sharing via git |
-| **Single-corpus** | `hiivmind-corpus-{lib}/` (standalone repo) | Marketplace publishing |
-| **Multi-corpus** | `{marketplace}/hiivmind-corpus-{lib}/` | Marketplace publishing (related projects) |
-
-## Generated Structures
-
-**Project-local:**
-```
-.claude-plugin/skills/hiivmind-corpus-{lib}/
-├── SKILL.md                     # Navigate skill
-├── data/
-│   ├── config.yaml
-│   ├── index.md
-│   └── project-awareness.md     # Snippet for project CLAUDE.md
-└── .source/                     # Gitignored
-```
-
-**Standalone plugin:**
 ```
 hiivmind-corpus-{project}/
-├── .claude-plugin/plugin.json   # Plugin manifest
-├── skills/navigate/SKILL.md     # Project-specific navigation skill
-├── data/
-│   ├── config.yaml              # Source repo URL, branch, last indexed commit SHA
-│   ├── index.md                 # Human-readable markdown index
-│   └── project-awareness.md     # Snippet for project CLAUDE.md
-├── .source/                     # Local clone (gitignored)
-└── README.md
+├── config.yaml              # Source definitions + keywords
+├── index.md                 # Human-readable markdown index
+├── index-*.md               # Sub-indexes (tiered corpora only)
+├── .source/                 # Local clones (gitignored)
+├── uploads/                 # Local document sources
+├── .cache/                  # Web/llms-txt cached content
+├── CLAUDE.md                # Project awareness
+├── README.md
+├── .gitignore
+└── LICENSE
 ```
 
 ## Naming Convention
 
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
-- Creation skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-upgrade`
-- Discovery skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`
-- Setup skills: `hiivmind-corpus-awareness`
+- Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`
+- Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`
 - Gateway command: `/hiivmind-corpus`
-- Generated plugins: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-polars`, `hiivmind-corpus-react`)
-- Generated navigate skills: `hiivmind-corpus-navigate-{project}` (per-corpus navigation)
+- Generated corpora: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-flyio`, `hiivmind-corpus-polars`)
 
 ## Pattern Documentation Library
 
@@ -206,8 +213,7 @@ Using bash with yq:
 - **Change tracking**: Stores commit SHA to know when index is stale
 - **Per-project skills**: Each corpus skill has its own navigate skill for discoverability
 - **Project awareness**: Corpora include snippets for injecting into project CLAUDE.md files
-- **Upgradeable**: `hiivmind-corpus-upgrade` brings existing corpora to latest template standards
-- **Discoverable**: `hiivmind-corpus-discover` finds corpora across all installation types
+- **Discoverable**: `hiivmind-corpus-discover` finds available corpora
 - **Unified access**: `/hiivmind-corpus` gateway provides single entry point for all corpus interaction
 - **Global navigation**: `hiivmind-corpus-navigate` routes queries across all installed corpora
 - **Tool-agnostic patterns**: `lib/corpus/patterns/` documents algorithms, not executable scripts
@@ -232,9 +238,14 @@ The `index.md` uses markdown headings to organize topics:
 
 When answering questions, the navigate skill:
 1. Reads `index.md` to find relevant file paths
-2. Fetches from `.source/{path}` (local) or `raw.githubusercontent.com/{path}` (remote)
+2. Fetches documentation content:
+   - **Local:** Read from `.source/{path}` if clone exists
+   - **Remote (preferred):** Use `gh api repos/{owner}/{repo}/contents/{path} --jq '.content' | base64 -d`
+   - **Remote (fallback):** Use WebFetch with `raw.githubusercontent.com/{path}` if gh unavailable
 3. Warns if local clone is newer than last indexed commit
 4. Cites file paths and suggests related docs
+
+**Note:** The `gh api` method is preferred for remote fetching as it works consistently for all public repositories and uses authenticated access for better rate limits.
 
 ## Working with Templates
 
@@ -242,7 +253,7 @@ Templates in `templates/` use placeholders like `{{project_name}}`, `{{repo_url}
 
 ## Maintaining Skill Alignment
 
-**IMPORTANT**: All 9 skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
+**IMPORTANT**: All skills must remain aware of each other and share consistent knowledge about corpus features. When modifying any skill, check if other skills need updates.
 
 ### Cross-Cutting Concerns
 
@@ -250,29 +261,25 @@ These features span multiple skills and must stay synchronized:
 
 | Feature | Relevant Skills | What to Check |
 |---------|-----------------|---------------|
-| Destination types | init, enhance, refresh, upgrade, discover | Prerequisites table lists all 4 types |
-| Tiered indexes | build, enhance, refresh, upgrade | Detection logic, update handling |
+| Tiered indexes | build, enhance, refresh | Detection logic, update handling |
 | Source types (git/local/web/generated-docs/llms-txt) | add-source, build, enhance, refresh | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
-| Project awareness | init, upgrade, navigate command (template) | Template exists, command help mentions it, skill has NO project awareness section |
+| Project awareness | init, navigate command (template) | Template exists, command help mentions it |
 | Config schema | all skills | Schema fields, validation |
 | Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
 | Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
 | Entry keywords | enhance, refresh, navigate (template) | Keyword line format, search logic, preserve on refresh |
-| Corpus keywords | discover, navigate (global), init, upgrade | config.yaml schema, per-session discovery |
+| Corpus keywords | discover, navigate (global), init | config.yaml schema, per-session discovery |
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
-| Fork context (ADR-007) | navigate (template), upgrade | Frontmatter: context, agent, allowed-tools |
-| Command/skill separation | navigate (template), upgrade | Command is thin wrapper (~30 lines), skill has no maintenance refs |
-| Modular consequences | all workflow-based skills, gateway command | Domain file references, new consequence types |
+| Fork context (ADR-007) | navigate (template) | Frontmatter: context, agent, allowed-tools |
 
 ### When Adding New Features
 
 1. **Implement in the primary skill** (where the feature originates)
 2. **Update skills that validate prerequisites** (enhance, refresh) with awareness
-3. **Update hiivmind-corpus-upgrade** to detect and apply the feature to existing corpora
-4. **Update templates** if the navigate skill needs new sections
+3. **Update templates** if the navigate skill needs new sections
 5. **Update this CLAUDE.md** with the feature in Key Design Decisions and/or this table
 
 ### Skill Dependency Chain
@@ -296,9 +303,7 @@ build ◄─────────────┤ ──► source-scanner age
                      │
 enhance ◄───────────┤ (must know all features to validate)
                      │
-refresh ◄───────────┤ ──► source-scanner agent (parallel multi-source)
-                     │
-upgrade ◄───────────┘ (must know all features to retrofit)
+refresh ◄───────────┘ ──► source-scanner agent (parallel multi-source)
 ```
 
 ### Reference Sections

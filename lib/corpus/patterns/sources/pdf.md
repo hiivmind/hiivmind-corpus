@@ -214,8 +214,29 @@ Consider specifying manual page ranges or adding bookmarks first.
 2. User manually defines page ranges (future enhancement)
 3. User adds bookmarks to PDF externally and re-runs
 
+---
+
+### Extraction Support
+
+PDF sources have minimal extraction support. PDFs are converted to text and lack native markdown features. Extraction is available but unlikely to produce useful results.
+
+**Default extraction config:**
+
+```yaml
+extraction:
+  wikilinks: false      # PDFs do not contain wikilinks
+  frontmatter: false    # PDFs do not have YAML frontmatter
+  tags: false           # No hashtag convention in PDF content
+  dataview: false       # Not applicable
+```
+
+To override defaults: add `extraction:` block to the source entry in config.yaml.
+
+**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+
 ## Related Patterns
 
 - `local.md` - Where split chapters are stored
 - `../scanning.md` - File discovery after splitting
 - `shared.md` - Path utilities
+- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline

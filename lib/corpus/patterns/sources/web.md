@@ -88,7 +88,28 @@ get_cache_age() {
 - Cache age helps identify stale content
 - Use `hiivmind-corpus-refresh` to re-fetch cached content
 
+---
+
+### Extraction Support
+
+Web sources have limited extraction support. Cached markdown from web sources rarely contains structured metadata.
+
+**Default extraction config:**
+
+```yaml
+extraction:
+  wikilinks: false      # Web-cached markdown does not use wikilinks
+  frontmatter: false    # Web-cached markdown rarely has YAML frontmatter
+  tags: false           # Hashtags in web content are typically decorative, not structural
+  dataview: false       # Not applicable
+```
+
+To override defaults: add `extraction:` block to the source entry in config.yaml.
+
+**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+
 ## Related Patterns
 
 - `shared.md` - Existence checks
 - `generated-docs.md` - Uses web caching optionally
+- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline

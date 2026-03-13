@@ -1,0 +1,89 @@
+# {{project_display_name}} Documentation Corpus
+
+A data-only documentation corpus for {{project_display_name}}. Use with the `hiivmind-corpus` plugin for navigation and maintenance.
+
+## What is This?
+
+This repository contains:
+- **Indexed documentation** - Structured index of {{project_display_name}} docs with summaries and cross-references
+- **Source tracking** - Configuration tracking upstream documentation commits
+- **Keywords** - Routing keywords for automatic corpus selection
+
+This is NOT a Claude Code plugin. All operations (navigation, building, refreshing) are provided by the `hiivmind-corpus` plugin.
+
+## Quick Start
+
+### 1. Install the hiivmind-corpus plugin
+
+```bash
+# In Claude Code
+/plugin install hiivmind/hiivmind-corpus
+```
+
+### 2. Register this corpus
+
+```bash
+# Register from GitHub
+/hiivmind-corpus register github:{{author_name}}/hiivmind-corpus-{{project_name}}
+```
+
+### 3. Start asking questions
+
+```
+{{example_questions}}
+```
+
+## File Structure
+
+```
+hiivmind-corpus-{{project_name}}/
+├── config.yaml          # Source definitions, keywords, tracking
+├── index.md             # Main documentation index
+├── index-*.md           # Sub-indexes (for large corpora)
+├── uploads/             # Local document uploads
+├── .source/             # Cloned docs (gitignored)
+├── .cache/              # Web cache (gitignored)
+└── README.md
+```
+
+## Maintenance
+
+Use `hiivmind-corpus` skills to maintain this corpus:
+
+| Command | Purpose |
+|---------|---------|
+| `/hiivmind-corpus refresh {{project_name}}` | Update from upstream changes |
+| `/hiivmind-corpus enhance {{project_name}} <topic>` | Add depth to a topic |
+| `/hiivmind-corpus build {{project_name}}` | Full rebuild |
+| `/hiivmind-corpus add-source {{project_name}} <url>` | Add new source |
+
+## config.yaml Schema
+
+```yaml
+schema_version: 2
+
+corpus:
+  name: "{{project_name}}"
+  display_name: "{{project_display_name}}"
+  keywords:            # For automatic routing
+{{#keywords}}
+    - {{.}}
+{{/keywords}}
+
+sources:
+  - id: {{project_name}}
+    type: git
+    repo_url: https://github.com/...
+    branch: main
+    last_commit_sha: "..."
+    last_indexed_at: "..."
+```
+
+## Requirements
+
+- `hiivmind-corpus` plugin (provides all operations)
+- Git (for source management)
+
+## License
+
+MIT

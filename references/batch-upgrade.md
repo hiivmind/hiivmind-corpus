@@ -1,6 +1,8 @@
 # Batch Upgrade Guide
 
-How to upgrade multiple corpora in a marketplace efficiently.
+How to upgrade multiple corpora efficiently.
+
+> **Note:** This guide covers both data-only corpora (recommended) and legacy plugin-based structures.
 
 ## When to Use Batch Upgrade
 
@@ -74,9 +76,25 @@ Apply upgrades to 3 plugins? [y/n]
 ls -d hiivmind-corpus-*/ 2>/dev/null
 ```
 
-### Step 2: Scan Each Plugin
+### Step 2: Detect Corpus Type and Scan
 
-For each plugin, run the compliance checks from `references/upgrade-checklists.md`.
+For each corpus, first detect its type:
+
+```bash
+for corpus in hiivmind-corpus-*/; do
+  if [ -f "$corpus/config.yaml" ] && [ ! -d "$corpus/.claude-plugin" ]; then
+    echo "$corpus: data-only (recommended)"
+  elif [ -f "$corpus/data/config.yaml" ]; then
+    echo "$corpus: legacy plugin"
+  else
+    echo "$corpus: unknown"
+  fi
+done
+```
+
+Then run the appropriate compliance checks from `references/upgrade-checklists.md`:
+- **Data-only corpora:** Check `config.yaml` and `index.md` at root
+- **Legacy corpora:** Check `data/config.yaml`, `data/index.md`, ADR-005 compliance, etc.
 
 ### Step 3: Aggregate Findings
 
@@ -191,6 +209,9 @@ Consider adding version tracking to identify when corpora were last upgraded:
 
 ### In config.yaml
 
+**Data-only corpus:** Add to `config.yaml` (root level)
+**Legacy corpus:** Add to `data/config.yaml`
+
 ```yaml
 corpus:
   name: "polars"
@@ -209,8 +230,20 @@ corpus:
 
 ```bash
 # Find corpora with old or missing version info
-for plugin in hiivmind-corpus-*/; do
-  version=$(grep "hiivmind_corpus_version:" "$plugin/data/config.yaml" 2>/dev/null | cut -d'"' -f2)
-  echo "$plugin: ${version:-NOT SET}"
+# Checks root-level config first (data-only), then data/ (legacy)
+for corpus in hiivmind-corpus-*/; do
+  if [ -f "$corpus/config.yaml" ]; then
+    # Data-only corpus (recommended)
+    version=$(grep "hiivmind_corpus_version:" "$corpus/config.yaml" 2>/dev/null | cut -d'"' -f2)
+    type="data-only"
+  elif [ -f "$corpus/data/config.yaml" ]; then
+    # Legacy plugin structure
+    version=$(grep "hiivmind_corpus_version:" "$corpus/data/config.yaml" 2>/dev/null | cut -d'"' -f2)
+    type="legacy"
+  else
+    version=""
+    type="unknown"
+  fi
+  echo "$corpus: ${version:-NOT SET} ($type)"
 done
 ```

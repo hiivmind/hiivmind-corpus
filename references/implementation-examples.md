@@ -2,7 +2,115 @@
 
 Step-by-step examples for each corpus destination type.
 
-## Example A: User-level Skill
+---
+
+## Example F: Data-Only Corpus (Recommended)
+
+**Scenario:** Creating a Polars documentation corpus for registration with hiivmind-corpus.
+
+### Step 1: Create Repository
+
+```bash
+mkdir hiivmind-corpus-polars && cd hiivmind-corpus-polars
+git init
+```
+
+### Step 2: Create Config
+
+Create `config.yaml`:
+
+```yaml
+corpus:
+  name: "polars"
+  display_name: "Polars"
+  keywords:
+    - polars
+    - dataframe
+    - lazy
+
+sources:
+  - id: "polars"
+    type: "git"
+    repo_url: "https://github.com/pola-rs/polars"
+    branch: "main"
+    docs_root: "docs"
+```
+
+### Step 3: Create Index Placeholder
+
+Create `index.md`:
+
+```markdown
+# Polars Documentation Corpus
+
+> Run `/hiivmind-corpus build` to build this index.
+
+This corpus is not yet populated. Add documentation sources and build the index.
+```
+
+### Step 4: Optional Files
+
+```bash
+# Create uploads directory for local docs
+mkdir -p uploads
+
+# Create .gitignore
+cat > .gitignore << 'EOF'
+.source/
+.cache/
+*.log
+EOF
+
+# Create README.md
+cat > README.md << 'EOF'
+# Polars Documentation Corpus
+
+Data-only corpus for Polars documentation.
+
+## Usage
+
+Register with hiivmind-corpus:
+```
+/hiivmind-corpus register github:hiivmind/hiivmind-corpus-polars
+```
+
+Then ask questions about Polars and the navigate skill will find relevant docs.
+EOF
+```
+
+### Step 5: Verify
+
+```bash
+ls -la
+# config.yaml, index.md, uploads/, .gitignore, README.md
+```
+
+### Result
+
+```
+hiivmind-corpus-polars/
+├── config.yaml       # Corpus configuration
+├── index.md          # Documentation index (placeholder)
+├── uploads/          # Local document uploads (optional)
+├── .gitignore        # Ignore .source/ and .cache/
+├── README.md         # Documentation (optional)
+├── .source/          # Created by build (gitignored)
+└── .cache/           # Created by build (gitignored)
+```
+
+### What's NOT Needed
+
+Data-only corpora do NOT require:
+- `.claude-plugin/` directory
+- `skills/` directory
+- `commands/` directory
+- `references/` directory
+
+Navigation is handled by the hiivmind-corpus plugin.
+
+---
+
+## Example A: User-level Skill (Legacy)
 
 **Scenario:** Personal Polars documentation accessible across all projects.
 
@@ -72,9 +180,9 @@ ls -la ~/.claude/skills/hiivmind-corpus-polars/
 
 ---
 
-## Example B: Repo-local Skill
+## Example B: Repo-local Skill (Legacy)
 
-**Scenario:** Team wants Polars docs available when working in their data-analysis project.
+**Scenario:** Team wants Polars docs available when working in their data-analysis project. **Deprecated:** Use data-only architecture instead.
 
 ### Step 1: Input Gathering
 
@@ -127,9 +235,9 @@ echo ".claude-plugin/skills/*/.cache/" >> .gitignore
 
 ---
 
-## Example C: Single-corpus Repo
+## Example C: Single-corpus Repo (Legacy)
 
-**Scenario:** Creating a dedicated React documentation corpus for marketplace publishing.
+**Scenario:** Creating a dedicated React documentation corpus for marketplace publishing. **Deprecated:** Use data-only architecture instead.
 
 ### Step 1: Input Gathering
 
@@ -213,9 +321,9 @@ hiivmind-corpus-react/
 
 ---
 
-## Example D: Multi-corpus Repo (New Marketplace)
+## Example D: Multi-corpus Repo (New Marketplace) (Legacy)
 
-**Scenario:** Creating a new frontend docs marketplace with React and Vue.
+**Scenario:** Creating a new frontend docs marketplace with React and Vue. **Deprecated:** Use data-only architecture instead.
 
 ### Step 1: Input Gathering
 
@@ -280,9 +388,9 @@ hiivmind-corpus-frontend/
 
 ---
 
-## Example E: Add to Existing Marketplace
+## Example E: Add to Existing Marketplace (Legacy)
 
-**Scenario:** Adding Vue docs to the existing frontend marketplace.
+**Scenario:** Adding Vue docs to the existing frontend marketplace. **Deprecated:** Use data-only architecture instead.
 
 ### Step 1: Input Gathering
 

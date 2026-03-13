@@ -5,6 +5,34 @@ All notable changes to hiivmind-corpus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-11
+
+### Removed
+
+- **All workflow.yaml files** — Skills are now self-contained phased prose SKILL.md files (~6,000 lines of workflow YAML deleted)
+- **Blueprint-lib dependency** — No longer requires `hiivmind/hiivmind-blueprint-lib@v2.0.0` execution engine
+- **Gateway intent-mapping.yaml** — 3VL intent detection replaced with simple keyword routing table
+- **`hiivmind-corpus-upgrade` skill** — Obsolete with data-only corpus format (no legacy formats to migrate)
+- **`hiivmind-corpus-awareness` skill** — Removed along with capability-awareness pattern
+- **`hiivmind-corpus-init` references/** — Legacy implementation-examples, marketplace-templates, template-placeholders
+- **`hiivmind-corpus-build` diagrams/** — Workflow diagram for deleted workflow
+- **Four destination types** — Corpora are now always data-only repositories
+
+### Changed
+
+- **`hiivmind-corpus-init`** — Simplified to scaffold flat data-only corpus repos (config.yaml, index.md, README, CLAUDE.md, .gitignore, LICENSE)
+- **`hiivmind-corpus-add-source`** — Rewritten as 4-phase prose skill supporting 6 source types (git, local, web, llms-txt, generated-docs, PDF)
+- **`hiivmind-corpus-build`** — Rewritten as 6-phase prose skill with parallel agent scanning for multi-source corpora
+- **`hiivmind-corpus-refresh`** — Rewritten as 6-phase prose skill with status/update modes and per-source-type freshness checks
+- **Gateway command** (`/hiivmind-corpus`) — Simplified to keyword routing table with interactive menu fallback
+- **CLAUDE.md** — Updated architecture docs to reflect data-only corpus format and removed all blueprint-lib/upgrade references
+
+### Unchanged
+
+- All `lib/corpus/patterns/` files (contain the actual source-type operations)
+- `agents/source-scanner.md` (parallel scanning protocol)
+- Pattern delegation model (skills reference pattern docs for operations)
+
 ## [1.0.0] - 2025-12-13
 
 ### Added

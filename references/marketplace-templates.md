@@ -1,10 +1,18 @@
-# Marketplace Templates Reference
+# Marketplace Templates Reference (Legacy)
+
+> **⚠️ Deprecation Notice:** These structures are for legacy plugin-based corpora. For new corpora, use the **data-only architecture** (see `lib/corpus/patterns/template-generation.md`).
+>
+> Data-only corpora are simpler and preferred:
+> - No `.claude-plugin/` directory needed
+> - No `skills/` or `commands/` directories needed
+> - Just `config.yaml` + `index.md` at the root
+> - Navigation handled by the hiivmind-corpus plugin
 
 Directory structures and template mappings for plugin-type corpora (single-corpus, multi-corpus, add to marketplace).
 
-## Single-corpus Repo Structure
+## Single-corpus Repo Structure (Legacy)
 
-A standalone corpus plugin in its own repository.
+A standalone corpus plugin in its own repository. **Templates located in `templates/deprecated/`.**
 
 ```
 {plugin-name}/
@@ -31,28 +39,28 @@ A standalone corpus plugin in its own repository.
 └── README.md                 # From readme.md.template
 ```
 
-**Files from templates:**
+**Files from templates (`templates/deprecated/`):**
 
 | File | Template |
 |------|----------|
-| `.claude-plugin/plugin.json` | `plugin.json.template` |
-| `skills/navigate/SKILL.md` | `navigate-skill.md.template` |
-| `commands/navigate.md` | `navigate-command.md.template` |
+| `.claude-plugin/plugin.json` | `deprecated/plugin.json.template` |
+| `skills/navigate/SKILL.md` | `deprecated/navigate-skill.md.template` |
+| `commands/navigate.md` | `deprecated/navigate-command.md.template` |
 | `data/config.yaml` | `config.yaml.template` |
-| `references/project-awareness.md` | `project-awareness.md.template` |
+| `references/project-awareness.md` | `deprecated/project-awareness.md.template` |
 | `.gitignore` | `gitignore.template` |
-| `CLAUDE.md` | `claude.md.template` |
+| `CLAUDE.md` | `deprecated/claude.md.template` |
 | `LICENSE` | `license.template` |
-| `README.md` | `readme.md.template` |
+| `README.md` | `deprecated/readme.md.template` |
 
 **Create manually:**
 - `data/index.md` - Simple placeholder
 
 ---
 
-## Multi-corpus Repo Structure (New Marketplace)
+## Multi-corpus Repo Structure (New Marketplace) (Legacy)
 
-A marketplace containing multiple corpus plugins as subdirectories.
+A marketplace containing multiple corpus plugins as subdirectories. **Templates located in `templates/deprecated/`.**
 
 ```
 {marketplace-name}/
@@ -82,30 +90,30 @@ A marketplace containing multiple corpus plugins as subdirectories.
     └── README.md             # From readme.md.template
 ```
 
-**Marketplace-level files from templates:**
+**Marketplace-level files from templates (`templates/deprecated/`):**
 
 | File | Template |
 |------|----------|
-| `.claude-plugin/marketplace.json` | `marketplace.json.template` |
-| `CLAUDE.md` | `marketplace-claude.md.template` |
+| `.claude-plugin/marketplace.json` | `deprecated/marketplace.json.template` |
+| `CLAUDE.md` | `deprecated/marketplace-claude.md.template` |
 
-**Per-plugin files from templates:**
+**Per-plugin files from templates (`templates/deprecated/`):**
 
 | File | Template |
 |------|----------|
-| `.claude-plugin/plugin.json` | `plugin.json.template` |
-| `skills/navigate/SKILL.md` | `navigate-skill.md.template` |
-| `commands/navigate.md` | `navigate-command.md.template` |
+| `.claude-plugin/plugin.json` | `deprecated/plugin.json.template` |
+| `skills/navigate/SKILL.md` | `deprecated/navigate-skill.md.template` |
+| `commands/navigate.md` | `deprecated/navigate-command.md.template` |
 | `data/config.yaml` | `config.yaml.template` |
-| `references/project-awareness.md` | `project-awareness.md.template` |
+| `references/project-awareness.md` | `deprecated/project-awareness.md.template` |
 | `.gitignore` | `gitignore.template` |
-| `README.md` | `readme.md.template` |
+| `README.md` | `deprecated/readme.md.template` |
 
 ---
 
-## Add to Marketplace Structure (Existing Marketplace)
+## Add to Marketplace Structure (Existing Marketplace) (Legacy)
 
-Adding a new corpus plugin to an existing marketplace.
+Adding a new corpus plugin to an existing marketplace. **Templates located in `templates/deprecated/`.**
 
 **Existing structure:**
 ```
@@ -150,14 +158,18 @@ Same as per-plugin files in Multi-corpus structure above.
 
 ---
 
-## Key Differences from User-level/Repo-local Skills
+## Key Differences: Data-Only vs Legacy Structures
 
-| Aspect | Skills (user/repo-local) | Plugins (marketplace) |
-|--------|--------------------------|----------------------|
-| Navigate implementation | Single `SKILL.md` at root | Both `skills/navigate/SKILL.md` AND `commands/navigate.md` |
-| Plugin manifest | None | `.claude-plugin/plugin.json` |
-| Distribution | Local only | Publishable to marketplace |
-| .gitignore | Parent handles | Own `.gitignore` file |
+| Aspect | Data-Only (Recommended) | Skills (user/repo-local) | Plugins (marketplace) |
+|--------|-------------------------|--------------------------|----------------------|
+| Config location | `config.yaml` (root) | `data/config.yaml` | `data/config.yaml` |
+| Index location | `index.md` (root) | `data/index.md` | `data/index.md` |
+| Navigate implementation | Handled by hiivmind-corpus | Single `SKILL.md` at root | Both `skills/navigate/SKILL.md` AND `commands/navigate.md` |
+| Plugin manifest | None needed | None | `.claude-plugin/plugin.json` |
+| Distribution | Register via registry.yaml | Local only | Publishable to marketplace |
+| Complexity | Minimal | Low | High |
+
+**Recommendation:** Use data-only for all new corpora. Legacy structures are maintained for backward compatibility.
 
 ---
 

@@ -29,13 +29,26 @@ Find all installed hiivmind-corpus corpora across user-level, repo-local, and ma
 
 ### Directory Structure Validation
 
-A valid corpus directory must have:
+A valid corpus directory must have one of two structures:
+
+**Data-only corpus (preferred for new corpora):**
+```
+{corpus}/
+├── config.yaml       # Required: corpus configuration (root level)
+├── index.md          # Documentation index
+└── README.md
+```
+
+**Legacy plugin corpus:**
 ```
 {corpus}/
 ├── data/
 │   └── config.yaml    # Required: corpus configuration
-└── SKILL.md          # or skills/navigate/SKILL.md for plugins
+├── skills/navigate/SKILL.md  # or SKILL.md at root
+└── .claude-plugin/plugin.json
 ```
+
+**Detection order:** Check root-level `config.yaml` first, then `data/config.yaml`.
 
 ---
 
@@ -46,20 +59,25 @@ A valid corpus directory must have:
 **Algorithm:**
 1. Expand home directory path
 2. List directories matching `~/.claude/skills/hiivmind-corpus-*/`
-3. For each, verify `data/config.yaml` exists
+3. For each, verify `config.yaml` exists (check root first, then `data/`)
 4. Extract corpus name from directory name
 
 **Using bash:**
 ```bash
 for d in ~/.claude/skills/hiivmind-corpus-*/; do
-    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "user-level|$(basename "$d")|$d"
+    [ -d "$d" ] || continue
+    # Check root first (data-only), then data/ (legacy)
+    if [ -f "${d}config.yaml" ] || [ -f "${d}data/config.yaml" ]; then
+        echo "user-level|$(basename "$d")|$d"
+    fi
 done
 ```
 
 **Using PowerShell:**
 ```powershell
 Get-ChildItem "$env:USERPROFILE\.claude\skills\hiivmind-corpus-*" -Directory | ForEach-Object {
-    if (Test-Path "$($_.FullName)\data\config.yaml") {
+    # Check root first (data-only), then data/ (legacy)
+    if ((Test-Path "$($_.FullName)\config.yaml") -or (Test-Path "$($_.FullName)\data\config.yaml")) {
         "user-level|$($_.Name)|$($_.FullName)\"
     }
 }
@@ -67,9 +85,13 @@ Get-ChildItem "$env:USERPROFILE\.claude\skills\hiivmind-corpus-*" -Directory | F
 
 **Using Claude tools:**
 ```
+# Data-only corpora (check first)
+Glob: ~/.claude/skills/hiivmind-corpus-*/config.yaml
+
+# Legacy corpora
 Glob: ~/.claude/skills/hiivmind-corpus-*/data/config.yaml
 ```
-Then extract corpus paths from results.
+Then extract corpus paths from results, deduplicate if needed.
 
 ---
 
@@ -78,13 +100,17 @@ Then extract corpus paths from results.
 **Algorithm:**
 1. Check for `.claude-plugin/skills/` in current directory (or specified base)
 2. List directories matching `hiivmind-corpus-*/`
-3. Verify `data/config.yaml` exists in each
+3. Verify `config.yaml` exists (check root first, then `data/`)
 
 **Using bash:**
 ```bash
 base_dir="${1:-.}"
 for d in "$base_dir"/.claude-plugin/skills/hiivmind-corpus-*/; do
-    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "repo-local|$(basename "$d")|$d"
+    [ -d "$d" ] || continue
+    # Check root first (data-only), then data/ (legacy)
+    if [ -f "${d}config.yaml" ] || [ -f "${d}data/config.yaml" ]; then
+        echo "repo-local|$(basename "$d")|$d"
+    fi
 done
 ```
 
@@ -92,7 +118,8 @@ done
 ```powershell
 $baseDir = if ($args[0]) { $args[0] } else { "." }
 Get-ChildItem "$baseDir\.claude-plugin\skills\hiivmind-corpus-*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-    if (Test-Path "$($_.FullName)\data\config.yaml") {
+    # Check root first (data-only), then data/ (legacy)
+    if ((Test-Path "$($_.FullName)\config.yaml") -or (Test-Path "$($_.FullName)\data\config.yaml")) {
         "repo-local|$($_.Name)|$($_.FullName)\"
     }
 }
@@ -100,6 +127,10 @@ Get-ChildItem "$baseDir\.claude-plugin\skills\hiivmind-corpus-*" -Directory -Err
 
 **Using Claude tools:**
 ```
+# Data-only corpora (check first)
+Glob: .claude-plugin/skills/hiivmind-corpus-*/config.yaml
+
+# Legacy corpora
 Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
 ```
 
@@ -110,19 +141,24 @@ Glob: .claude-plugin/skills/hiivmind-corpus-*/data/config.yaml
 **Algorithm:**
 1. List directories in `~/.claude/plugins/marketplaces/`
 2. For each marketplace, look for `hiivmind-corpus-*/` subdirectories
-3. Verify each has `data/config.yaml`
+3. Verify each has `config.yaml` (check root first, then `data/`)
 
 **Using bash:**
 ```bash
 for d in ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/; do
-    [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "marketplace|$(basename "$d")|$d"
+    [ -d "$d" ] || continue
+    # Check root first (data-only), then data/ (legacy)
+    if [ -f "${d}config.yaml" ] || [ -f "${d}data/config.yaml" ]; then
+        echo "marketplace|$(basename "$d")|$d"
+    fi
 done
 ```
 
 **Using PowerShell:**
 ```powershell
 Get-ChildItem "$env:USERPROFILE\.claude\plugins\marketplaces\*\hiivmind-corpus-*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-    if (Test-Path "$($_.FullName)\data\config.yaml") {
+    # Check root first (data-only), then data/ (legacy)
+    if ((Test-Path "$($_.FullName)\config.yaml") -or (Test-Path "$($_.FullName)\data\config.yaml")) {
         "marketplace|$($_.Name)|$($_.FullName)\"
     }
 }
@@ -130,6 +166,10 @@ Get-ChildItem "$env:USERPROFILE\.claude\plugins\marketplaces\*\hiivmind-corpus-*
 
 **Using Claude tools:**
 ```
+# Data-only corpora (check first)
+Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/config.yaml
+
+# Legacy corpora
 Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/data/config.yaml
 ```
 
@@ -140,7 +180,7 @@ Glob: ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/data/config.yaml
 **Algorithm:**
 1. List `hiivmind-corpus-*/` directories directly in marketplaces
 2. Skip if has child `hiivmind-corpus-*/` dirs (that's a multi-corpus marketplace)
-3. Verify has `data/config.yaml`
+3. Verify has `config.yaml` (check root first, then `data/`)
 
 **Using bash:**
 ```bash
@@ -148,7 +188,10 @@ for d in ~/.claude/plugins/marketplaces/hiivmind-corpus-*/; do
     [ -d "$d" ] || continue
     # Skip multi-corpus marketplaces
     ls "$d"/hiivmind-corpus-*/ >/dev/null 2>&1 && continue
-    [ -f "${d}data/config.yaml" ] && echo "marketplace-single|$(basename "$d")|$d"
+    # Check root first (data-only), then data/ (legacy)
+    if [ -f "${d}config.yaml" ] || [ -f "${d}data/config.yaml" ]; then
+        echo "marketplace-single|$(basename "$d")|$d"
+    fi
 done
 ```
 
@@ -157,7 +200,8 @@ done
 Get-ChildItem "$env:USERPROFILE\.claude\plugins\marketplaces\hiivmind-corpus-*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
     # Skip if has child corpus directories
     $hasChildren = Get-ChildItem "$($_.FullName)\hiivmind-corpus-*" -Directory -ErrorAction SilentlyContinue
-    if (-not $hasChildren -and (Test-Path "$($_.FullName)\data\config.yaml")) {
+    # Check root first (data-only), then data/ (legacy)
+    if (-not $hasChildren -and ((Test-Path "$($_.FullName)\config.yaml") -or (Test-Path "$($_.FullName)\data\config.yaml"))) {
         "marketplace-single|$($_.Name)|$($_.FullName)\"
     }
 }
@@ -175,26 +219,31 @@ Get-ChildItem "$env:USERPROFILE\.claude\plugins\marketplaces\hiivmind-corpus-*" 
 **Using bash:**
 ```bash
 discover_all() {
+    # Helper to check for config.yaml (root or data/)
+    has_config() {
+        [ -f "${1}config.yaml" ] || [ -f "${1}data/config.yaml" ]
+    }
+
     # User-level
     for d in ~/.claude/skills/hiivmind-corpus-*/; do
-        [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "user-level|$(basename "$d")|$d"
+        [ -d "$d" ] && has_config "$d" && echo "user-level|$(basename "$d")|$d"
     done
 
     # Repo-local
     for d in ./.claude-plugin/skills/hiivmind-corpus-*/; do
-        [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "repo-local|$(basename "$d")|$d"
+        [ -d "$d" ] && has_config "$d" && echo "repo-local|$(basename "$d")|$d"
     done
 
     # Marketplace multi
     for d in ~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/; do
-        [ -d "$d" ] && [ -f "${d}data/config.yaml" ] && echo "marketplace|$(basename "$d")|$d"
+        [ -d "$d" ] && has_config "$d" && echo "marketplace|$(basename "$d")|$d"
     done
 
     # Marketplace single
     for d in ~/.claude/plugins/marketplaces/hiivmind-corpus-*/; do
         [ -d "$d" ] || continue
         ls "$d"/hiivmind-corpus-*/ >/dev/null 2>&1 && continue
-        [ -f "${d}data/config.yaml" ] && echo "marketplace-single|$(basename "$d")|$d"
+        has_config "$d" && echo "marketplace-single|$(basename "$d")|$d"
     done
 }
 ```

@@ -6,878 +6,292 @@ description: >
   or mentions that documentation sources have changed. Triggers on "refresh my [corpus name] corpus",
   "sync corpus with upstream", "check if docs are current", "update from source repo", or
   "hiivmind-corpus refresh".
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, Task
+inputs:
+  - name: corpus_name
+    type: string
+    required: false
+    description: Name of the corpus to refresh (uses current directory if not provided)
+  - name: mode
+    type: string
+    required: false
+    description: "status" for check-only, "update" to pull changes (prompted if not provided)
+  - name: auto_approve
+    type: boolean
+    required: false
+    description: Skip confirmation prompts (for CI/automated runs)
+outputs:
+  - name: status_report
+    type: array
+    description: Per-source freshness status
+  - name: updated_sources
+    type: array
+    description: Sources that were updated (empty in status mode)
 ---
 
-# Corpus Index Refresh
+# Corpus Refresh
 
-Compare index against upstream changes and refresh based on diffs. Handles each source type independently.
+Check documentation sources for upstream changes and optionally update the index.
+Operates in two modes: **status** (check only) and **update** (pull changes and refresh index).
 
-## Prerequisites
+## Precondition
 
-Run from within a corpus skill directory. Valid locations:
-
-| Destination Type | Location |
-|------------------|----------|
-| User-level skill | `~/.claude/skills/{skill-name}/` |
-| Repo-local skill | `{repo}/.claude-plugin/skills/{skill-name}/` |
-| Single-corpus plugin | `{plugin-root}/` (with `.claude-plugin/plugin.json`) |
-| Multi-corpus plugin | `{marketplace}/{plugin-name}/` |
-
-Requires:
-- `data/config.yaml` with at least one source configured (with tracking metadata like `last_commit_sha`, `last_indexed_at`)
-- `data/index.md` with real entries (not placeholder)
-
-**Note:** This skill updates index *freshness* from upstream. Use `hiivmind-corpus-enhance` to add depth to topics.
-
-## When to Use vs Other Skills
-
-| Situation | Use This Skill? | Instead Use |
-|-----------|-----------------|-------------|
-| Upstream docs have changed | ✅ Yes | - |
-| Web cache is stale | ✅ Yes | - |
-| Local files were modified | ✅ Yes | - |
-| Need more detail on a topic | ❌ No | `hiivmind-corpus-enhance` |
-| Want to add a new source | ❌ No | `hiivmind-corpus-add-source` |
-| Corpus has no sources yet | ❌ No | `hiivmind-corpus-add-source` |
-| First-time index building | ❌ No | `hiivmind-corpus-build` |
-| Index only has placeholder | ❌ No | `hiivmind-corpus-build` |
-
-## Commands
-
-- **status**: Check if sources are current
-- **update**: Refresh selected sources
+A `config.yaml` must exist with at least one source and a built index (not placeholder).
+If not found, suggest running `hiivmind-corpus-init` or `hiivmind-corpus-build`.
 
 ---
 
-## Status
+## Phase 1: Validate
 
-Check currency of all sources.
+**Inputs:** working directory
+**Outputs:** `computed.config`, `computed.sources`, `computed.index_structure`
 
-### Step 1: Validate and Read config
-
-**See:** `lib/corpus/patterns/config-parsing.md` and `lib/corpus/patterns/status.md`
-
-Read `data/config.yaml` to check configuration.
-
-**Check 1: Sources exist**
-- If `sources:` array is empty → **STOP**: Run `hiivmind-corpus-add-source` to add sources first
-- If sources exist → Continue
-
-**Check 2: Index exists**
-Read `data/index.md` and check content:
-- If only placeholder text ("Run hiivmind-corpus-build...") → **STOP**: Run `hiivmind-corpus-build` first
-- If index has real entries → Continue
-
-### Step 2: Detect Index Structure
-
-**See:** `lib/corpus/patterns/paths.md` for path resolution.
-
-Check if this is a **tiered index** (for large corpora):
-
-**Using Claude tools:**
-```
-Glob: data/index-*.md
-```
-
-**Single index:** Only `data/index.md` exists - changes update one file
-**Tiered index:** Multiple files exist - need to track which sub-indexes are affected by changes
-
-For tiered indexes, note which sections/sub-indexes exist for change mapping later.
-
-### Step 3: Check each source
-
-**See:** `lib/corpus/patterns/status.md` and `lib/corpus/patterns/sources/README.md`
-
-#### Parallel Status Checking (for multi-source corpora)
-
-**See:** `lib/corpus/patterns/parallel-scanning.md` for agent invocation patterns.
-
-**For single source:** Check directly using the patterns below.
-
-**For multiple sources (2+):** Use the `source-scanner` agent for parallel status checking. Spawn one agent per source to verify availability and check for upstream changes, launch all in a single message, collect status results, and aggregate.
-
-#### Check by Source Type (single source or fallback)
-
-**For git sources:**
-```bash
-# If .source/{source_id}/ exists
-git -C .source/{source_id} fetch origin
-git -C .source/{source_id} rev-parse origin/{branch}
-# Compare to last_commit_sha in config
-
-# If no local clone
-git ls-remote {repo_url} refs/heads/{branch}
-```
-
-See `lib/corpus/patterns/sources/git.md` for detailed SHA comparison algorithms.
-
-**For local sources:**
-- Compare file modification times against `last_indexed_at` in config
-
-**For web sources:**
-- Report cache age (days since `fetched_at`)
-- Note: Re-fetching requires user approval
-
-**For generated-docs sources:**
-
-**See:** `lib/corpus/patterns/status.md` for generated-docs freshness checking.
-
-```bash
-# Check source repo SHA (not web output)
-git ls-remote {source_repo.url} refs/heads/{source_repo.branch}
-# Compare to source_repo.last_commit_sha in config
-```
-
-Report:
-- Source repo SHA comparison (current vs upstream)
-- Number of commits behind (if stale)
-- Note: "Source changed - docs may have been regenerated"
-- Optionally: Check sitemap for new/removed URLs
-
-**Important:** "Stale" for generated-docs means the *source repo* changed, not the web output. There may be a lag between source commits and doc site rebuild (CI/CD pipeline time).
-
-**For llms-txt sources:**
-
-**See:** `lib/corpus/patterns/sources/llms-txt.md` for hash-based freshness checking.
-
-```bash
-# Fetch current manifest
-WebFetch: {manifest.url}
-
-# Hash and compare
-import hashlib
-current_hash = hashlib.sha256(manifest_content.encode()).hexdigest()
-# Compare to manifest.last_hash in config
-```
-
-Report:
-- Manifest hash comparison (current vs stored)
-- If changed: parse new structure and diff sections/URLs
-- Report added/removed pages if manifest changed
-
-**Important:** "Stale" for llms-txt means the manifest has changed. Individual pages may have changed even if manifest hasn't (e.g., page content updated without new pages added).
-
-### Step 4: Report status
-
-Present per-source status:
-
-```
-Index Structure: Tiered (index.md + 4 sub-indexes)
-
-Source Status:
-
-1. react (git)
-   - Indexed: abc123 (2025-12-01)
-   - Upstream: def456
-   - Changes: 47 commits, 12 files changed
-   - Affected sections: reference/, learn/
-   - Status: UPDATES AVAILABLE
-
-2. team-standards (local)
-   - Last indexed: 2025-12-05
-   - Modified files: 2 (coding-guidelines.md, pr-process.md)
-   - Status: UPDATES AVAILABLE
-
-3. kent-testing-blog (web)
-   - Cache age: 7 days
-   - Status: Consider refreshing (URLs may have changed)
-
-4. tanstack-query (git)
-   - Indexed: xyz789 (2025-12-07)
-   - Upstream: xyz789
-   - Status: UP TO DATE
-
-5. gh-cli-manual (generated-docs)
-   - Source repo: https://github.com/cli/cli
-   - Indexed SHA: abc123 (2025-12-01)
-   - Upstream SHA: def456
-   - Source status: STALE (23 commits behind)
-   - Web output: https://cli.github.com/manual
-   - URLs discovered: 165
-   - Note: Source changed - docs may have been regenerated
-
-6. claude-code-docs (llms-txt)
-   - Manifest: https://code.claude.com/docs/llms.txt
-   - Indexed hash: sha256:abc123 (2025-12-01)
-   - Current hash: sha256:def456
-   - Manifest status: CHANGED
-   - Pages: 47 → 49 (+2 new pages)
-   - New sections: None
-   - Status: UPDATES AVAILABLE
-```
-
-For tiered indexes, also show which sub-indexes may need updates based on changed file paths.
+1. Read and parse `config.yaml`
+2. Verify at least one source exists in `config.sources`
+3. Read `index.md` and verify it has real content (not the placeholder from init)
+4. Detect tiered index structure:
+   - Glob for `index-*.md` files
+   - If found, set `computed.index_structure.is_tiered = true` and store sub-index paths
+5. Display: "Found corpus: {name} — Sources: {count} — Index: {single|tiered ({n} sub-indexes)}"
 
 ---
 
-## Update
+## Phase 2: Choose Mode
 
-Refresh selected sources and update index.
+**Inputs:** optional `mode` from invocation, optional `auto_approve`
+**Outputs:** `computed.command_mode`
 
-### Step 1: Select sources
+If `mode` was provided as input, use it directly.
 
-Ask user:
-> Which sources would you like to update?
-> - All sources with updates
-> - Specific sources: [list source IDs]
-> - All sources (including up-to-date)
+If `auto_approve` is set:
+- With `mode = "status"` → status mode
+- Without explicit mode → update mode (auto-approve implies update)
 
-### Step 2: Update by source type
+Otherwise ask: "What would you like to do?"
+- **Check status** → `computed.command_mode = "status"`
+- **Update sources** → `computed.command_mode = "update"`
 
-#### Git Sources
+---
 
-```bash
-# Ensure clone exists
-ls .source/{source_id} || git clone --depth 1 {repo_url} .source/{source_id}
+## Phase 3: Check Freshness
 
-# Fetch and show changes
-cd .source/{source_id}
-git fetch origin
+**Inputs:** `computed.sources`
+**Outputs:** `computed.status_report`
 
-# Show commit log since last index
-git log --oneline {last_commit_sha}..origin/{branch} -- {docs_root} | head -20
+Check each source for upstream changes. For multi-source corpora, use parallel Task agents
+when possible.
 
-# Show file changes
-git diff --name-status {last_commit_sha}..origin/{branch} -- {docs_root}
+### Per-source freshness check by type
 
-# Pull changes
-git pull origin {branch}
+**Git sources** — See `lib/corpus/patterns/sources/git.md` § "Fetch Upstream SHA":
 
-# Get new SHA
-git rev-parse HEAD
+```pseudocode
+upstream_sha = git ls-remote {repo_url} refs/heads/{branch} | cut -f1
+status = (upstream_sha == last_commit_sha) ? "current" : "stale"
 ```
 
-Show user:
-- Number of commits since last index
-- Files: Added (A), Modified (M), Deleted (D), Renamed (R)
+Report: source_id, type, indexed_sha, upstream_sha, status
 
-#### Local Sources
+**Local sources** — See `lib/corpus/patterns/sources/local.md`:
 
-```bash
-# Find new/modified files since last index
-find data/uploads/{source_id} -type f -name "*.md" -newer /tmp/timestamp_marker
+- Count files in `uploads/{source_id}/`
+- Compare file modification times against `last_indexed_at`
+- Status is always "check_manually" (no automatic change detection)
+
+Report: source_id, type, file_count, last_indexed_at, status
+
+**Web sources** — See `lib/corpus/patterns/sources/web.md` § "Get Cache Age":
+
+- Check cache age of files in `.cache/web/{source_id}/`
+- Report age in days
+
+Report: source_id, type, cache_age_days, last_indexed_at, status
+
+**llms-txt sources** — See `lib/corpus/patterns/sources/llms-txt.md` § "Check Freshness":
+
+```pseudocode
+current_manifest = fetch {base_url}/llms.txt
+current_hash = sha256(current_manifest)
+status = (current_hash == manifest.last_hash) ? "current" : "stale"
 ```
 
-Compare file list against `files:` array in config to detect:
-- New files (not in config)
-- Modified files (mtime > config timestamp)
-- Deleted files (in config but not on disk)
+Report: source_id, type, manifest_hash_match, status
 
-#### Web Sources
+**Generated-docs sources** — See `lib/corpus/patterns/sources/generated-docs.md` § "Check Freshness":
 
-**Important:** Web content requires user approval before updating cache.
+- Same as git: compare source_repo SHA against upstream
+- Report like git source
 
-For each URL in the source:
-1. Show current cache age
-2. Offer to re-fetch
-3. If user agrees:
-   - Fetch URL with WebFetch
-   - Show fetched content to user
-   - Compare with cached version (show diff if changed)
-   - **Only save if user approves**
-4. If URL fails to fetch, warn but preserve existing cache
+---
 
-#### Generated-Docs Sources
+## Phase 4: Present Status Report
 
-**See:** `lib/corpus/patterns/sources/generated-docs.md` for generated-docs operations.
+**Inputs:** `computed.status_report`
 
-Generated-docs sources track a source repository for change detection but fetch content live from the web.
+Display a table:
 
-**Step 1: Check source repo for changes**
-```bash
-# Fetch upstream SHA
-upstream_sha=$(git ls-remote {source_repo.url} refs/heads/{source_repo.branch} | cut -f1)
-
-# Compare to indexed SHA
-# If different, source has changed
+```
+Source Status Report
+─────────────────────────────────
+| Source ID       | Type   | Status  | Details                    |
+|-----------------|--------|---------|----------------------------|
+| {id}            | git    | stale   | 5 new commits              |
+| {id}            | local  | manual  | 12 files, check timestamps |
+| {id}            | web    | ok      | Cache: 3 days old          |
 ```
 
-**Step 2: Re-discover URLs (if source changed)**
+### If status mode
 
-If `sitemap_url` is configured:
-```bash
-# Fetch sitemap and extract URLs
-WebFetch: {sitemap_url}
-# Parse for new/removed URLs
+If any sources are stale, ask: "Some sources have updates. Would you like to update now?"
+- **Yes** → switch to update mode, continue to Phase 5
+- **No** → done
+
+If all sources are current: "All sources are up to date." → done
+
+### If update mode
+
+Continue directly to Phase 5 with the status report available.
+
+---
+
+## Phase 5: Update Sources
+
+**Inputs:** `computed.status_report`, `computed.sources`
+**Outputs:** `computed.updated_sources`, `computed.all_changes`
+
+### Select sources to update
+
+If `auto_approve` is set, automatically select all stale sources.
+
+Otherwise ask: "Which sources should be updated?"
+- **All stale sources** → select all with status != "current"
+- **Specific sources** → present list for selection
+- **Cancel** → done
+
+### Update loop
+
+For each selected source, execute the type-specific update:
+
+**Git source update** — See `lib/corpus/patterns/sources/git.md`:
+
+1. Check if `.source/{source_id}` clone exists
+   - If not, clone: `git clone --depth 1 --branch {branch} {url} .source/{source_id}`
+   - If exists, fetch and pull: `git -C .source/{source_id} pull origin`
+2. Get commit count between old and new SHA
+3. Get file changes (added/modified/deleted) filtered to `docs_root`
+4. Store new SHA
+5. Collect changes for index update
+
+**Local source update:**
+
+1. Scan `uploads/{source_id}/` for files newer than `last_indexed_at`
+2. List new/modified files
+3. Collect changes for index update
+
+**Web source update:**
+
+1. If `auto_approve`, re-fetch all cached URLs automatically
+2. Otherwise ask: "Re-fetch cached web content? (Yes / No, just re-index existing cache)"
+3. If re-fetching: for each URL in source config, WebFetch and overwrite cache file
+4. Collect changes for index update
+
+**llms-txt source update** — See `lib/corpus/patterns/sources/llms-txt.md`:
+
+1. Re-fetch manifest
+2. Diff old vs new manifest to find added/removed pages
+3. Update manifest hash in config
+4. Re-cache changed pages per caching strategy
+5. Collect changes for index update
+
+**Generated-docs source update** — See `lib/corpus/patterns/sources/generated-docs.md`:
+
+1. Pull source repo for new SHA
+2. Re-discover URLs from sitemap if available
+3. Compare discovered URLs to stored list
+4. Collect changes for index update
+
+---
+
+## Phase 6: Apply Changes to Index
+
+**Inputs:** `computed.all_changes`, `computed.index_structure`, `computed.updated_sources`
+
+### Single index
+
+If `computed.index_structure.is_tiered` is false:
+
+1. Read `index.md`
+2. Apply changes: update existing entries, add new entries, mark removed entries
+3. Show preview of changes to user
+4. If `auto_approve` or user confirms → save index.md
+
+### Tiered index
+
+If `computed.index_structure.is_tiered` is true:
+
+1. Map changes to affected sub-indexes (match source sections to `index-*.md` files)
+2. Present affected sections to user
+3. For each affected sub-index:
+   - Read `index-{section}.md`
+   - Apply relevant changes
+   - Save
+4. Update main `index.md` summary section
+5. If `auto_approve` or user confirms → save all files
+
+### Update config metadata
+
+After index changes are saved:
+
+1. Update `index.last_updated_at` in config.yaml
+2. For each updated source:
+   - Set `last_commit_sha` (git/generated-docs)
+   - Set `last_indexed_at` to current timestamp
+   - Update `manifest.last_hash` (llms-txt)
+3. Save config.yaml
+
+### Completion
+
+Display summary:
+
 ```
-
-Show user:
-- New URLs discovered (not in `discovered_urls`)
-- URLs no longer in sitemap (may have been removed)
-- Total URL count change
-
-**Step 3: Update discovered_urls in config**
-
-Ask user: "Source repo has N new commits. Re-discover URLs?"
-
-If yes:
-- Fetch sitemap/crawl
-- Compare to existing `discovered_urls`
-- Report additions/removals
-- Update config with new URL list
-
-**Step 4: Optionally enable caching**
-
-If `cache.enabled: true`:
-- Fetch changed/new URLs via WebFetch
-- Save to `.cache/web/{source_id}/`
-- Update cache metadata
-
-If `cache.enabled: false` (default):
-- No content fetching needed
-- Content is fetched live during navigation
-
-**Note:** Unlike web sources, generated-docs don't require pre-caching. The refresh primarily updates:
-1. `source_repo.last_commit_sha` - Track upstream changes
-2. `web_output.discovered_urls` - URL directory updates
-
-#### llms-txt Sources
-
-**See:** `lib/corpus/patterns/sources/llms-txt.md` for manifest operations.
-
-llms-txt sources use hash-based change detection on the manifest file.
-
-**Step 1: Fetch and compare manifest**
-```
-WebFetch: {manifest.url}
-Hash current content and compare to manifest.last_hash
-```
-
-**Step 2: If manifest changed, parse new structure**
-- Extract sections and URLs from new manifest
-- Compare to stored `structure.sections` in config
-- Report: new pages, removed pages, new sections
-
-**Step 3: Diff changes**
-Show user:
-- New pages discovered (not in current structure)
-- Pages no longer in manifest (may have been removed)
-- New sections (if any)
-- Removed sections (if any)
-
-**Step 4: Update cache based on strategy**
-
-If `cache.strategy: full`:
-- Fetch all new/changed pages
-- Remove cached pages no longer in manifest
-
-If `cache.strategy: selective`:
-- Fetch new pages in selected sections only
-- Update cache for selected sections
-
-If `cache.strategy: on-demand`:
-- No pre-caching needed
-- Content fetched live during navigation
-
-**Step 5: Update config**
-```yaml
-manifest:
-  last_hash: "{new_hash}"
-  last_fetched_at: "{timestamp}"
-structure:
-  # Updated from new manifest
-  sections:
-    - name: "Skills"
-      urls: [...]
-```
-
-**Note:** llms-txt refresh is lightweight - just fetch the small manifest file to detect changes. Only cache updates require fetching individual pages.
-
-### Step 3: Update index collaboratively
-
-For changes detected in each source:
-
-**Added files:**
-- Show file list to user
-- Ask: "Which new files should be added to the index?"
-- Add selected entries with `{source_id}:{path}` format
-
-**Modified files:**
-- Check if content significantly changed
-- Ask: "Should I update the description for {file}?"
-- Update entries as needed
-
-**Deleted files:**
-- Show which indexed files were deleted
-- Remove corresponding entries from index
-
-**Renamed files:**
-- Update path in index (keep same description)
-
-### Preserving Entry Keywords
-
-**IMPORTANT:** Entry keywords are human-curated and must be preserved during refresh.
-
-When updating entries, preserve any `Keywords:` lines:
-
-```markdown
-# Before refresh (entry with keywords)
-- **Milestones REST** `rest:repos/milestones.md` - REST API for milestones
-  Keywords: `milestones`, `POST`, `create`, `due_on`
-
-# After path change (keywords preserved)
-- **Milestones REST** `rest:repos/v2/milestones.md` - REST API for milestones
-  Keywords: `milestones`, `POST`, `create`, `due_on`
-```
-
-**When modifying entries:**
-- Keep existing keywords unless the content fundamentally changed
-- If content changed significantly, ask user: "Should the keywords for this entry be updated?"
-
-**When deleting entries:**
-- Keywords are deleted along with the entry (they're entry-specific)
-
-**When adding new entries:**
-- New entries don't get keywords automatically during refresh
-- Suggest: "Run `hiivmind-corpus-enhance` to add keywords to new entries if needed for operational lookup"
-
-### Tiered Index Updates
-
-For tiered indexes, determine which file(s) to update based on changed paths:
-
-| Changed Path | Update Target |
-|--------------|---------------|
-| `docs/reference/...` | `data/index-reference.md` |
-| `docs/guides/...` | `data/index-guides.md` |
-| New top-level section | `data/index.md` (main index) |
-
-If a change affects the main index structure (e.g., new major section), also update `data/index.md` summary and links.
-
-Ask user: "These changes affect `index-reference.md`. Should I also update the main index summary?"
-
-### Step 4: Update config metadata
-
-For each updated source:
-
-**Git sources:**
-```yaml
-- id: "react"
-  # ... other fields ...
-  last_commit_sha: "{new_sha}"
-  last_indexed_at: "{timestamp}"
-```
-
-**Local sources:**
-```yaml
-- id: "team-standards"
-  # ... other fields ...
-  files:
-    - path: "coding-guidelines.md"
-      last_modified: "{new_mtime}"
-    - path: "new-file.md"
-      last_modified: "{mtime}"
-  last_indexed_at: "{timestamp}"
-```
-
-**Web sources:**
-```yaml
-- id: "kent-testing-blog"
-  # ... other fields ...
-  urls:
-    - url: "..."
-      fetched_at: "{new_timestamp}"
-      content_hash: "{new_hash}"
-  last_indexed_at: "{timestamp}"
-```
-
-**Generated-docs sources:**
-```yaml
-- id: "gh-cli-manual"
-  type: "generated-docs"
-
-  source_repo:
-    url: "https://github.com/cli/cli"
-    branch: "trunk"
-    docs_root: "cmd/"
-    last_commit_sha: "{new_sha}"      # Updated to upstream SHA
-
-  web_output:
-    base_url: "https://cli.github.com/manual"
-    sitemap_url: "https://cli.github.com/sitemap.xml"
-    discovered_urls:                   # Updated from sitemap re-discovery
-      - path: "/gh_pr_create"
-        title: "gh pr create"
-      - path: "/gh_issue_new"          # New URL discovered
-        title: "gh issue new"
-
-  cache:
-    enabled: false
-    dir: ".cache/web/gh-cli-manual/"
-
-  last_indexed_at: "{timestamp}"
-```
-
-**llms-txt sources:**
-```yaml
-- id: "claude-code-docs"
-  type: "llms-txt"
-  manifest:
-    url: "https://code.claude.com/docs/llms.txt"
-    last_hash: "{new_hash}"           # Updated from current manifest
-    last_fetched_at: "{timestamp}"
-  urls:
-    base_url: "https://code.claude.com/docs/en"
-  structure:                          # Updated from new manifest
-    title: "Claude Code"
-    sections:
-      - name: "Skills"
-        urls:
-          - path: "skills.md"
-            title: "Skills"
-  last_indexed_at: "{timestamp}"
-```
-
-### Step 5: Commit reminder
-
-**For single index:**
-```bash
-git add data/index.md data/config.yaml
-git commit -m "Refresh docs index"
-```
-
-**For tiered index:**
-```bash
-# Include any updated sub-indexes
-git add data/index.md data/index-*.md data/config.yaml
-git commit -m "Refresh docs index ({sources_updated})"
+Refresh complete.
+Updated sources: {count}
+Index entries: {added} added, {modified} modified, {removed} removed
 ```
 
 ---
 
-## File Locations
+## Error Handling
 
-- **Config**: `data/config.yaml`
-- **Main index**: `data/index.md`
-- **Sub-indexes** (tiered): `data/index-{section}.md`
-- **Git sources**: `.source/{source_id}/` (gitignored)
-- **Local sources**: `data/uploads/{source_id}/`
-- **Web cache**: `.cache/web/{source_id}/` (gitignored)
-- **llms-txt cache**: `.cache/llms-txt/{source_id}/` (gitignored)
-
----
-
-## Next Steps Guidance
-
-After refresh, suggest appropriate next actions:
-
-| Situation | Recommend |
-|-----------|-----------|
-| Many new docs added, index feels shallow | `hiivmind-corpus-enhance` on expanded sections |
-| User mentions wanting to add external resources | `hiivmind-corpus-add-source` |
-| User wants deeper coverage of new topic | `hiivmind-corpus-enhance` |
-| Large corpus grew significantly | Consider tiered indexing (see `hiivmind-corpus-build`) |
+| Error | Message | Recovery |
+|-------|---------|----------|
+| No config.yaml | "No config.yaml found" | Run hiivmind-corpus-init |
+| No sources | "No sources configured" | Run hiivmind-corpus-add-source |
+| Index not built | "Index is a placeholder" | Run hiivmind-corpus-build |
+| Clone/fetch failed | "Failed to fetch from {url}" | Check network and URL |
+| Index update failed | "Failed to update index" | Check file permissions |
+| Config save failed | "Failed to save config.yaml" | Check file permissions |
 
 ---
 
-## Example Sessions
-
-### Refreshing a Single Git Source
-
-**User**: "refresh status"
-
-```
-Source Status:
-
-1. polars (git)
-   - Indexed: abc123 (2025-12-01)
-   - Upstream: def456
-   - Changes: 15 commits, 8 files changed
-   - Status: UPDATES AVAILABLE
-```
-
-**User**: "refresh update"
-
-```
-Updating polars (git)...
-
-Changes since last index:
-A  docs/guides/new-feature.md
-M  docs/reference/expressions.md
-M  docs/reference/io.md
-D  docs/deprecated/old-api.md
-
-Added files:
-- docs/guides/new-feature.md
-
-Would you like to add "new-feature.md" to the index?
-```
-
-User: "Yes, add it to the Guides section"
-
-```
-Updated index:
-- Added: **New Feature Guide** `polars:guides/new-feature.md`
-- Removed: `polars:deprecated/old-api.md`
-
-Updated config with new SHA: def456
-```
-
----
-
-### Refreshing Web Sources
-
-**User**: "refresh update kent-testing-blog"
-
-```
-Checking kent-testing-blog (web)...
-
-1. testing-implementation-details.md
-   - Cached: 14 days ago
-   - Re-fetch? [y/n]
-```
-
-User: "y"
-
-```
-Fetching https://kentcdodds.com/blog/testing-implementation-details...
-
-Content has changed since last fetch.
-[Shows diff or summary of changes]
-
-Save updated content? [y/n]
-```
-
-User: "y"
-
-```
-Saved updated content.
-Updated cache timestamp and content hash.
-```
-
----
-
-### Refreshing Local Sources
-
-**User**: "refresh status team-standards"
-
-```
-team-standards (local):
-- Last indexed: 2025-12-05
-- Modified files:
-  - coding-guidelines.md (modified 2025-12-07)
-- New files:
-  - deployment-process.md
-- Status: UPDATES AVAILABLE
-```
-
-**User**: "refresh update"
-
-```
-Updating team-standards (local)...
-
-New file found: deployment-process.md
-Add to index? [y/n]
-```
-
-User: "Yes, create a new Deployment section"
-
-```
-Updated index:
-- Added section: ## Deployment
-- Added: **Deployment Process** `local:team-standards/deployment-process.md`
-```
-
----
-
-### Refreshing Tiered Index
-
-**User**: "refresh status"
-
-```
-Index Structure: Tiered (index.md + index-reference.md + index-guides.md)
-
-Source Status:
-
-1. github (git)
-   - Indexed: abc123 (2025-12-01)
-   - Upstream: def456
-   - Changes: 23 commits, 15 files changed
-   - Affected sections:
-     - actions/using-workflows/ → index-actions.md
-     - rest/reference/ → index-rest-api.md
-   - Status: UPDATES AVAILABLE
-```
-
-**User**: "refresh update"
-
-```
-Updating github (git)...
-
-Changes affecting index-actions.md:
-A  actions/using-workflows/reusing-workflows.md
-M  actions/using-workflows/workflow-syntax.md
-
-Changes affecting index-rest-api.md:
-A  rest/reference/repos/autolinks.md
-D  rest/reference/deprecated/legacy-auth.md
-
-Would you like to update both sub-indexes?
-```
-
-User: "Yes"
-
-```
-Updated index-actions.md:
-- Added: **Reusing Workflows** `github:actions/using-workflows/reusing-workflows.md`
-
-Updated index-rest-api.md:
-- Added: **Repository Autolinks** `github:rest/reference/repos/autolinks.md`
-- Removed: `github:rest/reference/deprecated/legacy-auth.md`
-
-Main index.md: No structural changes needed (section counts unchanged)
-
-Updated config with new SHA: def456
-```
-
----
-
-### Refreshing Generated-Docs Sources
-
-**User**: "refresh status gh-cli-manual"
-
-```
-gh-cli-manual (generated-docs):
-- Source repo: https://github.com/cli/cli
-- Branch: trunk
-- Indexed SHA: abc123 (2025-12-01)
-- Upstream SHA: def456
-- Source status: STALE (23 commits behind)
-- Web output: https://cli.github.com/manual
-- URLs discovered: 165
-- Note: Source changed - docs may have been regenerated
-```
-
-**User**: "refresh update"
-
-```
-Updating gh-cli-manual (generated-docs)...
-
-Source repo has 23 new commits since last check.
-Re-discover URLs from sitemap? [y/n]
-```
-
-User: "y"
-
-```
-Fetching sitemap from https://cli.github.com/sitemap.xml...
-
-URL changes detected:
-+ /gh_attestation_verify (new)
-+ /gh_attestation_trusted-root (new)
-- /gh_api_deprecated (removed)
-
-Total URLs: 167 (was 165)
-
-Update discovered_urls in config? [y/n]
-```
-
-User: "y"
-
-```
-Updated config:
-- source_repo.last_commit_sha: def456
-- web_output.discovered_urls: 167 URLs
-- last_indexed_at: 2025-12-18T10:00:00Z
-
-Add new command pages to index? [y/n]
-```
-
-User: "Yes, add them to the Commands section"
-
-```
-Updated index.md:
-- Added: **gh attestation verify** `gh-cli-manual:/gh_attestation_verify`
-- Added: **gh attestation trusted-root** `gh-cli-manual:/gh_attestation_trusted-root`
-- Removed: `gh-cli-manual:/gh_api_deprecated`
-```
-
----
-
-### Refreshing llms-txt Sources
-
-**User**: "refresh status claude-code-docs"
-
-```
-claude-code-docs (llms-txt):
-- Manifest: https://code.claude.com/docs/llms.txt
-- Indexed hash: sha256:abc123 (2025-12-01)
-- Current hash: sha256:def456
-- Manifest status: CHANGED
-- Pages: 47 → 49 (+2 new pages)
-- Status: UPDATES AVAILABLE
-```
-
-**User**: "refresh update"
-
-```
-Updating claude-code-docs (llms-txt)...
-
-Manifest has changed since last check.
-Parsing new structure...
-
-Changes detected:
-+ new-feature.md (new page in "Core Features" section)
-+ troubleshooting.md (new page in "Getting Started" section)
-- deprecated-api.md (removed from "Reference" section)
-
-Update structure in config? [y/n]
-```
-
-User: "y"
-
-```
-Updated config:
-- manifest.last_hash: sha256:def456
-- structure.sections: Updated with new pages
-- last_indexed_at: 2025-12-18T10:00:00Z
-
-Cache strategy: selective (sections: skills, agents)
-New pages not in cached sections - skipping cache update.
-
-Add new pages to index? [y/n]
-```
-
-User: "Yes"
-
-```
-Updated index.md:
-- Added: **New Feature** `llms-txt:claude-code-docs/new-feature.md`
-- Added: **Troubleshooting** `llms-txt:claude-code-docs/troubleshooting.md`
-- Removed: `llms-txt:claude-code-docs/deprecated-api.md`
-```
-
----
-
-### Blocked: No Index Built
-
-**User**: "refresh status"
-
-**Step 1**: Validate prerequisites
-- Config: schema_version 2, sources exist ✓
-- Index: Only placeholder text ("Run hiivmind-corpus-build...")
-
-**Response**: "The index hasn't been built yet - it only contains placeholder text.
-
-**Recommended next step:** Run `hiivmind-corpus-build` to create the initial index, then use refresh for future updates."
-
----
-
-## Reference
-
-**Pattern documentation:**
-- `lib/corpus/patterns/tool-detection.md` - Detect available tools
-- `lib/corpus/patterns/config-parsing.md` - YAML config extraction
-- `lib/corpus/patterns/status.md` - Index status and freshness checking
-- `lib/corpus/patterns/paths.md` - Path resolution
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, llms-txt)
-
-**Related skills:**
-- Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
-- Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
-- Build index: `skills/hiivmind-corpus-build/SKILL.md`
-- Enhance topics: `skills/hiivmind-corpus-enhance/SKILL.md`
-- Upgrade to latest standards: `skills/hiivmind-corpus-upgrade/SKILL.md`
-- Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
-- Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
-- Gateway command: `commands/hiivmind-corpus.md`
-- **Agent:** Source scanner for parallel operations: `agents/source-scanner.md`
+## Pattern Documentation
+
+- **Git sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/git.md`
+- **Local sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/local.md`
+- **Web sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/web.md`
+- **llms-txt sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/llms-txt.md`
+- **Generated docs:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/generated-docs.md`
+- **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
+
+## Agent
+
+- **Source scanner:** `${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md`
+
+## Related Skills
+
+- Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
+- Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
+- Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
+- Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)

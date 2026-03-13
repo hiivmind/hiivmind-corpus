@@ -3,6 +3,85 @@
 Generate files from templates for different corpus destination types.
 
 **Templates location:** `${CLAUDE_PLUGIN_ROOT}/templates/`
+- Data-only templates: `templates/` (root)
+- Legacy plugin templates: `templates/deprecated/`
+
+---
+
+## Corpus Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| **Data-only** | Just data files, no plugin structure | New architecture (recommended) |
+| **User-level skill** | Simple skill in ~/.claude/skills | Legacy, personal use |
+| **Plugin** | Full plugin with manifests | Legacy, distribution |
+
+**Recommendation:** Use data-only structure for new corpora. Register via `.hiivmind/corpus/registry.yaml`.
+
+---
+
+## Data-Only Corpus (New Architecture)
+
+Creates a minimal data repository without any Claude Code plugin structure.
+
+**Context required:**
+- `corpus_root` - Base directory for corpus
+- `placeholders` - Template placeholders object
+- `corpus_name` - Corpus identifier
+
+### Files to Generate
+
+| Source Template | Destination | Description |
+|-----------------|-------------|-------------|
+| `config.yaml.template` | `{corpus_root}/config.yaml` | Source configuration |
+| `claude-data-only.md.template` | `{corpus_root}/CLAUDE.md` | Data-only CLAUDE.md |
+| `readme-data-only.md.template` | `{corpus_root}/README.md` | Data-only README |
+| `gitignore.template` | `{corpus_root}/.gitignore` | Git ignore rules |
+| `license.template` | `{corpus_root}/LICENSE` | MIT license |
+
+### Directories to Create
+
+| Directory | Purpose |
+|-----------|---------|
+| `{corpus_root}/uploads/` | Local document uploads |
+
+**Note:** `.source/` and `.cache/` are created on-demand by skills, not at init.
+
+### Index Placeholder
+
+Create `{corpus_root}/index.md` with content:
+
+```markdown
+# {{project_display_name}} Documentation Corpus
+
+> Run `/hiivmind-corpus build` to build this index.
+
+This corpus is not yet populated. Add documentation sources and build the index.
+```
+
+### Execution
+
+```
+Create directories:
+  mkdir -p {corpus_root}/uploads
+
+FOR each file mapping:
+  1. Read template from ${CLAUDE_PLUGIN_ROOT}/templates/{source}
+  2. Replace all {{placeholder}} with context.placeholders values
+  3. Replace {{year}} with current year
+  4. Write result to {destination}
+
+Create index placeholder manually (not from template)
+```
+
+### What's NOT Created
+
+Data-only corpora do NOT have:
+- `.claude-plugin/` directory
+- `skills/` directory
+- `commands/` directory
+- `references/` directory
+- Any navigate skill (handled by hiivmind-corpus plugin)
 
 ---
 
@@ -23,9 +102,9 @@ For each template file:
 
 ---
 
-## User-level or Repo-local Skill
+## User-level or Repo-local Skill (Legacy)
 
-Creates a simple skill structure without plugin manifests.
+Creates a simple skill structure without plugin manifests. **Deprecated:** Use data-only architecture instead.
 
 **Context required:**
 - `skill_root` - Base directory for skill
@@ -36,9 +115,9 @@ Creates a simple skill structure without plugin manifests.
 
 | Source Template | Destination | Description |
 |-----------------|-------------|-------------|
-| `navigate-skill.md.template` | `{skill_root}/SKILL.md` | Navigate skill |
+| `deprecated/navigate-skill.md.template` | `{skill_root}/SKILL.md` | Navigate skill |
 | `config.yaml.template` | `{skill_root}/data/config.yaml` | Source configuration |
-| `project-awareness.md.template` | `{skill_root}/references/project-awareness.md` | CLAUDE.md snippet |
+| `deprecated/project-awareness.md.template` | `{skill_root}/references/project-awareness.md` | CLAUDE.md snippet |
 
 ### Index Placeholder
 
@@ -65,9 +144,9 @@ Create index placeholder manually (not from template)
 
 ---
 
-## Single-corpus Plugin
+## Single-corpus Plugin (Legacy)
 
-Creates a standalone plugin with manifests, commands, and skills.
+Creates a standalone plugin with manifests, commands, and skills. **Deprecated:** Use data-only architecture instead.
 
 **Context required:**
 - `plugin_root` - Base directory for plugin
@@ -79,15 +158,15 @@ Creates a standalone plugin with manifests, commands, and skills.
 
 | Source Template | Destination | Description |
 |-----------------|-------------|-------------|
-| `plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` | Plugin manifest |
-| `navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` | Navigate skill |
-| `navigate-command.md.template` | `{plugin_root}/commands/navigate.md` | Navigate command |
+| `deprecated/plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` | Plugin manifest |
+| `deprecated/navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` | Navigate skill |
+| `deprecated/navigate-command.md.template` | `{plugin_root}/commands/navigate.md` | Navigate command |
 | `config.yaml.template` | `{plugin_root}/data/config.yaml` | Source configuration |
-| `project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` | CLAUDE.md snippet |
+| `deprecated/project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` | CLAUDE.md snippet |
 | `gitignore.template` | `{plugin_root}/.gitignore` | Git ignore rules |
-| `claude.md.template` | `{plugin_root}/CLAUDE.md` | Plugin CLAUDE.md |
+| `deprecated/claude.md.template` | `{plugin_root}/CLAUDE.md` | Plugin CLAUDE.md |
 | `license.template` | `{plugin_root}/LICENSE` | MIT license |
-| `readme.md.template` | `{plugin_root}/README.md` | Plugin documentation |
+| `deprecated/readme.md.template` | `{plugin_root}/README.md` | Plugin documentation |
 
 ### Index Placeholder
 
@@ -115,9 +194,9 @@ Create index placeholder manually (not from template)
 
 ---
 
-## Multi-corpus Marketplace (New)
+## Multi-corpus Marketplace (New) - Legacy
 
-Creates a new marketplace with the first plugin.
+Creates a new marketplace with the first plugin. **Deprecated:** Use data-only architecture instead.
 
 **Context required:**
 - `marketplace_root` - Base directory for marketplace
@@ -130,22 +209,22 @@ Creates a new marketplace with the first plugin.
 
 | Source Template | Destination | Description |
 |-----------------|-------------|-------------|
-| `marketplace.json.template` | `{marketplace_root}/.claude-plugin/marketplace.json` | Marketplace registry |
-| `marketplace-claude.md.template` | `{marketplace_root}/CLAUDE.md` | Marketplace CLAUDE.md |
+| `deprecated/marketplace.json.template` | `{marketplace_root}/.claude-plugin/marketplace.json` | Marketplace registry |
+| `deprecated/marketplace-claude.md.template` | `{marketplace_root}/CLAUDE.md` | Marketplace CLAUDE.md |
 
 ### Plugin-level Files
 
-Same as Single-corpus Plugin section, but paths are under `{plugin_root}/` instead of root.
+Same as Single-corpus Plugin (Legacy) section, but paths are under `{plugin_root}/` instead of root.
 
 | Source Template | Destination |
 |-----------------|-------------|
-| `plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` |
-| `navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` |
-| `navigate-command.md.template` | `{plugin_root}/commands/navigate.md` |
+| `deprecated/plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` |
+| `deprecated/navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` |
+| `deprecated/navigate-command.md.template` | `{plugin_root}/commands/navigate.md` |
 | `config.yaml.template` | `{plugin_root}/data/config.yaml` |
-| `project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` |
+| `deprecated/project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` |
 | `gitignore.template` | `{plugin_root}/.gitignore` |
-| `readme.md.template` | `{plugin_root}/README.md` |
+| `deprecated/readme.md.template` | `{plugin_root}/README.md` |
 
 ### Marketplace JSON Content
 
@@ -183,9 +262,9 @@ Create index placeholder in {plugin_root}/data/index.md
 
 ---
 
-## Multi-corpus Marketplace (Existing)
+## Multi-corpus Marketplace (Existing) - Legacy
 
-Adds a new plugin to an existing marketplace.
+Adds a new plugin to an existing marketplace. **Deprecated:** Use data-only architecture instead.
 
 **Context required:**
 - `marketplace_root` - Existing marketplace directory
@@ -196,17 +275,17 @@ Adds a new plugin to an existing marketplace.
 
 ### Plugin-level Files
 
-Same as Plugin-level files in Multi-corpus Marketplace (New).
+Same as Plugin-level files in Multi-corpus Marketplace (New) - Legacy.
 
 | Source Template | Destination |
 |-----------------|-------------|
-| `plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` |
-| `navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` |
-| `navigate-command.md.template` | `{plugin_root}/commands/navigate.md` |
+| `deprecated/plugin.json.template` | `{plugin_root}/.claude-plugin/plugin.json` |
+| `deprecated/navigate-skill.md.template` | `{plugin_root}/skills/navigate/SKILL.md` |
+| `deprecated/navigate-command.md.template` | `{plugin_root}/commands/navigate.md` |
 | `config.yaml.template` | `{plugin_root}/data/config.yaml` |
-| `project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` |
+| `deprecated/project-awareness.md.template` | `{plugin_root}/references/project-awareness.md` |
 | `gitignore.template` | `{plugin_root}/.gitignore` |
-| `readme.md.template` | `{plugin_root}/README.md` |
+| `deprecated/readme.md.template` | `{plugin_root}/README.md` |
 
 ### Marketplace Registry Update
 
@@ -269,6 +348,7 @@ Partial generation is acceptable - validation gates will catch missing files.
 
 ## Related Documentation
 
-- **Template files:** `${CLAUDE_PLUGIN_ROOT}/templates/`
+- **Data-only templates:** `${CLAUDE_PLUGIN_ROOT}/templates/`
+- **Legacy plugin templates:** `${CLAUDE_PLUGIN_ROOT}/templates/deprecated/`
 - **Placeholder reference:** `${CLAUDE_PLUGIN_ROOT}/references/template-placeholders.md`
 - **Marketplace structures:** `${CLAUDE_PLUGIN_ROOT}/references/marketplace-templates.md`

@@ -19,29 +19,32 @@ Manage documentation sources: git repositories, local uploads, web content, and 
 
 ## Source Type Taxonomy
 
-| Type | Storage Location | Change Detection | Content Access | Use Case |
-|------|------------------|------------------|----------------|----------|
-| `git` | `.source/{id}/` | SHA comparison | Local files | Full repos with docs |
-| `local` | `data/uploads/{id}/` | Timestamp | Local files | User-uploaded docs |
-| `web` | `.cache/web/{id}/` | Manual refresh | Cached files | Blog posts, articles |
-| `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs |
-| `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt |
+| Type | Storage Location | Change Detection | Content Access | Use Case | Extraction Default |
+|------|------------------|------------------|----------------|----------|--------------------|
+| `git` | `.source/{id}/` | SHA comparison | Local files | Full repos with docs | frontmatter, tags |
+| `local` | `data/uploads/{id}/` | Timestamp | Local files | User-uploaded docs | frontmatter, tags |
+| `web` | `.cache/web/{id}/` | Manual refresh | Cached files | Blog posts, articles | none |
+| `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs | frontmatter |
+| `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt | none |
+| `obsidian` | `.source/{id}/` (git) or direct path (local) | SHA / timestamp | Local files | Obsidian vaults | wikilinks, frontmatter, tags |
 
 ## When to Use Each Type
 
 ```
-Is the documentation in a git repository?
-├─ Yes: Is the repo the actual docs (markdown files)?
-│       ├─ Yes → git source
-│       └─ No (code generates docs) → generated-docs source
-└─ No: Is it a web page/article?
-        ├─ Yes: Does the site provide llms.txt manifest?
-        │       ├─ Yes → llms-txt source
-        │       └─ No → web source
-        └─ No (local files):
-                Is it a large PDF (50+ pages)?
-                ├─ Yes → pre-process with pdf.md, then local source
-                └─ No → local source
+Is it an Obsidian vault (has `.obsidian/` directory)?
+├─ Yes → obsidian source
+└─ No: Is the documentation in a git repository?
+        ├─ Yes: Is the repo the actual docs (markdown files)?
+        │       ├─ Yes → git source
+        │       └─ No (code generates docs) → generated-docs source
+        └─ No: Is it a web page/article?
+                ├─ Yes: Does the site provide llms.txt manifest?
+                │       ├─ Yes → llms-txt source
+                │       └─ No → web source
+                └─ No (local files):
+                        Is it a large PDF (50+ pages)?
+                        ├─ Yes → pre-process with pdf.md, then local source
+                        └─ No → local source
 ```
 
 ## Pre-Processing
@@ -63,6 +66,7 @@ Pre-processing converts files into formats suitable for local sources. The split
 | `web.md` | Cache setup, URL slugification, cache age | ~90 |
 | `generated-docs.md` | Hybrid git+web, URL discovery, live fetch | ~220 |
 | `llms-txt.md` | Manifest parsing, hash detection, raw markdown caching | ~280 |
+| `obsidian.md` | Obsidian vault source pattern — wikilink resolution, vault conventions, extraction defaults | ~200 |
 | `pdf.md` | PDF pre-processing, chapter detection, splitting | ~180 |
 | `shared.md` | URL parsing, existence checks, errors | ~160 |
 

@@ -15,7 +15,21 @@ Check corpus index status and source freshness. Determine if a corpus is built, 
 
 - **Tool detection** (see `tool-detection.md`) - For YAML parsing and git operations
 - **Config parsing** (see `config-parsing.md`) - For reading source metadata
-- Corpus exists with `data/config.yaml`
+- Corpus exists with `config.yaml` (data-only) or `config.yaml` (legacy plugin)
+
+## Path Resolution
+
+**See:** `paths.md` for full path detection logic.
+
+Data-only corpora store files at root level:
+```
+{corpus_path}/config.yaml        # Data-only (preferred)
+{corpus_path}/index.md           # Data-only (preferred)
+{corpus_path}/config.yaml   # Legacy plugin structure
+{corpus_path}/data/index.md      # Legacy plugin structure
+```
+
+**Examples below use data-only paths. For legacy plugins, prefix paths with `data/`.**
 
 ## Index Status Types
 
@@ -32,7 +46,7 @@ Check corpus index status and source freshness. Determine if a corpus is built, 
 ### Get Index Status
 
 **Algorithm:**
-1. Check if `data/index.md` exists
+1. Check if `index.md` exists (or `data/index.md` for legacy)
 2. If missing → `no-index`
 3. If contains "Run hiivmind-corpus-build" → `placeholder`
 4. Otherwise → `built`
@@ -41,11 +55,19 @@ Check corpus index status and source freshness. Determine if a corpus is built, 
 ```bash
 get_index_status() {
     local corpus_path="$1"
-    local index_file="${corpus_path%/}/data/index.md"
+    local index_file
 
-    if [ ! -f "$index_file" ]; then
+    # Detect index path (data-only vs legacy)
+    if [ -f "${corpus_path%/}/index.md" ]; then
+        index_file="${corpus_path%/}/index.md"
+    elif [ -f "${corpus_path%/}/data/index.md" ]; then
+        index_file="${corpus_path%/}/data/index.md"
+    else
         echo "no-index"
-    elif grep -q "Run hiivmind-corpus-build" "$index_file" 2>/dev/null; then
+        return
+    fi
+
+    if grep -q "Run hiivmind-corpus-build" "$index_file" 2>/dev/null; then
         echo "placeholder"
     else
         echo "built"
@@ -55,7 +77,7 @@ get_index_status() {
 
 **Using Claude tools:**
 ```
-Read: {corpus_path}/data/index.md
+Read: {corpus_path}/index.md (or data/index.md for legacy)
 Check content for "Run hiivmind-corpus-build"
 ```
 
@@ -93,8 +115,17 @@ fi
 ```bash
 check_has_sources() {
     local corpus_path="$1"
+    local config_file
+
+    # Detect config path
+    if [ -f "${corpus_path%/}/config.yaml" ]; then
+        config_file="${corpus_path%/}/config.yaml"
+    else
+        config_file="${corpus_path%/}/config.yaml"
+    fi
+
     local count
-    count=$(yq '.sources | length' "${corpus_path%/}/data/config.yaml" 2>/dev/null)
+    count=$(yq '.sources | length' "$config_file" 2>/dev/null)
     [ "${count:-0}" -gt 0 ]
 }
 ```
@@ -104,7 +135,12 @@ check_has_sources() {
 python3 -c "
 import yaml
 import sys
-sources = yaml.safe_load(open('$1/data/config.yaml')).get('sources', [])
+import os
+corpus_path = '$1'
+config_path = os.path.join(corpus_path, 'config.yaml')
+if not os.path.exists(config_path):
+    config_path = os.path.join(corpus_path, 'data', 'config.yaml')
+sources = yaml.safe_load(open(config_path)).get('sources', [])
 sys.exit(0 if len(sources) > 0 else 1)
 "
 ```
@@ -130,17 +166,17 @@ Read the last indexed commit SHA for a git source.
 **Using yq:**
 ```bash
 # For specific source
-yq '.sources[] | select(.id == "polars") | .last_commit_sha // ""' data/config.yaml
+yq '.sources[] | select(.id == "polars") | .last_commit_sha // ""' config.yaml
 
 # For first/primary source
-yq '.sources[0].last_commit_sha // ""' data/config.yaml
+yq '.sources[0].last_commit_sha // ""' config.yaml
 ```
 
 **Using Python:**
 ```bash
 python3 -c "
 import yaml
-sources = yaml.safe_load(open('data/config.yaml')).get('sources', [])
+sources = yaml.safe_load(open('config.yaml')).get('sources', [])
 source = next((s for s in sources if s.get('id') == 'polars'), {})
 print(source.get('last_commit_sha', ''))
 "
@@ -203,7 +239,7 @@ Compare indexed SHA against upstream.
 compare_freshness() {
     local corpus_path="$1"
     local source_id="$2"
-    local config_file="${corpus_path%/}/data/config.yaml"
+    local config_file="${corpus_path%/}/config.yaml"
 
     # Get source info
     local repo_url branch indexed_sha
@@ -249,7 +285,7 @@ check_is_stale() {
 
     local indexed_sha clone_sha
 
-    indexed_sha=$(yq ".sources[] | select(.id == \"$source_id\") | .last_commit_sha // \"\"" "${corpus_path%/}/data/config.yaml")
+    indexed_sha=$(yq ".sources[] | select(.id == \"$source_id\") | .last_commit_sha // \"\"" "${corpus_path%/}/config.yaml")
     clone_sha=$(git -C "${corpus_path%/}/.source/$source_id" rev-parse HEAD 2>/dev/null)
 
     # Can't determine without both
@@ -293,7 +329,7 @@ Unlike git sources (which have docs IN the repo), generated-docs have:
 check_generated_docs_freshness() {
     local corpus_path="$1"
     local source_id="$2"
-    local config_file="${corpus_path%/}/data/config.yaml"
+    local config_file="${corpus_path%/}/config.yaml"
 
     # Get source_repo fields (nested under source_repo)
     local source_url branch indexed_sha
@@ -349,14 +385,14 @@ Source: gh-cli-manual (generated-docs)
 
 **Using yq:**
 ```bash
-yq '.sources[] | select(.id == "polars") | .last_indexed_at // ""' data/config.yaml
+yq '.sources[] | select(.id == "polars") | .last_indexed_at // ""' config.yaml
 ```
 
 **Using Python:**
 ```bash
 python3 -c "
 import yaml
-sources = yaml.safe_load(open('data/config.yaml')).get('sources', [])
+sources = yaml.safe_load(open('config.yaml')).get('sources', [])
 source = next((s for s in sources if s.get('id') == 'polars'), {})
 print(source.get('last_indexed_at', ''))
 "
@@ -381,13 +417,15 @@ echo "Last indexed $age_days days ago"
 ### Check for Tiered Index
 
 **Algorithm:**
-1. Look for `data/index-*.md` files
+1. Look for `index-*.md` files (data-only) or `data/index-*.md` (legacy)
 2. If found, corpus uses tiered indexing
 
 **Using bash:**
 ```bash
 detect_tiered_index() {
     local corpus_path="$1"
+    # Check data-only first, then legacy
+    ls "${corpus_path%/}"/index-*.md >/dev/null 2>&1 || \
     ls "${corpus_path%/}"/data/index-*.md >/dev/null 2>&1
 }
 
@@ -399,7 +437,7 @@ fi
 
 **Using Claude tools:**
 ```
-Glob: {corpus_path}/data/index-*.md
+Glob: {corpus_path}/index-*.md (or data/index-*.md for legacy)
 ```
 
 ### List Sub-Indexes
@@ -408,7 +446,12 @@ Glob: {corpus_path}/data/index-*.md
 ```bash
 list_subindex_files() {
     local corpus_path="$1"
-    ls "${corpus_path%/}"/data/index-*.md 2>/dev/null | xargs -n1 basename
+    # Check data-only first, then legacy
+    if ls "${corpus_path%/}"/index-*.md >/dev/null 2>&1; then
+        ls "${corpus_path%/}"/index-*.md 2>/dev/null | xargs -n1 basename
+    else
+        ls "${corpus_path%/}"/data/index-*.md 2>/dev/null | xargs -n1 basename
+    fi
 }
 ```
 
@@ -459,7 +502,7 @@ Source: polars (git)
 ### Config Not Found
 
 ```
-Cannot check status: data/config.yaml not found.
+Cannot check status: config.yaml not found (checked both root and data/).
 
 This corpus may not be properly initialized.
 ```
