@@ -99,6 +99,15 @@ For each source, create a Task with prompt:
 Scan source '{source_id}' (type: {type}) at corpus path '{corpus_path}'.
 Return YAML with: source_id, type, status, file_count, sections (name/path/file_count),
 large_files, framework, frontmatter_type, notes.
+{if source has extraction: block in config}
+extraction_config:
+  wikilinks: {true|false}
+  frontmatter: {true|false}
+  tags: {true|false}
+  dataview: {true|false}
+Include extraction output in your YAML report per the extraction output format in
+${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md § "Source-Scanner Extraction Output Format".
+{end if}
 ```
 
 Launch ALL tasks in a single response for parallel execution. Aggregate results.
@@ -233,6 +242,67 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ---
 
+## Phase 5b: Graph Generation
+
+**Inputs:** `computed.scan_results` (with extraction data from sources that had it enabled)
+**Outputs:** `graph.yaml` written alongside `index.md`
+
+**Precondition:** At least one source in `computed.scan_results` has an `extraction:` block in its scan report.
+
+**Skip condition:** If no source produced extraction data → skip this phase entirely. No graph.yaml is written.
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md` and `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
+
+### Steps
+
+1. **Merge extraction data**
+
+   Collect `extraction:` blocks from all source-scanner reports. For each source's extraction data, prefix all file paths with `{source_id}:` to create corpus-scoped references. Merge into a unified extraction dataset:
+   - All wikilinks (with prefixed `from` and `to` paths)
+   - All tags (with prefixed file lists)
+   - All frontmatter keys (with prefixed file lists)
+
+2. **Cluster entries into concepts**
+
+   Apply the clustering algorithm from `graph.md` § "Graph Generation from Extraction Output":
+   - Group by directory structure (subdirectory = candidate concept)
+   - Group by shared tags
+   - Identify wikilink hub pages (pages linking to many others)
+
+3. **Propose concepts to user**
+
+   Present a table of proposed concepts with their candidate labels and entry counts:
+
+   ```
+   Proposed Concepts from Extraction
+   ────────────────────────────────────────
+   | Concept (proposed)  | Entries | Based On        |
+   |---------------------|---------|-----------------|
+   | family-activities   | 12      | directory + tags |
+   | work-projects       | 8       | tags            |
+   | recipes             | 5       | directory       |
+
+   Accept all / Rename / Merge / Discard unwanted
+   ```
+
+   Allow the user to rename, merge, or discard proposed concepts before proceeding.
+
+4. **Generate relationships**
+
+   From the merged extraction data and confirmed concepts:
+   - Wikilinks between entries in different concepts → typed relationship (origin: `wikilink`)
+   - Hub pages spanning multiple concepts → `includes` relationships
+   - Shared tags across concepts → `see-also` relationships (origin: `tag`)
+   - Record `evidence` path for each auto-generated relationship
+
+5. **Write graph.yaml**
+
+   Write `graph.yaml` to the same directory as `index.md`, following the strict schema in `graph.md` § "Schema Definition (Strict)". Set `meta.generated_at` to current timestamp, populate `meta.sources_extracted` with source IDs that contributed extraction data.
+
+   Display: "Graph generated: graph.yaml ({concept_count} concepts, {relationship_count} relationships)"
+
+---
+
 ## Phase 6: Save and Complete
 
 **Inputs:** `computed.index`, `computed.segmentation`
@@ -284,6 +354,8 @@ Sources indexed: {source_count}
 - **Index generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-generation.md`
 - **Config parsing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-parsing.md`
 - **Source patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/`
+- **Extraction pipeline:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
+- **Graph generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
 
 ## Agent
 
