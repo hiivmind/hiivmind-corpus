@@ -42,6 +42,8 @@ If multiple skills match, prefer the one with the most specific keyword match.
 | `hiivmind-corpus-discover` | list, available, installed, discover, what/which/show corpora | "list available corpora" |
 | `hiivmind-corpus-register` | register, add corpus, connect corpus, enable corpus, add to registry | "register polars corpus" |
 | `hiivmind-corpus-status` | status, health, check, diagnose, info | "check corpus health" |
+| `hiivmind-corpus-graph` | graph, show graph, validate graph, concepts, relationships | "show graph" |
+| `hiivmind-corpus-bridge` | bridge, cross-corpus, link corpora, registry graph, alias | "bridge polars and clickhouse" |
 
 ### Disambiguation
 
@@ -113,3 +115,5 @@ Skill(
 | `hiivmind-corpus-discover` | List available corpora |
 | `hiivmind-corpus-register` | Register corpus with project |
 | `hiivmind-corpus-status` | Check corpus health/freshness |
+| `hiivmind-corpus-graph` | View, validate, edit concept graphs |
+| `hiivmind-corpus-bridge` | Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented) |
