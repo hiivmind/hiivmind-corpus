@@ -20,7 +20,7 @@ outputs:
     description: Identifier of the added source
   - name: source_type
     type: string
-    description: Type of source added (git, local, web, llms-txt, generated-docs)
+    description: Type of source added (git, local, web, llms-txt, generated-docs, obsidian)
 ---
 
 # Add Source
@@ -68,6 +68,23 @@ Check the URL to auto-detect type:
    - Web page → `source_type = web`
    - Generated docs (MkDocs, Sphinx, ReadTheDocs) → `source_type = generated-docs`
 
+### Obsidian Vault Detection
+
+Before falling through to the generic type question, check if the source is an Obsidian vault:
+
+**For a URL pointing to a git repository:**
+1. Use `gh api repos/{owner}/{repo}/contents/` to list root contents
+2. If `.obsidian` directory is present in the root → vault detected
+3. Ask user: "This looks like an Obsidian vault. Add as Obsidian source? (Recommended) / Choose different type"
+4. If accepted → `source_type = obsidian`
+
+**For a local path:**
+1. Use Glob to check if `{path}/.obsidian/` exists
+2. If found → vault detected, prompt as above
+3. If accepted → `source_type = obsidian`
+
+**Reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/obsidian.md`
+
 ### If source_url was NOT provided
 
 Ask: "What documentation would you like to add?"
@@ -78,6 +95,7 @@ Ask: "What documentation would you like to add?"
 | Local files | `source_type = local` |
 | Web pages | `source_type = web` |
 | llms.txt site | `source_type = llms-txt` |
+| Obsidian vault | `source_type = obsidian` |
 
 If user types a URL instead of selecting an option, store it as `source_url` and
 re-enter the detection flow above.
@@ -175,6 +193,66 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 
    Substitute collected values: `source_id`, `source_repo_url`, `sha`, `web_base_url`.
 
+### Obsidian Source
+
+**See:** `lib/corpus/patterns/sources/obsidian.md`
+
+1. If `source_url` not set (user selected "Obsidian vault" without URL), ask: "Where is the vault? (git URL or local path)"
+2. Detect whether git-backed or local:
+   - URL starting with `https://` or `git@` → git-backed
+   - Filesystem path → local
+3. **Git-backed vault:**
+   - Parse URL to extract `owner` and `repo_name`
+   - Derive `source_id` from repo name (lowercase, alphanumeric + hyphens)
+   - Clone: `git clone --depth 1 {url} .source/{source_id}`
+   - Get SHA: `git -C .source/{source_id} rev-parse HEAD`
+   - Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Obsidian Source Entry"
+4. **Local vault:**
+   - Ask: "What should this vault source be called? (used as ID)"
+   - Set `source_id` from user input
+   - Record `vault_path` as the absolute path to the vault directory
+   - Add to config.yaml per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/config-yaml-formatting.md` § "Obsidian Source Entry"
+
+---
+
+## Phase 3b: Extraction Configuration
+
+**Inputs:** `computed.source_id`, `computed.source_type`
+**Outputs:** `computed.extraction_config` (merged into config.yaml source entry)
+
+After source type determination and before post-setup, offer extraction configuration.
+
+Inform the user:
+
+```
+Extraction is available for this source. It extracts wikilinks, tags, and frontmatter
+to build a concept graph (graph.yaml) alongside the index. This enables richer navigation.
+```
+
+Ask: "How would you like to configure extraction?"
+
+| Option | Action |
+|--------|--------|
+| **Enable with defaults** | Use default extraction settings for this source type (see extraction.md) |
+| **Customize** | Ask per-feature: wikilinks? frontmatter? tags? (y/n each) |
+| **No extraction** | Skip — no extraction block added to config |
+
+**If "Enable with defaults":**
+- Read default settings for `computed.source_type` from `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md` § "Extraction Config" defaults table
+- Add `extraction:` block to the source's config.yaml entry with those defaults
+
+**If "Customize":**
+- Ask for each feature:
+  - "Extract wikilinks ([[...]] and markdown links to local files)? (y/n)"
+  - "Extract frontmatter key-value pairs? (y/n)"
+  - "Extract #tags? (y/n)"
+- Build `extraction:` block from responses and add to config.yaml source entry
+
+**If "No extraction":**
+- Skip — omit `extraction:` block from config.yaml source entry
+
+**Reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
+
 ---
 
 ## Phase 4: Post-Setup
@@ -229,6 +307,8 @@ Source-specific operations referenced by this skill:
 - **llms-txt sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/llms-txt.md`
 - **Generated docs:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/generated-docs.md`
 - **PDF processing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/pdf.md`
+- **Obsidian vaults:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/obsidian.md`
+- **Extraction:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
 - **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
 
 ## Related Skills
