@@ -19,13 +19,14 @@ Manage documentation sources: git repositories, local uploads, web content, and 
 
 ## Source Type Taxonomy
 
-| Type | Storage Location | Change Detection | Content Access | Use Case |
-|------|------------------|------------------|----------------|----------|
-| `git` | `.source/{id}/` | SHA comparison | Local files | Full repos with docs |
-| `local` | `data/uploads/{id}/` | Timestamp | Local files | User-uploaded docs |
-| `web` | `.cache/web/{id}/` | Manual refresh | Cached files | Blog posts, articles |
-| `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs |
-| `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt |
+| Type | Storage Location | Change Detection | Content Access | Use Case | Extraction Default |
+|------|------------------|------------------|----------------|----------|--------------------|
+| `git` | `.source/{id}/` | SHA comparison | Local files | Full repos with docs | frontmatter, tags |
+| `local` | `data/uploads/{id}/` | Timestamp | Local files | User-uploaded docs | frontmatter, tags |
+| `web` | `.cache/web/{id}/` | Manual refresh | Cached files | Blog posts, articles | none |
+| `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs | frontmatter |
+| `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt | none |
+| `obsidian` | `.source/{id}/` (git) or direct path (local) | SHA / timestamp | Local files | Obsidian vaults | wikilinks, frontmatter, tags |
 
 ## When to Use Each Type
 
