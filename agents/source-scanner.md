@@ -96,6 +96,50 @@ frontmatter_type: "{yaml|toml|none}"
 notes: "{any issues or observations}"
 ```
 
+## Extraction
+
+When the caller includes `extraction_config:` in your input (sourced from the source's `extraction:` block in config.yaml), run the extraction pipeline after scanning and append an `extraction:` block to your YAML output.
+
+**When extraction is enabled:**
+
+- Read `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md` for the full algorithm
+- Build a filename→path lookup table for the source (required for wikilink resolution)
+- Run each enabled extractor (wikilinks, frontmatter, tags) per file in the source
+- Resolve wikilinks using the lookup table; skip ambiguous or unresolvable links with a warning
+- Aggregate all extraction output into a single block
+
+**Extraction output format** (appended to the scan YAML when extraction is enabled):
+
+```yaml
+extraction:
+  wikilinks:
+    - from: "{relative_path}"
+      to: "{resolved_relative_path}"
+      anchor: "{anchor_or_null}"
+  tags:
+    "{tag_name}":
+      - "{relative_path}"
+  frontmatter_keys:
+    "{key_name}": ["{relative_path}", ...]
+  headings:
+    "{relative_path}":
+      - {level: 1, text: "{text}", anchor: "{slug}"}
+  warnings:
+    - "{description of skipped or ambiguous items}"
+```
+
+**Steps:**
+
+1. Build filename→path lookup: use Glob to list all `.md` files, map bare filename (no extension) to full relative path
+2. For each file, run enabled extractors per `extraction.md` algorithms
+3. Resolve each wikilink target using the lookup table; if multiple matches → skip with warning
+4. Aggregate: merge wikilinks list, group tags and frontmatter keys by name, build headings map
+5. Append `extraction:` block to output YAML
+
+**Reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
+
+---
+
 **Quality Standards:**
 - Be fast - use Glob/Grep over full file reads
 - Be accurate - verify paths exist before reporting
@@ -109,6 +153,8 @@ notes: "{any issues or observations}"
 | git | `.source/{source_id}/{docs_root}` |
 | local | `data/uploads/{source_id}/` |
 | web | `.cache/web/{source_id}/` |
+| obsidian (git) | `.source/{source_id}/` |
+| obsidian (local) | `{vault_path}/` |
 
 **Large File Grep Pattern Suggestions:**
 
