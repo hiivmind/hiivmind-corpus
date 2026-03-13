@@ -661,3 +661,5 @@ User: "The detailed actions sub-index"
 - Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)

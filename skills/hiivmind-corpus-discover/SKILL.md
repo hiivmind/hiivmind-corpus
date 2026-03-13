@@ -353,5 +353,7 @@ Skip and note in output:
 - **Initialize:** `skills/hiivmind-corpus-init/SKILL.md` - Create new corpus
 - **Build:** `skills/hiivmind-corpus-build/SKILL.md` - Build corpus index
 - **Gateway:** `commands/hiivmind-corpus.md` - Unified entry point
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)
 
 **Note:** Navigation is now handled by `hiivmind-corpus-navigate` skill, which works with both registry-based and legacy plugin-based corpora.

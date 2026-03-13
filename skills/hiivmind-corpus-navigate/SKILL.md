@@ -273,3 +273,5 @@ The documentation may have moved. Try:
 - **Status:** `hiivmind-corpus-status` - Check corpus health
 - **Discover:** `hiivmind-corpus-discover` - Find available corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update corpus from upstream
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)
