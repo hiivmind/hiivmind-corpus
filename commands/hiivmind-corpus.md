@@ -43,7 +43,7 @@ If multiple skills match, prefer the one with the most specific keyword match.
 | `hiivmind-corpus-register` | register, add corpus, connect corpus, enable corpus, add to registry | "register polars corpus" |
 | `hiivmind-corpus-status` | status, health, check, diagnose, info | "check corpus health" |
 | `hiivmind-corpus-graph` | graph, show graph, validate graph, concepts, relationships | "show graph" |
-| `hiivmind-corpus-bridge` | bridge, cross-corpus, link corpora, registry graph, alias | "bridge polars and clickhouse" |
+| `hiivmind-corpus-bridge` (deferred) | bridge, cross-corpus, link corpora, registry graph, alias | "bridge polars and clickhouse" |
 
 ### Disambiguation
 

@@ -136,7 +136,7 @@ Search the index for relevant entries:
    - `depends-on` → medium relevance
    - `see-also` / `contrast-with` → lower relevance
 
-   Limit: up to 3 entries per related concept, up to 2 hops of relationship types used.
+   Limit: up to 3 entries per related concept, up to 2 relationship types considered as traversal candidates (1 hop only — do not recurse).
 
    > **Note:** Tier 4 (registry-graph.yaml cross-corpus traversal) is deferred to the generalization pass.
 

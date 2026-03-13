@@ -26,7 +26,7 @@ extraction:
   wikilinks: true        # Parse [[wikilinks]] and [text](path.md) links
   frontmatter: true      # Extract YAML frontmatter key-value pairs
   tags: true             # Extract #hashtags as concept label candidates
-  dataview: false         # Parse dataview queries (Obsidian-specific, usually false)
+  dataview: false         # Parse dataview queries (Obsidian-specific, usually false) — not yet implemented, reserved for future use
 ```
 
 **Defaults by source type:**

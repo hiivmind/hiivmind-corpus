@@ -222,6 +222,8 @@ Branch based on `computed.source_type`. Each path collects what's needed and upd
 
 After source type determination and before post-setup, offer extraction configuration.
 
+> **Note:** If the source type's extraction defaults are all `false` (e.g., web, llms-txt, pdf), present "No extraction" as the pre-selected default option.
+
 Inform the user:
 
 ```

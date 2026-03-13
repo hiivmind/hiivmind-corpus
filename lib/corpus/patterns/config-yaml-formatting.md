@@ -195,10 +195,68 @@ and updated by build/refresh skills.
 | `cache.enabled` | Default `false` | Live fetch by default |
 | `last_indexed_at` | `null` | Set by build/refresh |
 
+### Obsidian Source Entry
+
+```yaml
+- id: "{source_id}"
+  type: "obsidian"
+  # Git-backed mode
+  repo_url: "https://github.com/{owner}/{repo}"
+  repo_owner: "{owner}"
+  repo_name: "{repo}"
+  branch: "main"
+  # Local mode (alternative — use vault_path instead of repo fields)
+  # vault_path: "~/path/to/vault"
+  exclude_patterns:
+    - "**/.obsidian/plugins/**"
+    - "**/.obsidian/*.json"
+    - "**/images/**"
+    - "**/.trash/**"
+    - "**/templates/**"
+  include_patterns: ["**/*.md"]
+  extraction:
+    wikilinks: true
+    frontmatter: true
+    tags: true
+    dataview: false
+  last_commit_sha: ""
+  last_indexed_at: ""
+```
+
+| Field | Source | Notes |
+|-------|--------|-------|
+| `id` | Derived from repo name or user input | Lowercase, alphanumeric + hyphens |
+| `repo_url` | Parsed from URL (git-backed mode) | Full HTTPS URL |
+| `repo_owner` | Parsed from URL | GitHub owner/org |
+| `repo_name` | Parsed from URL | Repository name |
+| `branch` | Default `"main"` | Git-backed mode only |
+| `vault_path` | User input (local mode) | Absolute path to vault directory |
+| `exclude_patterns` | Default Obsidian exclusions | Plugins, JSON config, images, trash, templates |
+| `include_patterns` | Default `["**/*.md"]` | Markdown files only |
+| `extraction` | Defaults for Obsidian source type | See extraction.md for defaults |
+| `last_commit_sha` | From `git rev-parse HEAD` (git-backed) | Empty string on initial creation |
+| `last_indexed_at` | Empty string | Set by build/refresh |
+
+### Extraction Block
+
+The `extraction:` block is optional and can be added to **any** source type's config entry.
+It controls which relationship data is extracted during indexing.
+
+```yaml
+# Extraction block (optional, added to any source type)
+extraction:
+  wikilinks: true|false    # Extract [[wikilinks]] and [markdown](links)
+  frontmatter: true|false  # Extract YAML frontmatter key-value pairs
+  tags: true|false         # Extract #tags from content
+  dataview: false          # Dataview queries (not yet implemented)
+```
+
+> See `extraction.md` for defaults by source type and extraction algorithms.
+
 ---
 
 ## Related Patterns
 
 - **Reading config:** `config-parsing.md` (extraction patterns with yq/python/grep)
-- **Source operations:** `sources/git.md`, `sources/local.md`, `sources/web.md`, `sources/llms-txt.md`, `sources/generated-docs.md`
+- **Source operations:** `sources/git.md`, `sources/local.md`, `sources/web.md`, `sources/llms-txt.md`, `sources/generated-docs.md`, `sources/obsidian.md`
 - **Template file:** `${CLAUDE_PLUGIN_ROOT}/templates/config.yaml.template` (mustache-syntax template for tooling)
