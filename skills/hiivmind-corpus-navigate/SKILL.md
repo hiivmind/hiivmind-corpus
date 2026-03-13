@@ -111,6 +111,43 @@ Search the index for relevant entries:
 - Look for entries with backtick-wrapped paths
 - Rank by relevance (keyword match > description match)
 
+### Phase 4b: Graph Enrichment
+
+**Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
+
+**Optional** — skip this phase if no `graph.yaml` exists in the same location as `index.md`.
+
+**Check:** After fetching the index, attempt to load `graph.yaml` from the same location (same repo path or local directory). If missing or fetch fails → skip phase, proceed to Phase 5 with only Tier 1 results.
+
+**When graph.yaml exists:**
+
+1. **Load graph.yaml** — parse concepts and relationships
+
+2. **Tier 2: Concept membership**
+
+   For each Tier 1 matched entry (`source_id:path`), find which concepts it belongs to. Collect all other entries in those same concepts as Tier 2 candidates. These are topically related pages that may answer the query from a different angle.
+
+   Limit: up to 5 additional entries per matched concept.
+
+3. **Tier 3: Relationship traversal (1 hop)**
+
+   For each concept matched in Tier 2, follow typed relationships in `graph.yaml` to find related concepts (1 hop only — do not recurse). Add entries from those related concepts as Tier 3 candidates, ranked by relationship type:
+   - `includes` / `extends` → high relevance
+   - `depends-on` → medium relevance
+   - `see-also` / `contrast-with` → lower relevance
+
+   Limit: up to 3 entries per related concept, up to 2 hops of relationship types used.
+
+   > **Note:** Tier 4 (registry-graph.yaml cross-corpus traversal) is deferred to the generalization pass.
+
+4. **Fetch priority**
+
+   - **Tier 1** entries: always fetch
+   - **Tier 2** entries: fetch if Tier 1 content doesn't fully answer the query
+   - **Tier 3** entries: fetch only if the query touches concepts not covered by Tiers 1–2
+
+   Annotate each fetched item with its tier in the presented response for transparency.
+
 ### Phase 5: Fetch Documentation
 
 For matched entry `source_id:relative_path`:
@@ -225,6 +262,10 @@ Document not found: {source}:{path}
 The documentation may have moved. Try:
   /hiivmind-corpus refresh {corpus}
 ```
+
+## Pattern Documentation
+
+- **Graph enrichment:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
 
 ## Related Skills
 
