@@ -23,6 +23,21 @@ total_files:      # Total file count across all sources
 
 ---
 
+## Index Format Versions
+
+This pattern documents **v1 (prose index.md)** generation — where the LLM produces human-readable markdown directly.
+
+**v2 (index.yaml)** is documented in `index-format-v2.md`. In v2:
+- Build produces `index.yaml` (structured, machine-queryable) instead of hand-crafted prose
+- `index.md` is rendered deterministically from `index.yaml` (see `index-rendering.md`)
+- Navigate uses yq pre-filtering against `index.yaml` for candidate selection
+
+**Dual support:** Build now produces both formats. Navigate checks for `index.yaml` first, falls back to `index.md` (v1) if absent. Existing corpora continue working unchanged.
+
+**Migration:** No migration script needed. Rebuilding a corpus with the updated build skill automatically produces index.yaml + rendered index.md.
+
+---
+
 ## single
 
 Generate a single comprehensive index file.
