@@ -44,15 +44,18 @@ If not found, suggest running `hiivmind-corpus-init` or `hiivmind-corpus-build`.
 ## Phase 1: Validate
 
 **Inputs:** working directory
-**Outputs:** `computed.config`, `computed.sources`, `computed.index_structure`
+**Outputs:** `computed.config`, `computed.sources`, `computed.index_structure`, `computed.index_format`
 
 1. Read and parse `config.yaml`
 2. Verify at least one source exists in `config.sources`
 3. Read `index.md` and verify it has real content (not the placeholder from init)
-4. Detect tiered index structure:
+4. Detect index format version:
+   - Check if `index.yaml` exists → `computed.index_format = "v2"`
+   - If only `index.md` → `computed.index_format = "v1"`
+5. Detect tiered index structure:
    - Glob for `index-*.md` files
    - If found, set `computed.index_structure.is_tiered = true` and store sub-index paths
-5. Display: "Found corpus: {name} — Sources: {count} — Index: {single|tiered ({n} sub-indexes)}"
+6. Display: "Found corpus: {name} — Sources: {count} — Index: {format} {single|tiered ({n} sub-indexes)}"
 
 ---
 
@@ -214,9 +217,27 @@ For each selected source, execute the type-specific update:
 
 ## Phase 6: Apply Changes to Index
 
-**Inputs:** `computed.all_changes`, `computed.index_structure`, `computed.updated_sources`
+**Inputs:** `computed.all_changes`, `computed.index_structure`, `computed.index_format`, `computed.updated_sources`
 
-### Single index
+### v2 format (index.yaml exists)
+
+If `computed.index_format == "v2"`:
+
+1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords.
+2. **For added entries**: Add placeholder entries with `stale: true`, `category: "unknown"`, `summary: "Pending re-scan"`. Full metadata populated on next build or LLM re-scan.
+3. **For deleted entries**: Remove entry from index.yaml. Remove from graph.yaml concept entries if referenced.
+4. Update `meta.generated_at` and `meta.entry_count` in index.yaml.
+5. Update `last_commit_sha` and `last_indexed_at` in config.yaml.
+6. Re-render index.md: `bash render-index.sh index.yaml`
+7. Show preview of changes (entries added/modified/removed, stale count).
+
+**Note:** `links_from` is NOT updated during refresh — requires a full build to recompute cross-references.
+
+**Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+
+### v1 format (index.md only)
+
+#### Single index
 
 If `computed.index_structure.is_tiered` is false:
 
@@ -225,7 +246,7 @@ If `computed.index_structure.is_tiered` is false:
 3. Show preview of changes to user
 4. If `auto_approve` or user confirms → save index.md
 
-### Tiered index
+#### Tiered index
 
 If `computed.index_structure.is_tiered` is true:
 
@@ -238,7 +259,7 @@ If `computed.index_structure.is_tiered` is true:
 4. Update main `index.md` summary section
 5. If `auto_approve` or user confirms → save all files
 
-### Update config metadata
+#### Update config metadata
 
 After index changes are saved:
 
@@ -257,6 +278,7 @@ Display summary:
 Refresh complete.
 Updated sources: {count}
 Index entries: {added} added, {modified} modified, {removed} removed
+{if v2: Stale entries: {stale_count} (run build or dispatch LLM re-scan to update)}
 ```
 
 ---
@@ -282,6 +304,9 @@ Index entries: {added} added, {modified} modified, {removed} removed
 - **llms-txt sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/llms-txt.md`
 - **Generated docs:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/generated-docs.md`
 - **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
+- **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
+- **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+- **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 
 ## Agent
 
