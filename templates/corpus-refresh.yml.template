@@ -154,7 +154,7 @@ jobs:
           git push
 
       - name: Dispatch LLM re-scan (optional)
-        if: steps.check.outputs.changed == 'true' && steps.refresh.outputs.stale_count > 0
+        if: steps.check.outputs.changed == 'true' && steps.refresh.outputs.stale_count != '0'
         run: |
           STALE_COUNT="${{ steps.refresh.outputs.stale_count }}"
           gh issue create \
