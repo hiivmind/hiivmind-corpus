@@ -227,9 +227,8 @@ If `computed.index_format == "v2"`:
 2. **For added entries**: Add placeholder entries with `stale: true`, `category: "unknown"`, `summary: "Pending re-scan"`. Full metadata populated on next build or LLM re-scan.
 3. **For deleted entries**: Remove entry from index.yaml. Remove from graph.yaml concept entries if referenced.
 4. Update `meta.generated_at` and `meta.entry_count` in index.yaml.
-5. Update `last_commit_sha` and `last_indexed_at` in config.yaml.
-6. Re-render index.md: `bash render-index.sh index.yaml`
-7. Show preview of changes (entries added/modified/removed, stale count).
+5. Re-render index.md: `bash ./render-index.sh index.yaml` (render-index.sh is at corpus root, copied from templates/ during build)
+6. Show preview of changes (entries added/modified/removed, stale count).
 
 **Note:** `links_from` is NOT updated during refresh — requires a full build to recompute cross-references.
 
@@ -259,9 +258,9 @@ If `computed.index_structure.is_tiered` is true:
 4. Update main `index.md` summary section
 5. If `auto_approve` or user confirms → save all files
 
-#### Update config metadata
+### Update config metadata (both formats)
 
-After index changes are saved:
+After index changes are saved (applies to both v1 and v2):
 
 1. Update `index.last_updated_at` in config.yaml
 2. For each updated source:
