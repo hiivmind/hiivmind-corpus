@@ -94,7 +94,37 @@ large_files:
 framework: "{docusaurus|mkdocs|sphinx|vitepress|nextra|mdbook|antora|none}"
 frontmatter_type: "{yaml|toml|none}"
 notes: "{any issues or observations}"
+# Per-file entry metadata (for index.yaml generation)
+entries:
+  - path: "{relative_path}"
+    title: "{title from frontmatter, first heading, or filename}"
+    summary: "{1-2 sentence description of file content}"
+    tags: ["{curated_tag1}", "{curated_tag2}"]
+    keywords: ["{extracted_term1}", "{extracted_term2}"]
+    category: "{reference|tutorial|guide|api|config|navigation|journal}"
+    content_type: "{markdown|yaml|json|text|rst}"
+    size: "{standard|large}"
+    grep_hint: "{grep pattern for large files, null otherwise}"
+    headings:
+      - anchor: "{slugified_heading}"
+        title: "{heading text}"
 ```
+
+### Entry Metadata Generation
+
+For each documentation file discovered during scanning, generate entry metadata:
+
+1. **title**: Extract from YAML frontmatter `title` field, or first `# Heading`, or derive from filename (hyphens/underscores → spaces, title case)
+2. **summary**: Write 1-2 sentences describing the file's content. Focus on what a reader will find, not the file structure
+3. **tags**: Assign 2-5 curated facets. Use controlled vocabulary where the corpus has conventions. Prefer lowercase, hyphenated terms
+4. **keywords**: Extract 3-10 significant terms from the content body — function names, API terms, domain-specific identifiers. Broader than tags
+5. **category**: Classify as one of: `reference` (API docs, config reference), `tutorial` (step-by-step guides), `guide` (conceptual explanations), `api` (API endpoint docs), `config` (configuration reference), `navigation` (index/overview pages), `journal` (changelogs, release notes)
+6. **content_type**: File extension mapping — `.md`/`.mdx` → `markdown`, `.yaml`/`.yml` → `yaml`, `.json` → `json`, `.rst` → `rst`, other → `text`
+7. **size**: `large` if file exceeds 1000 lines, `standard` otherwise
+8. **grep_hint**: For large files only — a grep/search command with `FILE` placeholder, e.g. `grep -n "^## " FILE`. Null for standard files
+9. **headings**: Extract heading structure — `anchor` is the slugified heading text, `title` is the original text
+
+**Sampling strategy for entries:** For corpora with 50+ files, sample 5-10 representative files to establish tag/category conventions, then apply consistently across all files. For smaller corpora, analyze each file individually.
 
 ## Extraction
 
@@ -189,4 +219,19 @@ large_files:
 framework: "docusaurus"
 frontmatter_type: "yaml"
 notes: "Well-structured docs with consistent frontmatter"
+entries:
+  - path: "src/content/learn/installation.md"
+    title: "Installation"
+    summary: "How to install React and set up a development environment"
+    tags: [getting-started, installation, setup]
+    keywords: [npm, create-react-app, vite, next.js]
+    category: tutorial
+    content_type: markdown
+    size: standard
+    grep_hint: null
+    headings:
+      - anchor: "prerequisites"
+        title: "Prerequisites"
+      - anchor: "create-a-new-app"
+        title: "Create a New App"
 ```
