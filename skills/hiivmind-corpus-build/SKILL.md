@@ -5,7 +5,7 @@ description: >
   "analyze documentation", "populate corpus index", or needs to build the initial index for a
   corpus that was just initialized. Triggers on "build my corpus", "index the documentation",
   "create the index.md", "finish setting up corpus", "hiivmind-corpus build", or when a corpus
-  has placeholder index.md that says "Run hiivmind-corpus-build".
+  has placeholder index.md that says "Run hiivmind-corpus-build", or "create the index.yaml".
 allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, Task
 inputs:
   - name: corpus_name
@@ -16,6 +16,9 @@ outputs:
   - name: index_path
     type: string
     description: Path to the generated index.md
+  - name: index_yaml_path
+    type: string
+    description: Path to the generated index.yaml
   - name: segmentation_strategy
     type: string
     description: Strategy used (single, tiered, by-section, by-source)
@@ -27,8 +30,9 @@ outputs:
 # Corpus Build
 
 Build the documentation corpus index. Prepares all sources, scans for content, consults
-the user on organization preferences, generates `index.md`, and updates config metadata.
-Supports single and multi-source corpora with tiered indexing for large (500+ file) corpora.
+the user on organization preferences, generates `index.yaml` (structured, machine-queryable)
+and renders `index.md` from it. Updates config metadata. Supports single and multi-source
+corpora with tiered indexing for large (500+ file) corpora.
 
 ## Precondition
 
@@ -108,6 +112,9 @@ extraction_config:
 Include extraction output in your YAML report per the extraction output format in
 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md § "Source-Scanner Extraction Output Format".
 {end if}
+Additionally, for each documentation file, include entry metadata in your output:
+path, title, summary, tags, keywords, category, content_type, size, grep_hint, headings.
+See ${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md § "Entry Metadata Generation" for field details.
 ```
 
 Launch ALL tasks in a single response for parallel execution. Aggregate results.
@@ -226,6 +233,38 @@ For tiered indexes, generate the main `index.md` with section summaries and sepa
 
 **See:** `lib/corpus/patterns/index-generation.md`
 
+### Generate index.yaml (v2)
+
+From the source-scanner output, construct `index.yaml` following the strict schema in `lib/corpus/patterns/index-format-v2.md`.
+
+For each entry from each source-scanner report:
+
+1. Construct `id` as `{source_id}:{path}`
+2. Map scanner output fields directly: `title`, `summary`, `tags`, `keywords`, `category`, `content_type`, `size`, `grep_hint`, `headings`
+3. Set `source` to the source ID
+4. Set `links_to` from extraction wikilinks (if extraction was enabled)
+5. Compute `links_from` by cross-referencing all entries' `links_to` lists
+6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
+7. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
+
+Construct `meta`:
+- `generated_at`: current timestamp
+- `entry_count`: total entries
+
+Write `index.yaml` to the corpus root.
+
+### Render index.md
+
+After writing index.yaml, render index.md deterministically:
+
+```bash
+bash render-index.sh index.yaml
+```
+
+If `render-index.sh` does not exist in the corpus root, copy it from `${CLAUDE_PLUGIN_ROOT}/templates/render-index.sh` first.
+
+**Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+
 ### Show draft and refine
 
 Present the draft to the user and ask: "How does this look?"
@@ -309,8 +348,10 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ### Save index files
 
-1. Write `index.md` with the generated content
-2. If tiered: write each `index-{section}.md` sub-index file
+1. Write `index.yaml` with the structured index
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/render-index.sh` to corpus root (if not already present)
+3. Run `bash render-index.sh index.yaml` to generate `index.md`
+4. If tiered: write each `index-{section}.md` sub-index file (v1 format only — tiered v2 is deferred)
 
 ### Update config metadata
 
@@ -326,7 +367,9 @@ Display summary:
 ```
 Build complete!
 
-Index: index.md ({entry_count} entries)
+Index: index.yaml ({entry_count} entries)
+Rendered: index.md
+{if graph: Graph: graph.yaml ({concept_count} concepts, {relationship_count} relationships)}
 {if tiered: Sub-indexes: {count} files}
 Strategy: {segmentation_strategy}
 Sources indexed: {source_count}
@@ -356,6 +399,9 @@ Sources indexed: {source_count}
 - **Source patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/`
 - **Extraction pipeline:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md`
 - **Graph generation:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
+- **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
+- **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+- **Freshness:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 
 ## Agent
 
