@@ -70,6 +70,51 @@ Arguments: "flyio how to deploy"
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-fetching.md`
 
+#### Step 3a: Attempt index.yaml fetch (v2)
+
+Try to fetch `index.yaml` first. If it exists, the v2 flow (yq pre-filtering) is used.
+
+**From GitHub source:**
+```bash
+gh api repos/{owner}/{repo}/contents/index.yaml --jq '.content' | base64 -d
+
+# With subdirectory path:
+gh api repos/{owner}/{repo}/contents/{path}/index.yaml --jq '.content' | base64 -d
+
+# With specific ref:
+gh api repos/{owner}/{repo}/contents/index.yaml?ref={ref} --jq '.content' | base64 -d
+```
+
+**From local source:**
+```
+Read: {source.path}/index.yaml
+```
+
+If `index.yaml` is found → continue to Step 3b (freshness check) then Phase 4 (v2 search).
+If `index.yaml` is NOT found → fall back to Step 3c (index.md fetch, v1 flow).
+
+#### Step 3b: Freshness check (v2 only)
+
+**Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+
+After fetching config.yaml (which navigate already does to resolve source IDs), compare the stored SHA against the live repo:
+
+```bash
+SOURCE_REPO=$(yq '.sources[0].repo_owner + "/" + .sources[0].repo_name' config.yaml)
+SOURCE_BRANCH=$(yq '.sources[0].branch' config.yaml)
+INDEXED_SHA=$(yq '.sources[0].last_commit_sha' config.yaml)
+CURRENT_SHA=$(gh api "repos/${SOURCE_REPO}/commits/${SOURCE_BRANCH}" --jq '.sha')
+```
+
+If `INDEXED_SHA` differs from `CURRENT_SHA`, include a note in the response:
+> Note: this corpus was indexed at {short_sha}, source is now at {current_short_sha}. Consider running `/hiivmind-corpus refresh`.
+
+If the check fails (network error, permissions, non-git source) → skip silently and proceed.
+
+> **Multi-source corpora:** The example above checks `sources[0]` only. For multi-source corpora, repeat for each source or check only the primary source.
+
+#### Step 3c: Fetch index.md (v1 fallback)
+
 **From GitHub source (using gh api - preferred):**
 ```bash
 gh api repos/{owner}/{repo}/contents/index.md --jq '.content' | base64 -d
@@ -94,6 +139,32 @@ Read: {source.path}/index.md
 
 ### Phase 4: Search Index
 
+#### If index.yaml was fetched (v2 flow):
+
+**Step 4a: yq pre-filter**
+
+Extract 2-5 search terms from the user's query. Construct yq filters:
+
+```bash
+yq '.entries[] | select(
+  (.tags[] | test("term1|term2"; "i")) or
+  (.keywords[] | test("term1|term2"; "i")) or
+  (.summary | test("term1.*term2|term2.*term1"; "i"))
+) | {id, title, summary, tags, category, stale}' index.yaml
+```
+
+This returns a candidate set (typically 5-20 entries) with enough metadata for semantic judgment.
+
+**Step 4b: LLM semantic judgment**
+
+Review the pre-filtered candidates. Select the 2-5 entries that best answer the user's query. Consider:
+- Summary relevance to the question
+- Tag/keyword alignment
+- Category appropriateness (e.g., prefer `tutorial` for "how to" questions)
+- Stale status (include but note if entry is stale)
+
+#### If index.md was fetched (v1 fallback):
+
 Search the index for relevant entries:
 
 1. Extract search terms from user query
@@ -111,11 +182,11 @@ Search the index for relevant entries:
 - Look for entries with backtick-wrapped paths
 - Rank by relevance (keyword match > description match)
 
-### Phase 4b: Graph Enrichment
+### Phase 4c: Graph Enrichment
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
 
-**Optional** — skip this phase if no `graph.yaml` exists in the same location as `index.md`.
+**Optional** — skip this phase if no `graph.yaml` exists in the same location as the index.
 
 **Check:** After fetching the index, attempt to load `graph.yaml` from the same location (same repo path or local directory). If missing or fetch fails → skip phase, proceed to Phase 5 with only Tier 1 results.
 
@@ -125,13 +196,37 @@ Search the index for relevant entries:
 
 2. **Tier 2: Concept membership**
 
-   For each Tier 1 matched entry (`source_id:path`), find which concepts it belongs to. Collect all other entries in those same concepts as Tier 2 candidates. These are topically related pages that may answer the query from a different angle.
+   For each Tier 1 matched entry, find which concepts it belongs to.
+
+   **v2 mode (yq queries):**
+   ```bash
+   # Find concepts containing the matched entry
+   yq ".concepts | to_entries[] | select(.value.entries[] == \"${ENTRY_ID}\") | .key" graph.yaml
+
+   # Collect sibling entries from matched concepts (up to 5 additional per concept)
+   yq '.concepts["{concept_id}"].entries[]' graph.yaml
+   ```
+
+   **v1 mode:** For each Tier 1 matched entry (`source_id:path`), find which concepts it belongs to by reading graph.yaml directly. Collect all other entries in those same concepts as Tier 2 candidates.
 
    Limit: up to 5 additional entries per matched concept.
 
 3. **Tier 3: Relationship traversal (1 hop)**
 
-   For each concept matched in Tier 2, follow typed relationships in `graph.yaml` to find related concepts (1 hop only — do not recurse). Add entries from those related concepts as Tier 3 candidates, ranked by relationship type:
+   For each concept matched in Tier 2, follow typed relationships in `graph.yaml` to find related concepts (1 hop only — do not recurse).
+
+   **v2 mode (yq queries):**
+   ```bash
+   # Find related concepts via relationships
+   yq '.relationships[] | select(.from == "{concept}") | .to' graph.yaml
+
+   # Collect entries from related concepts
+   yq '.concepts["{related_concept}"].entries[]' graph.yaml
+   ```
+
+   **v1 mode:** Read graph.yaml directly and traverse relationships manually.
+
+   Add entries from related concepts as Tier 3 candidates, ranked by relationship type:
    - `includes` / `extends` → high relevance
    - `depends-on` → medium relevance
    - `see-also` / `contrast-with` → lower relevance
@@ -147,6 +242,16 @@ Search the index for relevant entries:
    - **Tier 3** entries: fetch only if the query touches concepts not covered by Tiers 1–2
 
    Annotate each fetched item with its tier in the presented response for transparency.
+
+### Graceful Degradation
+
+| Condition | Behavior |
+|-----------|----------|
+| No index.yaml | Fall back to index.md prose scanning (v1) |
+| No graph.yaml | Skip concept enrichment and relationship traversal |
+| yq not available | LLM reads index.yaml directly as structured YAML |
+| Freshness check fails | Skip silently, proceed with cached index |
+| Stale entries in results | Include them but note "this entry may be outdated" |
 
 ### Phase 5: Fetch Documentation
 
@@ -266,6 +371,9 @@ The documentation may have moved. Try:
 ## Pattern Documentation
 
 - **Graph enrichment:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
+- **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
+- **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+- **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 
 ## Related Skills
 

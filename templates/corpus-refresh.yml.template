@@ -1,0 +1,165 @@
+# corpus-refresh.yml.template
+#
+# Usage: Copy to .github/workflows/corpus-refresh.yml in your corpus repository.
+#
+# Three trigger modes:
+#   - cron: Scheduled check (default: weekly Monday 06:00 UTC). Adjust to fit source velocity.
+#   - repository_dispatch: Webhook-triggered by the source repo on push (type: source-updated).
+#   - workflow_dispatch: Manual trigger from the GitHub Actions UI.
+#
+# What this workflow does:
+#   - No LLM inference — structural updates only (~$0 per run)
+#   - Compares current source SHA against config.yaml last_commit_sha
+#   - If changed: flags modified entries stale, adds placeholders for new files, removes deleted entries
+#   - Re-renders index.md deterministically from index.yaml
+#   - Commits config.yaml + index.yaml + index.md
+#   - Optionally creates a GitHub Issue to signal external agents for LLM re-scan
+#
+# Prerequisites:
+#   - index.yaml at repo root (produced by hiivmind-corpus build)
+#   - config.yaml at repo root (with sources[].repo_owner, repo_name, branch, last_commit_sha)
+#   - render-index.sh at repo root (copied from templates/ during hiivmind-corpus build)
+
+# .github/workflows/corpus-refresh.yml
+name: Corpus Refresh
+on:
+  schedule:
+    - cron: '0 6 * * 1'       # Configurable: daily, weekly, etc.
+  repository_dispatch:
+    types: [source-updated]    # For webhook-triggered mode
+  workflow_dispatch:            # Manual trigger
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+      - name: Check freshness
+        id: check
+        run: |
+          # Source metadata lives in config.yaml, not index.yaml
+          SOURCE_REPO=$(yq '.sources[0].repo_owner + "/" + .sources[0].repo_name' config.yaml)
+          SOURCE_BRANCH=$(yq '.sources[0].branch' config.yaml)
+          INDEXED_SHA=$(yq '.sources[0].last_commit_sha' config.yaml)
+          CURRENT_SHA=$(gh api "repos/${SOURCE_REPO}/commits/${SOURCE_BRANCH}" --jq '.sha')
+
+          if [ "$INDEXED_SHA" = "$CURRENT_SHA" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "old_sha=$INDEXED_SHA" >> "$GITHUB_OUTPUT"
+            echo "new_sha=$CURRENT_SHA" >> "$GITHUB_OUTPUT"
+            echo "source_repo=$SOURCE_REPO" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Differential refresh
+        id: refresh
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          OLD="${{ steps.check.outputs.old_sha }}"
+          NEW="${{ steps.check.outputs.new_sha }}"
+          REPO="${{ steps.check.outputs.source_repo }}"
+
+          # Get changed markdown files
+          ADDED=$(gh api "repos/${REPO}/compare/${OLD}...${NEW}" \
+            --jq '.files[] | select(.status == "added" and (.filename | test("\\.md$"))) | .filename')
+          DELETED=$(gh api "repos/${REPO}/compare/${OLD}...${NEW}" \
+            --jq '.files[] | select(.status == "removed" and (.filename | test("\\.md$"))) | .filename')
+          MODIFIED=$(gh api "repos/${REPO}/compare/${OLD}...${NEW}" \
+            --jq '.files[] | select(.status == "modified" and (.filename | test("\\.md$"))) | .filename')
+
+          SOURCE_ID=$(yq '.sources[0].id' config.yaml)
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Flag modified entries as stale
+          for FILE in $MODIFIED; do
+            ID="${SOURCE_ID}:${FILE}"
+            yq -i "(.entries[] | select(.id == \"${ID}\")) .stale = true |
+                   (.entries[] | select(.id == \"${ID}\")) .stale_since = \"${NOW}\"" index.yaml
+          done
+
+          # Add placeholder entries for new files
+          for FILE in $ADDED; do
+            TITLE=$(basename "$FILE" .md | sed 's/-/ /g; s/_/ /g')
+            yq -i ".entries += [{
+              \"id\": \"${SOURCE_ID}:${FILE}\",
+              \"source\": \"${SOURCE_ID}\",
+              \"path\": \"${FILE}\",
+              \"title\": \"${TITLE}\",
+              \"summary\": \"Pending re-scan\",
+              \"tags\": [],
+              \"keywords\": [],
+              \"category\": \"unknown\",
+              \"content_type\": \"markdown\",
+              \"size\": \"standard\",
+              \"grep_hint\": null,
+              \"headings\": [],
+              \"links_to\": [],
+              \"links_from\": [],
+              \"frontmatter\": {},
+              \"stale\": true,
+              \"stale_since\": \"${NOW}\",
+              \"last_indexed\": \"${NOW}\"
+            }]" index.yaml
+          done
+
+          # Remove deleted entries
+          for FILE in $DELETED; do
+            ID="${SOURCE_ID}:${FILE}"
+            yq -i "del(.entries[] | select(.id == \"${ID}\"))" index.yaml
+          done
+
+          # Update config.yaml source tracking
+          yq -i ".sources[0].last_commit_sha = \"${NEW}\" |
+                 .sources[0].last_indexed_at = \"${NOW}\"" config.yaml
+
+          # Update index.yaml meta
+          yq -i ".meta.generated_at = \"${NOW}\" |
+                 .meta.entry_count = (.entries | length)" index.yaml
+
+          # Count stale for dispatch
+          STALE_COUNT=$(yq '.entries[] | select(.stale == true) | .id' index.yaml | wc -l)
+          echo "stale_count=$STALE_COUNT" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Render index.md
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          # render-index.sh is copied from templates/ during build
+          # and lives at the corpus root alongside index.yaml
+          bash render-index.sh index.yaml
+
+      - name: Commit
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          OLD="${{ steps.check.outputs.old_sha }}"
+          NEW="${{ steps.check.outputs.new_sha }}"
+          git add config.yaml index.yaml index.md
+          git commit -m "chore: refresh index (${OLD:0:7}..${NEW:0:7})"
+          git push
+
+      - name: Dispatch LLM re-scan (optional)
+        if: steps.check.outputs.changed == 'true' && steps.refresh.outputs.stale_count != '0'
+        run: |
+          STALE_COUNT="${{ steps.refresh.outputs.stale_count }}"
+          gh issue create \
+            --title "Corpus refresh: ${STALE_COUNT} stale entries need re-scan" \
+            --body "$(yq '.entries[] | select(.stale == true) | "- " + .id + " (stale since " + .stale_since + ")"' index.yaml)" \
+            --label "corpus-refresh"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
