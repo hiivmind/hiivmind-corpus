@@ -28,6 +28,7 @@ concepts:
       - "{source_id}:{path}"                   #   Standard entry reference
       - "{source_id}:{path}#{anchor}"          #   Sub-file anchor (optional)
     tags: ["{tag1}", "{tag2}"]                 # Optional. From extracted #tags. Used for concept matching.
+    entry_count: {integer}                    # Optional. Count of entries. Lightweight signal for navigate prioritization.
 
 # Relationships: typed edges between concepts
 relationships:
@@ -131,6 +132,27 @@ The `graph validate` subcommand checks:
 5. **Duplicate entries** — same entry appearing in multiple concepts (allowed but flagged)
 6. **Relationship type vocabulary** — only controlled types used
 7. **Origin type vocabulary** — only defined origins used
+
+---
+
+### yq Query Patterns
+
+```bash
+# Find concepts by tag
+yq '.concepts | to_entries[] | select(.value.tags[] == "performance") | .key' graph.yaml
+
+# Find concepts containing an entry
+yq '.concepts | to_entries[] | select(.value.entries[] == "polars:optimizations/lazy.md") | .key' graph.yaml
+
+# Follow relationships from a concept (1 hop)
+yq '.relationships[] | select(.from == "query-optimization") | .to' graph.yaml
+
+# Get all entries for a related concept
+yq '.concepts["lazy-frames"].entries[]' graph.yaml
+
+# Find manually curated relationships (preserved on refresh)
+yq '.relationships[] | select(.origin == "manual")' graph.yaml
+```
 
 ---
 
