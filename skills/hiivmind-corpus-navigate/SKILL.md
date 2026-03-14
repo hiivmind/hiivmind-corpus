@@ -111,6 +111,8 @@ If `INDEXED_SHA` differs from `CURRENT_SHA`, include a note in the response:
 
 If the check fails (network error, permissions, non-git source) → skip silently and proceed.
 
+> **Multi-source corpora:** The example above checks `sources[0]` only. For multi-source corpora, repeat for each source or check only the primary source.
+
 #### Step 3c: Fetch index.md (v1 fallback)
 
 **From GitHub source (using gh api - preferred):**
@@ -148,7 +150,7 @@ yq '.entries[] | select(
   (.tags[] | test("term1|term2"; "i")) or
   (.keywords[] | test("term1|term2"; "i")) or
   (.summary | test("term1.*term2|term2.*term1"; "i"))
-) | {id, title, summary, tags, category}' index.yaml
+) | {id, title, summary, tags, category, stale}' index.yaml
 ```
 
 This returns a candidate set (typically 5-20 entries) with enough metadata for semantic judgment.
@@ -180,7 +182,7 @@ Search the index for relevant entries:
 - Look for entries with backtick-wrapped paths
 - Rank by relevance (keyword match > description match)
 
-### Phase 4b: Graph Enrichment
+### Phase 4c: Graph Enrichment
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md`
 
