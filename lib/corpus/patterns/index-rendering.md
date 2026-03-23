@@ -43,6 +43,17 @@ bash render-index.sh index.yaml
 
 The script reads `config.yaml` from the same directory for corpus name and source count. It writes `index.md` in place.
 
+### yq Compatibility Note
+
+The render script uses **mikefarah/yq v4**, which does **not** support jq-style `if/then/else` expressions. The yq lexer rejects them with: `lexer: invalid input text`.
+
+The script avoids this by using a **hybrid yq+bash approach**:
+- **yq** handles data extraction: filtering by category, sorting, and outputting fields as TSV via `@tsv`
+- **bash** handles formatting: constructing the markdown entry line and appending conditional suffixes (GREP hints, STALE markers)
+- **`env()`** passes bash loop variables into single-quoted yq expressions, avoiding all escaping issues
+
+This is more robust than attempting complex string concatenation with conditionals inside yq, which also suffers from nested quote-escaping problems when the yq expression is passed via a bash double-quoted string.
+
 ## Example Output
 
 ```markdown

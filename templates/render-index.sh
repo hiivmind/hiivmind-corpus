@@ -51,15 +51,30 @@ CATEGORIES=$(yq -r '.entries[].category' "$INDEX_YAML" | sort -u)
     echo ""
 
     # Entries in this category, sorted by title
-    yq -r "
+    #
+    # Uses yq for data extraction (TSV) and bash for formatting.
+    # mikefarah/yq v4 does NOT support jq-style if/then/else, and passing
+    # complex expressions via bash double-quoted strings with escaped inner
+    # quotes (\") breaks yq's lexer. This approach avoids both issues:
+    # - env() reads the loop variable without bash interpolation
+    # - @tsv output lets bash handle conditional suffixes cleanly
+    CAT_FILTER="$CAT" yq -r '
       .entries
-      | map(select(.category == \"${CAT}\"))
+      | map(select(.category == env(CAT_FILTER)))
       | sort_by(.title)
       | .[]
-      | \"- **\" + .title + \"** \`\" + .id + \"\` - \" + .summary
-        + (if .size == \"large\" and .grep_hint != null then \" ⚡ GREP - \`\" + .grep_hint + \"\`\" else \"\" end)
-        + (if .stale == true then \" ⏳ STALE\" else \"\" end)
-    " "$INDEX_YAML"
+      | [.title, .id, .summary, .size, (.grep_hint // ""), (.stale | tostring)]
+      | @tsv
+    ' "$INDEX_YAML" | while IFS=$'\t' read -r title id summary size grep_hint stale; do
+      line="- **${title}** \`${id}\` - ${summary}"
+      if [[ "$size" == "large" && -n "$grep_hint" ]]; then
+        line+=" ⚡ GREP - \`${grep_hint}\`"
+      fi
+      if [[ "$stale" == "true" ]]; then
+        line+=" ⏳ STALE"
+      fi
+      echo "$line"
+    done
   done
 
   # Footer
