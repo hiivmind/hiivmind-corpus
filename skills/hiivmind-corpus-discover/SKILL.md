@@ -373,7 +373,8 @@ Skip and note in output:
 - `lib/corpus/patterns/status.md` - Index status checking
 - `lib/corpus/patterns/paths.md` - Path resolution
 
-**Related skills:**
+## Related Skills
+
 - **Navigate:** `skills/hiivmind-corpus-navigate/SKILL.md` - Query corpus documentation
 - **Register:** `skills/hiivmind-corpus-register/SKILL.md` - Add corpus to registry
 - **Status:** `skills/hiivmind-corpus-status/SKILL.md` - Check corpus health
@@ -381,6 +382,6 @@ Skip and note in output:
 - **Build:** `skills/hiivmind-corpus-build/SKILL.md` - Build corpus index
 - **Gateway:** `commands/hiivmind-corpus.md` - Unified entry point
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
-- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases
 
 **Note:** Navigation is now handled by `hiivmind-corpus-navigate` skill, which works with both registry-based and legacy plugin-based corpora.

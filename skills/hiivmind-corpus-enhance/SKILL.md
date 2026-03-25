@@ -661,7 +661,8 @@ User: "The detailed actions sub-index"
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, self)
 
-**Related skills:**
+## Related Skills
+
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
@@ -670,4 +671,4 @@ User: "The detailed actions sub-index"
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
-- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases

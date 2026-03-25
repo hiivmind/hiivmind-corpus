@@ -221,7 +221,7 @@ Add a typed relationship between two existing concepts. Supports explicit (args)
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md` — Generates graph.yaml during build
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-navigate/SKILL.md` — Uses graph.yaml for enriched retrieval
-- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus graph overlay
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md` — Can add entries to concepts
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md` — Updates auto-extracted relationships
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md` — Configures extraction
