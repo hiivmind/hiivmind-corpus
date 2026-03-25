@@ -26,7 +26,7 @@ A new source type in `config.yaml` that means "this repo is the source."
 sources:
   - id: vault              # User-chosen identifier
     type: self
-    docs_root: "/"          # Relative to repo root. "/" = whole repo, "/docs" = docs/ subtree
+    docs_root: "."          # Relative to repo root. "." = whole repo, "docs" = docs/ subtree
     last_commit_sha: null   # Scoped to docs_root via git log
     last_indexed_at: null
 ```
@@ -39,7 +39,11 @@ sources:
 {source_id}:{relative_path}  →  {repo_root}/{docs_root}/{relative_path}
 ```
 
-Example: `vault:notes/architecture.md` → `/home/user/obsidian-vault/notes/architecture.md`
+**`docs_root` normalization:** `"."` is normalized to empty string before path concatenation, consistent with how existing git sources handle `docs_root: ""` / null (omitting the segment entirely). The existing `resolve_source_ref()` in `paths.md` uses `[ -n "$docs_root" ]` to decide whether to insert the segment — `"."` must be treated as equivalent to empty in this check. This normalization is documented in `lib/corpus/patterns/sources/self.md` and applied in the `paths.md` update.
+
+Example: `vault:notes/architecture.md` with `docs_root: "."` → `/home/user/obsidian-vault/notes/architecture.md` (not `/home/user/obsidian-vault/./notes/architecture.md`)
+
+**Note on scoping:** When `docs_root` is `"."` (whole repo), `git log -1 --format=%H -- .` is equivalent to `git log -1 --format=%H` — any commit marks the corpus stale, not just documentation changes. The scoping benefit only applies when `docs_root` targets a subdirectory like `"docs"`.
 
 **Freshness tracking:** Scoped to `docs_root` so unrelated commits don't trigger staleness:
 
@@ -48,6 +52,8 @@ git log -1 --format=%H -- {docs_root}
 ```
 
 **Auto-exclusions:** Build and refresh auto-exclude `.hiivmind/` from scanning to avoid indexing the corpus's own files.
+
+**Relationship to `type: obsidian`:** The existing source taxonomy includes `type: obsidian` for standalone corpora that index an Obsidian vault from a separate repo. `type: self` is for embedded corpora where the index lives *inside* the vault. The distinction: `type: obsidian` = external index pointing at a vault; `type: self` = index co-located with the content. The decision tree in `sources/README.md` should be updated to route "corpus lives inside the source repo" to `type: self`.
 
 **Pattern doc:** New file at `lib/corpus/patterns/sources/self.md`.
 
@@ -58,13 +64,12 @@ git log -1 --format=%H -- {docs_root}
 ```
 my-obsidian-vault/
 ├── .hiivmind/
-│   ├── corpus/
-│   │   ├── config.yaml          # Corpus config with type: self source
-│   │   ├── index.md             # Main index
-│   │   ├── index-*.md           # Sub-indexes (tiered, if needed)
-│   │   └── .gitignore           # Minimal or empty
 │   └── corpus/
-│       └── registry.yaml        # Existing registry (for remote corpora)
+│       ├── config.yaml          # Embedded corpus config (type: self)
+│       ├── index.md             # Main index
+│       ├── index-*.md           # Sub-indexes (tiered, if needed)
+│       ├── registry.yaml        # Existing registry (for remote corpora)
+│       └── .gitignore           # Minimal or empty
 │
 ├── notes/                       # The actual documentation
 ├── projects/
@@ -98,7 +103,7 @@ A new discovery location added to the existing four:
 
 **Detection:** `.hiivmind/corpus/config.yaml` exists → embedded corpus found.
 
-**Name derivation:** Other locations derive the corpus name from the directory name. Embedded corpora derive the name from `config.yaml`'s `corpus.name` field, since the directory is always `corpus/`.
+**Name derivation:** Other locations derive the corpus name from the directory name. Embedded corpora derive the name from `config.yaml`'s `corpus.name` field, since the directory is always `corpus/`. This makes `corpus.name` a required field for embedded corpora (it is optional for standalone corpora where the directory name suffices).
 
 **Status determination:** Same as other corpora — check `index.md` exists, check for placeholder text, check freshness via scoped SHA.
 
@@ -110,7 +115,7 @@ corpora:
   - id: my-vault
     source:
       type: local
-      path: /home/user/obsidian-vault
+      path: /home/user/obsidian-vault/.hiivmind/corpus  # Full path to corpus directory
     # OR
     source:
       type: github
@@ -139,7 +144,7 @@ The registry schema's existing `path` field handles the subdirectory case.
 4. Does **not** create `README.md`, `LICENSE`, `CLAUDE.md`, `uploads/`, `.source/`
 5. Does **not** call `add-source` — the source is implicit
 
-**`docs_root` detection:** If `docs/` exists, suggest it. If the repo is an Obsidian vault (flat markdown), suggest `"/"`. User confirms or overrides.
+**`docs_root` detection:** If `docs/` exists, suggest `"docs"`. If the repo is an Obsidian vault (flat markdown), suggest `"."`. User confirms or overrides.
 
 **After init:** User runs build as normal.
 
@@ -191,7 +196,7 @@ These three skills resolve source paths. Changes are thin.
 | `lib/corpus/patterns/paths.md` | `type: self` path resolution |
 | `lib/corpus/patterns/sources/README.md` | Add `self` to taxonomy |
 | `lib/corpus/patterns/config-parsing.md` | `type: self` schema fields |
-| `lib/corpus/patterns/freshness.md` | Scoped SHA via `git log -- {docs_root}` |
+| `lib/corpus/patterns/freshness.md` | Scoped SHA via `git log -- {docs_root}` (also add to CLAUDE.md pattern table) |
 | `lib/corpus/patterns/scanning.md` | Auto-exclude `.hiivmind/` for self sources |
 
 **Updated skills (SKILL.md):**
@@ -213,18 +218,23 @@ These three skills resolve source paths. Changes are thin.
 |------|--------|
 | `CLAUDE.md` | Key Design Decisions, cross-cutting concerns, discovery locations |
 
+**Minimal changes:**
+
+| File | Change |
+|------|--------|
+| `enhance` | Path resolution delegates to shared `resolve_source_ref()` which gets `type: self` support from `paths.md` update — verify this delegation exists, add if missing |
+| `add-source` | Add validation: reject `add-source` on embedded corpora (`type: self` must be the only source) |
+
 **No changes needed:**
 
 | File | Why |
 |------|-----|
-| `enhance` | Works on existing index entries; source type irrelevant |
-| `add-source` | Embedded corpora don't add sources |
 | Gateway command | Routes to existing skills; no new routing |
 
 ## Constraints
 
 - Single embedded corpus per repo (one `.hiivmind/corpus/` directory)
-- `type: self` source must be the only source in an embedded corpus (no mixing with git/web/local sources)
+- `type: self` source must be the only source in an embedded corpus (enforced by `add-source` rejecting operations on embedded corpora). Rationale: embedded corpora are about self-contained documentation repos. If you need to mix in external sources, use a standalone corpus instead. This keeps path resolution simple and avoids needing `.source/` and `.cache/` directories inside `.hiivmind/corpus/`
 - Embedded corpora are always committed to the host repo (not gitignored)
 - The `.hiivmind/` directory itself is always excluded from scanning
 
