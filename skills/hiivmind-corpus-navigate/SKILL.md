@@ -41,6 +41,8 @@ No corpus registry found. Register a corpus first:
 
 > **Embedded corpora:** If `.hiivmind/corpus/config.yaml` exists in the current repo, it is available for navigation without registry registration. Treat it as an additional corpus alongside registry entries.
 
+> **Cross-corpus bridges:** Also attempt to load `.hiivmind/corpus/registry-graph.yaml`. If found, extract the `aliases` section for use in Phase 2 routing. If missing or malformed, skip silently — bridges are optional.
+
 ```yaml
 # Registry structure
 corpora:
@@ -62,11 +64,12 @@ Arguments: "flyio how to deploy"
 ```
 
 **If corpus not specified:**
-1. Load keywords from each corpus config
-2. Score query against keywords
-3. If single match → use that corpus
-4. If multiple matches → ask user to clarify
-5. If no matches → list available corpora
+1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
+2. Load keywords from each corpus config
+3. Score query against keywords (alias matches count as additional keyword hits)
+4. If single match → use that corpus
+5. If multiple matches → ask user to clarify
+6. If no matches → list available corpora
 
 ### Phase 3: Fetch Corpus Index
 
