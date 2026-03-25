@@ -263,6 +263,14 @@ SEARCH_SOURCES(targets, topic):
         results = Glob(base + "/*.md")
         keyword_hits = Grep(topic, path=base, glob="*.md", output_mode="files_with_matches")
 
+      CASE "self":
+        repo_root = Bash("git rev-parse --show-toplevel").strip()
+        docs_root = source.docs_root
+        IF docs_root == ".": docs_root = ""
+        base = repo_root + ("/" + docs_root IF docs_root ELSE "")
+        results = Glob(base + "/**/*.md", exclude=".hiivmind/**")
+        keyword_hits = Grep(topic, path=base, glob="*.md", output_mode="files_with_matches")
+
     # Filter to docs not already in the index
     FOR hit IN keyword_hits:
       entry_path = source.id + ":" + relative_path(hit, base)
@@ -651,7 +659,7 @@ User: "The detailed actions sub-index"
 - `lib/corpus/patterns/status.md` - Index status checking
 - `lib/corpus/patterns/paths.md` - Path resolution
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
-- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs)
+- `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, self)
 
 **Related skills:**
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
