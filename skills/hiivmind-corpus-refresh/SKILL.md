@@ -125,6 +125,19 @@ Report: source_id, type, manifest_hash_match, status
 - Same as git: compare source_repo SHA against upstream
 - Report like git source
 
+**Self sources** — See `lib/corpus/patterns/sources/self.md` § "Freshness Tracking":
+
+```pseudocode
+docs_root = source.docs_root (normalize "." to "")
+if docs_root:
+    current_sha = git log -1 --format=%H -- {docs_root}
+else:
+    current_sha = git log -1 --format=%H
+status = (current_sha == last_commit_sha) ? "current" : "stale"
+```
+
+Report: source_id, type, indexed_sha, current_sha, status
+
 ---
 
 ## Phase 4: Present Status Report
@@ -212,6 +225,15 @@ For each selected source, execute the type-specific update:
 2. Re-discover URLs from sitemap if available
 3. Compare discovered URLs to stored list
 4. Collect changes for index update
+
+**Self source update:**
+
+1. No clone or fetch needed — files are already local
+2. Get current scoped SHA: `git log -1 --format=%H -- {docs_root}`
+3. Get file changes: `git diff --name-status {old_sha}..{new_sha} -- {docs_root}`
+4. Filter changes to `include_patterns` from config
+5. Store new SHA
+6. Collect changes for index update
 
 ---
 
@@ -302,6 +324,7 @@ Index entries: {added} added, {modified} modified, {removed} removed
 - **Web sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/web.md`
 - **llms-txt sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/llms-txt.md`
 - **Generated docs:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/generated-docs.md`
+- **Self sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/self.md`
 - **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
