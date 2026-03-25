@@ -237,6 +237,26 @@ and updated by build/refresh skills.
 | `last_commit_sha` | From `git rev-parse HEAD` (git-backed) | Empty string on initial creation |
 | `last_indexed_at` | Empty string | Set by build/refresh |
 
+### Self Source Entry
+
+Embedded source for corpora that index their own repository:
+
+```yaml
+- id: "{source_id}"
+  type: "self"
+  docs_root: "."
+  last_commit_sha: null
+  last_indexed_at: null
+```
+
+| Field | Source | Notes |
+|-------|--------|-------|
+| `id` | User-provided or derived from repo name | Lowercase, alphanumeric + hyphens |
+| `type` | Always `"self"` | Embedded source |
+| `docs_root` | User-confirmed | `"."` for whole repo, `"docs"` for subdirectory |
+| `last_commit_sha` | Set by build | Scoped to docs_root |
+| `last_indexed_at` | Set by build | Timestamp of last index |
+
 ### Extraction Block
 
 The `extraction:` block is optional and can be added to **any** source type's config entry.

@@ -168,6 +168,25 @@ Tracks git for change detection, fetches content live from web.
 - `cache.enabled` defaults to `false`
 - `discovered_urls` can be empty (populated by discovery)
 
+### Self Source
+
+Embedded source — the corpus indexes the repo it lives in:
+
+```yaml
+- id: "vault"
+  type: "self"
+  docs_root: "."                     # "." = whole repo, "docs" = docs/ subtree
+  last_commit_sha: null              # Scoped to docs_root
+  last_indexed_at: null
+```
+
+**Key differences from other source types:**
+- No `repo_url`, `repo_owner`, `repo_name`, `branch` — the repo is implicit
+- `docs_root` uses `"."` for whole repo (normalized to empty during path resolution)
+- Freshness tracked via `git log -1 --format=%H -- {docs_root}`
+
+---
+
 ## Extraction Patterns
 
 ### Get Corpus Name
