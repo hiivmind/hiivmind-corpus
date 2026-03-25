@@ -249,13 +249,36 @@ Search the index for relevant entries:
 
    Limit: up to 3 entries per related concept, up to 2 relationship types considered as traversal candidates (1 hop only — do not recurse).
 
-   > **Note:** Tier 4 (registry-graph.yaml cross-corpus traversal) is deferred to the generalization pass.
+4. **Tier 4: Cross-corpus bridge traversal**
 
-4. **Fetch priority**
+   Check for cross-corpus bridges via `registry-graph.yaml` (loaded in Phase 1). If not loaded → skip Tier 4.
+
+   For each concept matched in Tiers 2-3, check if it participates in any bridge:
+
+   **v2 mode (yq queries):**
+   ```bash
+   # Find bridges involving a matched concept
+   yq '.bridges[] | select(.concept_a == "{corpus}:{concept}" or .concept_b == "{corpus}:{concept}")' .hiivmind/corpus/registry-graph.yaml
+   ```
+
+   **v1 mode:** Read registry-graph.yaml directly and search bridges manually.
+
+   For each bridge match, fetch the bridged concept's entries from the other corpus (using that corpus's source config for path resolution).
+
+   Limits: up to 2 cross-corpus concepts, up to 3 entries per concept.
+
+   Annotate Tier 4 results:
+   ```
+   **Related (from {other_corpus} corpus via bridge):**
+   - [{entry_title}]({entry_path}) — Tier 4: bridged from {source_corpus}:{source_concept}
+   ```
+
+5. **Fetch priority**
 
    - **Tier 1** entries: always fetch
    - **Tier 2** entries: fetch if Tier 1 content doesn't fully answer the query
    - **Tier 3** entries: fetch only if the query touches concepts not covered by Tiers 1–2
+   - **Tier 4** entries: fetch only if query explicitly spans topics covered by multiple corpora
 
    Annotate each fetched item with its tier in the presented response for transparency.
 
@@ -268,6 +291,7 @@ Search the index for relevant entries:
 | yq not available | LLM reads index.yaml directly as structured YAML |
 | Freshness check fails | Skip silently, proceed with cached index |
 | Stale entries in results | Include them but note "this entry may be outdated" |
+| No registry-graph.yaml | Skip cross-corpus bridges and aliases |
 
 ### Phase 5: Fetch Documentation
 
@@ -405,6 +429,7 @@ The documentation may have moved. Try:
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+- **Registry graph:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/registry-graph.md`
 
 ## Related Skills
 
