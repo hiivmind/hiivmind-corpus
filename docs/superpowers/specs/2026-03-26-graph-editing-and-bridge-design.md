@@ -50,7 +50,7 @@ navigate Tier 4 integration
 4. Check concept ID doesn't already exist — if it does, error with suggestion to use a different name
 5. Scan the corpus index for entries matching the concept:
    - Extract 2-4 search terms from the concept label
-   - **v2 (index.yaml):** yq pre-filter on tags, keywords, summary fields
+   - **v2 (index.yaml):** yq pre-filter on tags, keywords, summary fields (if yq unavailable, read index.yaml directly and use LLM judgment)
    - **v1 (index.md):** grep + LLM semantic judgment
    - Present top 10-15 candidates ranked by relevance
 6. User selects which entries to include (confirm/deselect from list)
@@ -67,7 +67,7 @@ navigate Tier 4 integration
      tags: ["{tag1}", "{tag2}"]
      entry_count: {n}
    ```
-10. Update `meta.concept_count` and `meta.generated_at`
+10. Update `meta.concept_count`, `meta.entry_count`, and `meta.generated_at`
 11. Confirm: "Added concept '{label}' with {n} entries to graph.yaml"
 
 **Empty graph bootstrap:** If `graph.yaml` doesn't exist and user invokes `add-concept`, create a new graph with schema_version 1, empty relationships, and the first concept. Set `meta.sources_extracted: []` since this is manually curated.
@@ -127,6 +127,20 @@ graph add-relationship "query-optimization" "lazy-frames" depends-on
 
 New skill at `skills/hiivmind-corpus-bridge/SKILL.md`. Creates and manages cross-corpus concept bridges stored in `.hiivmind/corpus/registry-graph.yaml`.
 
+### SKILL.md Frontmatter
+
+```yaml
+---
+name: hiivmind-corpus-bridge
+description: >
+  Create and manage cross-corpus concept bridges in registry-graph.yaml. Use when users
+  want to link concepts across corpora, create query-routing aliases, or validate
+  cross-corpus relationships. Triggers: "bridge", "cross-corpus", "link corpora",
+  "registry graph", "alias", "bridge show", "bridge validate", "add alias".
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
+---
+```
+
 ### Subcommands
 
 | Subcommand | Purpose |
@@ -142,12 +156,18 @@ New skill at `skills/hiivmind-corpus-bridge/SKILL.md`. Creates and manages cross
 - At least 2 registered corpora must have `graph.yaml` files
 - If not met, report what's missing and suggest next steps
 
+### Phase Structure
+
+The bridge skill follows the standard phase pattern:
+- **Phase 1:** Load Registry + Fetch Graphs (prerequisite validation)
+- **Phase 2:** Execute Subcommand (bridge/show/validate/add-alias)
+
 ### bridge (default) — Interactive Creation
 
 **Workflow:**
 
 1. **Load registry:** Read `.hiivmind/corpus/registry.yaml` to find registered corpora
-2. **Fetch graphs:** For each corpus, fetch its `graph.yaml`:
+2. **Fetch graphs:** For each corpus, fetch its `graph.yaml`. Resolve source details from the registry entry: `source.repo` (split on `/` for owner/repo) and `source.ref` for the branch/tag.
    - GitHub sources: `gh api repos/{owner}/{repo}/contents/graph.yaml?ref={ref} --jq '.content' | base64 -d`
    - Local sources: `Read: {path}/graph.yaml`
    - Embedded (self) sources: `Read: .hiivmind/corpus/graph.yaml`
@@ -244,6 +264,17 @@ bridge add-alias "lazy evaluation" polars:lazy-evaluation ibis:deferred-executio
 3. Write to registry-graph.yaml aliases section
 4. Update meta
 
+### Error Handling
+
+| Error | Message | Recovery |
+|-------|---------|----------|
+| No registry | "No corpus registry found at .hiivmind/corpus/registry.yaml" | Suggest `/hiivmind-corpus register` |
+| Fewer than 2 corpora | "Bridge requires at least 2 registered corpora. Found: {n}" | Suggest registering more |
+| No corpora with graph.yaml | "No registered corpora have concept graphs. Build graphs first." | Suggest `/hiivmind-corpus graph add-concept` or run build with extraction |
+| Invalid registry-graph.yaml | "registry-graph.yaml has syntax errors: {details}" | Show error location |
+| Network error fetching graph | "Could not fetch graph.yaml for corpus '{id}': {error}" | Skip that corpus, continue with others |
+| Dangling concept reference | "Concept '{id}' not found in corpus '{name}' graph.yaml" | Warning during validate, not blocking |
+
 ---
 
 ## Feature 3: Navigate Tier 4 Integration
@@ -253,25 +284,31 @@ bridge add-alias "lazy evaluation" polars:lazy-evaluation ibis:deferred-executio
 Navigate Phase 4c handles graph enrichment with Tiers 1-3. Line 249 of the navigate SKILL.md says:
 > **Note:** Tier 4 (registry-graph.yaml cross-corpus traversal) is deferred to the generalization pass.
 
-### Change
+### Changes
 
-Replace the deferred note with working Tier 4:
+Two distinct insertion points in navigate:
 
-**Tier 4: Cross-corpus bridge traversal**
+#### Change A: Alias routing enhancement (Phase 1 + Phase 2)
 
-After Tier 3 completes (within the same corpus), check for cross-corpus bridges:
+**Phase 1 addition:** After loading the registry, also attempt to load `.hiivmind/corpus/registry-graph.yaml`. If found, extract the `aliases` section and hold it in memory for Phase 2. If missing or malformed, skip silently.
 
-1. **Load registry-graph.yaml** from `.hiivmind/corpus/registry-graph.yaml`
-   - If missing → skip Tier 4 silently
-2. **Check aliases first:** Before corpus routing (Phase 2), check if query matches any alias keys. If so, add the alias target corpora/concepts to the routing candidates.
-3. **Bridge traversal:** For each concept matched in Tiers 2-3, check if it participates in any bridge:
+**Phase 2 addition:** Before scoring the query against corpus keywords, check if any alias keys match the query (exact or substring match). If an alias matches, add its target corpora/concepts to the routing candidates alongside keyword-based matches. This means a search for "lazy evaluation" can route to both Polars and Ibis if an alias exists.
+
+#### Change B: Tier 4 bridge traversal (Phase 4c)
+
+Replace the deferred Tier 4 note with working cross-corpus bridge traversal:
+
+After Tier 3 completes (within the same corpus):
+
+1. **Check for registry-graph.yaml** (already loaded in Phase 1). If not loaded → skip Tier 4 silently.
+2. **Bridge traversal:** For each concept matched in Tiers 2-3, check if it participates in any bridge:
    ```bash
    # Find bridges involving a matched concept
    yq '.bridges[] | select(.concept_a == "{corpus}:{concept}" or .concept_b == "{corpus}:{concept}")' registry-graph.yaml
    ```
-4. **Cross-corpus fetch:** For each bridge match, fetch the bridged concept's entries from the other corpus (using that corpus's source config for path resolution)
-5. **Limits:** Up to 2 cross-corpus concepts, up to 3 entries per concept
-6. **Annotation:** Mark Tier 4 results clearly:
+3. **Cross-corpus fetch:** For each bridge match, fetch the bridged concept's entries from the other corpus (using that corpus's source config for path resolution)
+4. **Limits:** Up to 2 cross-corpus concepts, up to 3 entries per concept
+5. **Annotation:** Mark Tier 4 results clearly:
    ```
    **Related (from Ibis corpus via bridge):**
    - [Deferred Execution](ibis:concepts/deferred.md) — Tier 4: bridged from polars:lazy-evaluation
@@ -293,10 +330,15 @@ Add to navigate's degradation table:
 | `skills/hiivmind-corpus-graph/SKILL.md` | Replace deferred `add-concept` and `add-relationship` with full sections |
 | `skills/hiivmind-corpus-bridge/SKILL.md` | **New file** — full skill definition |
 | `skills/hiivmind-corpus-navigate/SKILL.md` | Wire Tier 4, add alias check to Phase 2, update degradation table |
-| `commands/hiivmind-corpus.md` | Remove "(deferred)" from bridge row, add to interactive menu and Available Skills table |
+| `commands/hiivmind-corpus.md` | Remove "(deferred)" from bridge routing row. Add menu items: `10. Graph — View, validate, edit concept graphs` and `11. Bridge — Cross-corpus concept links and aliases`. Update Available Skills table: change bridge from deferred to implemented. |
 | `skills/hiivmind-corpus-discover/SKILL.md` | Add missing Related Skills section |
 | `skills/hiivmind-corpus-enhance/SKILL.md` | Add missing Related Skills section |
-| All other skill SKILL.md files | Update bridge reference from "(deferred — ...)" to normal reference |
+| `skills/hiivmind-corpus-init/SKILL.md` | Update bridge reference from deferred to normal |
+| `skills/hiivmind-corpus-add-source/SKILL.md` | Update bridge reference from deferred to normal |
+| `skills/hiivmind-corpus-build/SKILL.md` | Update bridge reference from deferred to normal |
+| `skills/hiivmind-corpus-refresh/SKILL.md` | Update bridge reference from deferred to normal |
+| `skills/hiivmind-corpus-register/SKILL.md` | Update bridge reference from deferred to normal |
+| `skills/hiivmind-corpus-status/SKILL.md` | Update bridge reference from deferred to normal |
 | `CLAUDE.md` | Update Key Design Decisions, cross-cutting concerns table |
 | `.claude-plugin/plugin.json` | Version bump `1.1.0` → `1.2.0` |
 
