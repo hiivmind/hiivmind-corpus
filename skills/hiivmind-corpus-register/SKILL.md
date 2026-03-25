@@ -195,6 +195,17 @@ For GitHub:
 Enter the GitHub repository (e.g., hiivmind/hiivmind-corpus-flyio):
 ```
 
+## Registering Embedded Corpora (External Access)
+
+Other projects can register an embedded corpus from another repo:
+
+```
+/hiivmind-corpus register local:/path/to/vault/.hiivmind/corpus
+/hiivmind-corpus register github:user/vault@main path:.hiivmind/corpus
+```
+
+The `path` parameter is required for GitHub sources since the corpus lives at a subdirectory, not the repo root.
+
 ## Error Handling
 
 **Invalid source format:**
