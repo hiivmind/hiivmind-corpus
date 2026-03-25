@@ -45,7 +45,15 @@ No config.yaml found. Run hiivmind-corpus-init first.
 
 1. Read `config.yaml` and parse it
 2. Check if `sources` array is empty → set `computed.is_first_source`
-3. Display: "Found corpus: {config.corpus.name} — Existing sources: {count}"
+3. Check if any existing source has `type: self`:
+   - If yes, display:
+     ```
+     This is an embedded corpus (type: self). Additional sources cannot be added.
+     Embedded corpora index their own repository content only.
+     To add external sources, create a standalone corpus instead.
+     ```
+   - STOP — do not proceed to Phase 2
+4. Display: "Found corpus: {config.corpus.name} — Existing sources: {count}"
 
 ---
 
