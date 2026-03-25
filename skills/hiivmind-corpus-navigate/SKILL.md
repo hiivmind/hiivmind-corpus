@@ -41,6 +41,8 @@ No corpus registry found. Register a corpus first:
 
 > **Embedded corpora:** If `.hiivmind/corpus/config.yaml` exists in the current repo, it is available for navigation without registry registration. Treat it as an additional corpus alongside registry entries.
 
+> **Cross-corpus bridges:** Also attempt to load `.hiivmind/corpus/registry-graph.yaml`. If found, extract the `aliases` section for use in Phase 2 routing. If missing or malformed, skip silently — bridges are optional.
+
 ```yaml
 # Registry structure
 corpora:
@@ -62,11 +64,12 @@ Arguments: "flyio how to deploy"
 ```
 
 **If corpus not specified:**
-1. Load keywords from each corpus config
-2. Score query against keywords
-3. If single match → use that corpus
-4. If multiple matches → ask user to clarify
-5. If no matches → list available corpora
+1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
+2. Load keywords from each corpus config
+3. Score query against keywords (alias matches count as additional keyword hits)
+4. If single match → use that corpus
+5. If multiple matches → ask user to clarify
+6. If no matches → list available corpora
 
 ### Phase 3: Fetch Corpus Index
 
@@ -246,13 +249,36 @@ Search the index for relevant entries:
 
    Limit: up to 3 entries per related concept, up to 2 relationship types considered as traversal candidates (1 hop only — do not recurse).
 
-   > **Note:** Tier 4 (registry-graph.yaml cross-corpus traversal) is deferred to the generalization pass.
+4. **Tier 4: Cross-corpus bridge traversal**
 
-4. **Fetch priority**
+   Check for cross-corpus bridges via `registry-graph.yaml` (loaded in Phase 1). If not loaded → skip Tier 4.
+
+   For each concept matched in Tiers 2-3, check if it participates in any bridge:
+
+   **v2 mode (yq queries):**
+   ```bash
+   # Find bridges involving a matched concept
+   yq '.bridges[] | select(.concept_a == "{corpus}:{concept}" or .concept_b == "{corpus}:{concept}")' .hiivmind/corpus/registry-graph.yaml
+   ```
+
+   **v1 mode:** Read registry-graph.yaml directly and search bridges manually.
+
+   For each bridge match, fetch the bridged concept's entries from the other corpus (using that corpus's source config for path resolution).
+
+   Limits: up to 2 cross-corpus concepts, up to 3 entries per concept.
+
+   Annotate Tier 4 results:
+   ```
+   **Related (from {other_corpus} corpus via bridge):**
+   - [{entry_title}]({entry_path}) — Tier 4: bridged from {source_corpus}:{source_concept}
+   ```
+
+5. **Fetch priority**
 
    - **Tier 1** entries: always fetch
    - **Tier 2** entries: fetch if Tier 1 content doesn't fully answer the query
    - **Tier 3** entries: fetch only if the query touches concepts not covered by Tiers 1–2
+   - **Tier 4** entries: fetch only if query explicitly spans topics covered by multiple corpora
 
    Annotate each fetched item with its tier in the presented response for transparency.
 
@@ -265,6 +291,7 @@ Search the index for relevant entries:
 | yq not available | LLM reads index.yaml directly as structured YAML |
 | Freshness check fails | Skip silently, proceed with cached index |
 | Stale entries in results | Include them but note "this entry may be outdated" |
+| No registry-graph.yaml | Skip cross-corpus bridges and aliases |
 
 ### Phase 5: Fetch Documentation
 
@@ -402,6 +429,7 @@ The documentation may have moved. Try:
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+- **Registry graph:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/registry-graph.md`
 
 ## Related Skills
 
@@ -410,4 +438,4 @@ The documentation may have moved. Try:
 - **Discover:** `hiivmind-corpus-discover` - Find available corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update corpus from upstream
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
-- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges (deferred — schema defined, skill not yet implemented)
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases

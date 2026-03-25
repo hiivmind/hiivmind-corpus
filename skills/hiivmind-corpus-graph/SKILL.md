@@ -77,9 +77,126 @@ Check graph.yaml for issues.
 3. Report: errors (must fix), warnings (should review)
 4. If clean: "Graph validates OK — N concepts, M relationships, no issues."
 
-### add-concept (deferred — vertical slice excludes this)
+### add-concept
 
-### add-relationship (deferred — vertical slice excludes this)
+Add a new concept to graph.yaml with semi-automated entry suggestion.
+
+**Invocation:** `graph add-concept "Concept Label"` or interactive (no args → prompt for label)
+
+**Procedure:**
+
+1. **Slugify label** to concept ID per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md` § Concept ID Conventions:
+   ```bash
+   slugify() {
+     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//'
+   }
+   ```
+2. **Check for duplicates** — if concept ID already exists in graph.yaml, error:
+   "Concept '{id}' already exists. Use a different name or edit the existing concept."
+3. **Scan index for matching entries:**
+   - Extract 2-4 search terms from the concept label
+   - **v2 (index.yaml):** yq pre-filter on tags, keywords, summary fields. If yq unavailable, read index.yaml directly and use LLM judgment.
+     ```bash
+     yq '.entries[] | select(
+       (.tags[] | test("term1|term2"; "i")) or
+       (.keywords[] | test("term1|term2"; "i")) or
+       (.summary | test("term1.*term2|term2.*term1"; "i"))
+     ) | {id, title, summary, tags}' index.yaml
+     ```
+   - **v1 (index.md):** grep for search terms + LLM semantic judgment
+   - Present top 10-15 candidates ranked by relevance
+4. **User selects entries** — present numbered list, user confirms/deselects
+5. **Suggest tags** — based on selected entries' metadata (if available from index.yaml)
+6. **Suggest description** — one-line summary based on selected entries' summaries
+7. **Write concept to graph.yaml:**
+   ```yaml
+   {concept-id}:
+     label: "{User-Provided Label}"
+     description: "{description}"
+     entries:
+       - "{source_id}:{path}"
+     tags: ["{tag1}", "{tag2}"]
+     entry_count: {n}
+   ```
+8. **Update meta** — increment `concept_count`, recompute `entry_count` (total across all concepts), set `generated_at` to current ISO-8601 timestamp
+
+**Empty graph bootstrap:** If `graph.yaml` doesn't exist, create a new one:
+
+```yaml
+schema_version: 1
+
+concepts:
+  {concept-id}:
+    label: "{label}"
+    description: "{description}"
+    entries:
+      - "{source_id}:{path}"
+    tags: []
+    entry_count: {n}
+
+relationships: []
+
+meta:
+  generated_at: "{ISO-8601}"
+  entry_count: {n}
+  concept_count: 1
+  relationship_count: 0
+  sources_extracted: []
+```
+
+**Output:** "Added concept '{label}' with {n} entries to graph.yaml"
+
+### add-relationship
+
+Add a typed relationship between two existing concepts. Supports explicit (args) and interactive (no args) modes.
+
+**Explicit invocation:** `graph add-relationship "{from-concept}" "{to-concept}" {type}`
+
+**Procedure (explicit):**
+
+1. **Validate concept IDs** — both `from` and `to` must exist in graph.yaml. If not:
+   "Concept '{id}' not found. Available concepts: {list}"
+2. **Validate relationship type** — must be one of the controlled vocabulary:
+   `includes`, `depends-on`, `see-also`, `extends`, `contrast-with`
+   (see `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/graph.md` § Relationship Type Vocabulary)
+3. **Check for duplicates** — same from/to/type triple already exists:
+   "Relationship '{from}' → '{to}' ({type}) already exists."
+4. **Optionally ask for evidence** — an entry path that demonstrates the link (can be null)
+5. **Write relationship to graph.yaml:**
+   ```yaml
+   - from: "{from-concept}"
+     to: "{to-concept}"
+     type: "{type}"
+     origin: "manual"
+     evidence: null
+   ```
+6. **Update meta** — increment `relationship_count`, set `generated_at`
+
+**Interactive invocation** (no args):
+
+1. Load graph.yaml, list all concepts
+2. Analyze concept pairs for relationship candidates:
+   - **Tag overlap:** Concepts sharing 2+ tags → strong candidate
+   - **Entry cross-references:** If entries in concept A link to entries in concept B
+   - **Label/description keyword similarity:** Fuzzy match on descriptions
+3. Present candidates:
+   ```
+   These concept pairs look related — confirm or skip each:
+
+   1. query-optimization → lazy-frames
+      Reason: shared tags [performance, optimization]
+      Suggested type: depends-on
+      [Confirm / Change type / Skip]
+
+   2. data-types → serialization
+      Reason: entries cross-reference each other
+      Suggested type: see-also
+      [Confirm / Change type / Skip]
+   ```
+4. For each confirmed pair, write relationship with `origin: "manual"`
+5. Summary: "Added {n} relationships to graph.yaml"
+
+**Note:** All relationships added by this subcommand use `origin: "manual"`, which means refresh will preserve them (never overwritten by auto-extraction).
 
 ---
 
@@ -104,7 +221,7 @@ Check graph.yaml for issues.
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md` — Generates graph.yaml during build
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-navigate/SKILL.md` — Uses graph.yaml for enriched retrieval
-- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus graph overlay
+- `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md` — Can add entries to concepts
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md` — Updates auto-extracted relationships
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md` — Configures extraction
