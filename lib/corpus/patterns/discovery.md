@@ -26,6 +26,7 @@ Find all installed hiivmind-corpus corpora across user-level, repo-local, and ma
 | **Repo-local** | `{repo}/.claude-plugin/skills/hiivmind-corpus-*/` | Same | Team sharing via git |
 | **Marketplace-single** | `~/.claude/plugins/marketplaces/hiivmind-corpus-*/` | `%USERPROFILE%\.claude\plugins\marketplaces\hiivmind-corpus-*\` | Published single-corpus plugins |
 | **Marketplace-multi** | `~/.claude/plugins/marketplaces/*/hiivmind-corpus-*/` | `%USERPROFILE%\.claude\plugins\marketplaces\*\hiivmind-corpus-*\` | Published multi-corpus marketplaces |
+| **Embedded** | `{repo}/.hiivmind/corpus/` | Same | Corpus about the current repo |
 
 ### Directory Structure Validation
 
@@ -209,10 +210,32 @@ Get-ChildItem "$env:USERPROFILE\.claude\plugins\marketplaces\hiivmind-corpus-*" 
 
 ---
 
+### Discover Embedded Corpus
+
+**Algorithm:**
+1. Check if `.hiivmind/corpus/config.yaml` exists in the current repo
+2. If exists, this is an embedded corpus
+3. Extract corpus name from `config.yaml`'s `corpus.name` field (required for embedded corpora since the directory is always `corpus/`)
+
+**Using bash:**
+```bash
+if [ -f ".hiivmind/corpus/config.yaml" ]; then
+    echo "embedded|$(yq '.corpus.name' .hiivmind/corpus/config.yaml 2>/dev/null || grep 'name:' .hiivmind/corpus/config.yaml | head -1 | sed 's/.*name: *//' | tr -d '"')|.hiivmind/corpus/"
+fi
+```
+
+**Using Claude tools:**
+```
+Glob: .hiivmind/corpus/config.yaml
+```
+If found, read config.yaml to extract `corpus.name`.
+
+---
+
 ### Discover All Corpora
 
 **Algorithm:**
-1. Run all four discovery methods
+1. Run all five discovery methods (user-level, repo-local, marketplace-multi, marketplace-single, embedded)
 2. Combine results
 3. Deduplicate if necessary (same corpus could appear in multiple locations)
 
@@ -245,6 +268,13 @@ discover_all() {
         ls "$d"/hiivmind-corpus-*/ >/dev/null 2>&1 && continue
         has_config "$d" && echo "marketplace-single|$(basename "$d")|$d"
     done
+
+    # Embedded corpus
+    if [ -f ".hiivmind/corpus/config.yaml" ]; then
+        local name
+        name=$(yq '.corpus.name' .hiivmind/corpus/config.yaml 2>/dev/null || grep 'name:' .hiivmind/corpus/config.yaml | head -1 | sed 's/.*name: *//' | tr -d '"')
+        echo "embedded|$name|.hiivmind/corpus/"
+    fi
 }
 ```
 
