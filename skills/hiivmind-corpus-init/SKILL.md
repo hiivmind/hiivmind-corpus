@@ -50,6 +50,25 @@ hiivmind-corpus-{name}/
 
 ---
 
+## Embedded Mode Detection
+
+Before collecting project info, check if the user wants an embedded corpus:
+
+**Detection heuristic:** If the current working directory is a git repo with documentation-like content, offer embedded mode:
+
+1. Check: is this a git repo? (`git rev-parse --show-toplevel`)
+2. Check for doc indicators: `.obsidian/` directory, `docs/` folder, or 10+ `.md` files at root
+3. If indicators found, ask:
+
+> "This looks like a documentation repository. Would you like to:
+> (A) Create an embedded corpus at `.hiivmind/corpus/` that indexes this repo's own content
+> (B) Create a standalone corpus in a new repository"
+
+If user chooses (A), skip to Phase 4-embedded below.
+If user chooses (B), continue with standard flow.
+
+---
+
 ## Phase 1: Collect Project Name
 
 **Inputs:** invocation arguments (optional `source_url`, optional `corpus_name`)
@@ -229,6 +248,98 @@ Immediately invoke `hiivmind-corpus-add-source` with:
 - `working_directory`: `computed.corpus_root`
 
 Set `computed.delegated_to_add_source = true`. Init is complete.
+
+---
+
+## Phase 4-embedded: Scaffold Embedded Corpus
+
+**Inputs:** `computed.corpus_name`, `computed.display_name`, `computed.keywords`
+**Outputs:** `computed.corpus_root`, files on disk
+
+Create the embedded corpus at `.hiivmind/corpus/`:
+
+```bash
+mkdir -p .hiivmind/corpus
+```
+
+### 4e-1: Detect docs_root
+
+Suggest `docs_root` based on repo structure:
+- If `docs/` directory exists → suggest `"docs"`
+- If `.obsidian/` exists (Obsidian vault) → suggest `"."`
+- Otherwise → suggest `"."`
+
+Confirm with user: "What directory contains the documentation? (default: {suggestion})"
+
+### 4e-2: config.yaml
+
+Write `.hiivmind/corpus/config.yaml` using the full schema from `config-yaml-formatting.md`, with these differences:
+- `sources` is pre-populated with a `type: self` entry (NOT empty)
+- `settings.exclude_patterns` includes `.hiivmind/**`
+
+```yaml
+schema_version: 2
+
+corpus:
+  name: "{name}"
+  display_name: "{Display Name}"
+  keywords:
+    - "{keyword1}"
+    - "{keyword2}"
+  created_at: null
+
+sources:
+  - id: "{source_id}"
+    type: "self"
+    docs_root: "{docs_root}"
+    last_commit_sha: null
+    last_indexed_at: null
+
+index:
+  format: "markdown"
+  last_updated_at: null
+
+settings:
+  include_patterns:
+    - "**/*.md"
+    - "**/*.mdx"
+  exclude_patterns:
+    - "**/_*.md"
+    - "**/_snippets/**"
+    - ".hiivmind/**"
+```
+
+### 4e-3: index.md
+
+Write `.hiivmind/corpus/index.md` using the same placeholder template as standard init.
+
+### 4e-4: .gitignore
+
+Minimal or empty — embedded corpora commit everything (no `.source/`, `.cache/`, `uploads/`).
+
+### 4e-5: Verify
+
+Verify these exist:
+- `.hiivmind/corpus/config.yaml`
+- `.hiivmind/corpus/index.md`
+
+### 4e-6: Skip add-source delegation
+
+Embedded corpora do NOT delegate to add-source. The `type: self` source is already configured. Display:
+
+```
+Embedded corpus '{name}' initialized at .hiivmind/corpus/
+
+Files created:
+  .hiivmind/corpus/config.yaml
+  .hiivmind/corpus/index.md
+
+Source: this repository (docs_root: {docs_root})
+
+Next: Run hiivmind-corpus-build to create the index.
+```
+
+Done — do NOT invoke add-source.
 
 ---
 

@@ -183,8 +183,9 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `discovery.md` | Find installed corpora | Location types, scanning algorithms |
 | `status.md` | Check corpus freshness | Index status, SHA comparison |
 | `paths.md` | Resolve paths | Source reference parsing, path resolution |
-| `sources/` | Git/local/web/llms-txt operations | Per-type patterns (git, local, web, generated-docs, llms-txt) |
+| `sources/` | Git/local/web/llms-txt/self operations | Per-type patterns (git, local, web, generated-docs, llms-txt, self) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
+| `freshness.md` | SHA-gated freshness | Read-time checks, CI refresh, stale flagging |
 
 **How skills use patterns:**
 
@@ -220,6 +221,7 @@ Using bash with yq:
 - **Cross-platform**: Works on Linux, macOS, and Windows with appropriate tool fallbacks
 - **Forked context execution**: Navigate skills run in isolated sub-agent (`context: fork`) to keep main conversation clean (ADR-007)
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
+- **Embedded corpora**: Documentation repos can contain their own corpus at `.hiivmind/corpus/`, powered by `type: self` sources — see spec at `docs/superpowers/specs/2026-03-25-embedded-corpus-design.md`
 
 ## Index Format
 
@@ -262,11 +264,12 @@ These features span multiple skills and must stay synchronized:
 | Feature | Relevant Skills | What to Check |
 |---------|-----------------|---------------|
 | Tiered indexes | build, enhance, refresh | Detection logic, update handling |
-| Source types (git/local/web/generated-docs/llms-txt) | add-source, build, enhance, refresh | Path formats, fetch methods |
+| Source types (git/local/web/generated-docs/llms-txt/self) | add-source, build, enhance, refresh | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
 | Project awareness | init, navigate command (template) | Template exists, command help mentions it |
 | Config schema | all skills | Schema fields, validation |
-| Discovery locations | discover, navigate, gateway command | All 4 location types scanned consistently |
+| Discovery locations | discover, navigate, gateway command | All 5 location types scanned consistently (including embedded at `.hiivmind/corpus/`) |
+| Embedded corpora | init, discover, navigate, build, refresh, status, add-source, enhance, source-scanner | `type: self` source type, `.hiivmind/corpus/` discovery, `docs_root` normalization |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
 | Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
 | Entry keywords | enhance, refresh, navigate (template) | Keyword line format, search logic, preserve on refresh |

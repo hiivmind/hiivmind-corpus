@@ -29,7 +29,7 @@ tools: ["Read", "Glob", "Grep", "Bash"]
 You are a documentation source scanner. Your job is to analyze a single documentation source and return a structured report.
 
 **Input:** You will receive:
-- Source type (git, local, or web)
+- Source type (git, local, web, or self)
 - Source ID
 - Source configuration (repo URL, docs root, etc.)
 - Corpus root path
@@ -40,6 +40,7 @@ You are a documentation source scanner. Your job is to analyze a single document
    - Git: Check `.source/{source_id}/` exists or report missing
    - Local: Check `data/uploads/{source_id}/` exists
    - Web: Check `.cache/web/{source_id}/` exists
+   - Self: Verify repo root exists and `docs_root` is accessible. Get repo root via `git rev-parse --show-toplevel`
 
 2. **Scan for documentation files**
    - Count total files (.md, .mdx)
@@ -185,6 +186,7 @@ extraction:
 | web | `.cache/web/{source_id}/` |
 | obsidian (git) | `.source/{source_id}/` |
 | obsidian (local) | `{vault_path}/` |
+| self | `{repo_root}/{docs_root}/` (docs_root `"."` normalized to empty, repo_root from `git rev-parse --show-toplevel`) |
 
 **Large File Grep Pattern Suggestions:**
 

@@ -27,13 +27,16 @@ Manage documentation sources: git repositories, local uploads, web content, and 
 | `generated-docs` | `.source/{id}/` + `.cache/web/{id}/` | Git SHA | Live WebFetch | CLI manuals, API docs | frontmatter |
 | `llms-txt` | `.cache/llms-txt/{id}/` | Manifest hash | Cached markdown | Sites with llms.txt | none |
 | `obsidian` | `.source/{id}/` (git) or direct path (local) | SHA / timestamp | Local files | Obsidian vaults | wikilinks, frontmatter, tags |
+| `self` | repo root (via `docs_root`) | Scoped SHA | Local files | Embedded corpus in own repo | frontmatter, tags |
 
 ## When to Use Each Type
 
 ```
-Is it an Obsidian vault (has `.obsidian/` directory)?
-├─ Yes → obsidian source
-└─ No: Is the documentation in a git repository?
+Is the corpus embedded in the source repo (.hiivmind/corpus/ exists)?
+├─ Yes → self source
+└─ No: Is it an Obsidian vault (has `.obsidian/` directory)?
+        ├─ Yes → obsidian source
+        └─ No: Is the documentation in a git repository?
         ├─ Yes: Is the repo the actual docs (markdown files)?
         │       ├─ Yes → git source
         │       └─ No (code generates docs) → generated-docs source
@@ -67,6 +70,7 @@ Pre-processing converts files into formats suitable for local sources. The split
 | `generated-docs.md` | Hybrid git+web, URL discovery, live fetch | ~220 |
 | `llms-txt.md` | Manifest parsing, hash detection, raw markdown caching | ~280 |
 | `obsidian.md` | Obsidian vault source pattern — wikilink resolution, vault conventions, extraction defaults | ~200 |
+| `self.md` | Embedded self-source — repo root path resolution, scoped SHA freshness, auto-exclusions | ~160 |
 | `pdf.md` | PDF pre-processing, chapter detection, splitting | ~180 |
 | `shared.md` | URL parsing, existence checks, errors | ~160 |
 
@@ -89,6 +93,9 @@ Pre-processing converts files into formats suitable for local sources. The split
 | Parse manifest structure | `llms-txt.md` | `parse_manifest()` |
 | Check manifest freshness | `llms-txt.md` | `check_freshness()` |
 | Check if source exists | `shared.md` | `exists_git_source()`, etc. |
+| Get self source SHA | `self.md` | `get_self_sha()` |
+| Check self freshness | `self.md` | `check_self_freshness()` |
+| Get self file changes | `self.md` | `get_self_changes()` |
 
 ---
 

@@ -39,6 +39,8 @@ No corpus registry found. Register a corpus first:
 2. Parse registered corpora
 3. Build in-memory corpus index
 
+> **Embedded corpora:** If `.hiivmind/corpus/config.yaml` exists in the current repo, it is available for navigation without registry registration. Treat it as an additional corpus alongside registry entries.
+
 ```yaml
 # Registry structure
 corpora:
@@ -110,6 +112,17 @@ If `INDEXED_SHA` differs from `CURRENT_SHA`, include a note in the response:
 > Note: this corpus was indexed at {short_sha}, source is now at {current_short_sha}. Consider running `/hiivmind-corpus refresh`.
 
 If the check fails (network error, permissions, non-git source) → skip silently and proceed.
+
+> **Self sources:** Use local `git log` instead of `gh api`:
+> ```bash
+> DOCS_ROOT=$(yq '.sources[] | select(.type == "self") | .docs_root // "."' config.yaml)
+> [ "$DOCS_ROOT" = "." ] && DOCS_ROOT=""
+> if [ -n "$DOCS_ROOT" ]; then
+>   CURRENT_SHA=$(git log -1 --format=%H -- "$DOCS_ROOT")
+> else
+>   CURRENT_SHA=$(git log -1 --format=%H)
+> fi
+> ```
 
 > **Multi-source corpora:** The example above checks `sources[0]` only. For multi-source corpora, repeat for each source or check only the primary source.
 
@@ -277,6 +290,21 @@ prompt: "Return the documentation content"
 ```
 Read: .corpus-cache/{corpus_id}/.source/{source_id}/{path}
 ```
+
+**Self source (embedded corpus):**
+
+For `type: self` sources, read files directly from the repo:
+
+```
+# Resolve path
+docs_root = source.docs_root (normalize "." to "")
+file_path = {repo_root}/{docs_root}/{relative_path}
+
+# Read directly
+Read: {file_path}
+```
+
+No cloning, no remote fetch, no `gh api` call needed. The file is already local.
 
 ### Phase 6: Present Answer
 

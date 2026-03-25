@@ -72,6 +72,13 @@ If not found, suggest running `hiivmind-corpus-init` and `hiivmind-corpus-add-so
 - Verify cached pages are present
 - If empty, suggest fetching content first
 
+**Self source:**
+- Get repo root: `git rev-parse --show-toplevel`
+- Normalize `docs_root`: if `"."`, treat as repo root
+- Verify repo root exists and is accessible
+- No cloning or fetching needed — files are read directly from repo
+- Note: `.hiivmind/` is auto-excluded during scanning (see `lib/corpus/patterns/sources/self.md`)
+
 Display: "Sources prepared: {count} ready, {skipped} skipped"
 
 ---
@@ -115,6 +122,10 @@ ${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md § "Source-Scanner Extra
 Additionally, for each documentation file, include entry metadata in your output:
 path, title, summary, tags, keywords, category, content_type, size, grep_hint, headings.
 See ${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md § "Entry Metadata Generation" for field details.
+{if type is "self"}
+For self sources: scan from repo root {repo_root}/{docs_root}. Auto-exclude .hiivmind/ directory.
+The repo root is: {output of git rev-parse --show-toplevel}
+{end if}
 ```
 
 Launch ALL tasks in a single response for parallel execution. Aggregate results.

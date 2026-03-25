@@ -237,6 +237,32 @@ prompt: "Extract just the SHA value from the response"
 
 Compare with tracked commit in corpus config.
 
+### Self Sources
+
+Self sources use local `git log` instead of remote API calls:
+
+```bash
+# Get current scoped SHA
+DOCS_ROOT=$(yq '.sources[] | select(.type == "self") | .docs_root // "."' config.yaml)
+[ "$DOCS_ROOT" = "." ] && DOCS_ROOT=""
+
+if [ -n "$DOCS_ROOT" ]; then
+    current=$(git log -1 --format=%H -- "$DOCS_ROOT")
+else
+    current=$(git log -1 --format=%H)
+fi
+
+tracked=$(yq -r '.sources[] | select(.type == "self") | .last_commit_sha' config.yaml)
+
+if [ "$current" = "$tracked" ]; then
+    echo "current"
+else
+    echo "stale"
+fi
+```
+
+No network required — purely local check.
+
 ## Error Handling
 
 **Registry not found:**

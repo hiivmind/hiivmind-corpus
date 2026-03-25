@@ -16,6 +16,13 @@ Discover and analyze documentation files within sources. Detect frameworks, find
 - **Paths** (see `paths.md`) - Know where source files are located
 - Source is cloned or uploaded
 
+### Self Source Auto-Exclusions
+
+When scanning a `type: self` source, always exclude the corpus's own directory:
+- `.hiivmind/**` — corpus config, index, and metadata files
+
+This is in addition to the standard `exclude_patterns` from config.yaml.
+
 ---
 
 ## File Discovery

@@ -44,7 +44,19 @@ Registry corpora are data-only repositories accessed via GitHub or local paths.
 
 **See:** `lib/corpus/patterns/registry-loading.md` for registry schema and loading.
 
-### 2. Legacy Plugin Locations (Backward Compatibility)
+### 2. Embedded Corpus (Local Repo)
+
+Check `.hiivmind/corpus/config.yaml` in the current repo:
+
+```
+Read: .hiivmind/corpus/config.yaml
+```
+
+If it exists and contains `corpus.name`, this is an embedded corpus. Extract `corpus.name`, `corpus.display_name`, `corpus.keywords` directly.
+
+Name derivation: use `corpus.name` field (required for embedded corpora since the directory is always `corpus/`).
+
+### 3. Legacy Plugin Locations (Backward Compatibility)
 
 Scan these locations for plugin-based corpora:
 
@@ -101,6 +113,12 @@ Before discovery, check tool availability (see `lib/corpus/patterns/tool-detecti
 - Required for reading corpus config metadata
 
 ### Step 2: Discover All Corpora
+
+**Embedded corpus (local check):**
+```
+Glob: .hiivmind/corpus/config.yaml
+```
+If found, read it to extract corpus metadata. This is faster than the legacy plugin scan.
 
 Scan each location for `hiivmind-corpus-*/` directories with `data/config.yaml`:
 
@@ -252,6 +270,7 @@ Determine corpus type based on its location:
 | `.claude-plugin/skills/hiivmind-corpus-*` | `repo-local` |
 | `~/.claude/plugins/marketplaces/hiivmind-corpus-*` (root has plugin.json) | `marketplace-single` |
 | `~/.claude/plugins/marketplaces/*/hiivmind-corpus-*` | `marketplace-multi` |
+| `.hiivmind/corpus/` (has config.yaml) | `embedded` |
 
 ## Corpus Path Resolution
 
@@ -275,6 +294,14 @@ hiivmind-corpus-{project}/
     ├── config.yaml
     └── index.md
 ```
+
+**Embedded corpus:**
+```
+.hiivmind/corpus/
+├── config.yaml
+└── index.md
+```
+Note: No `data/` subdirectory — embedded corpora are always data-only format with files at the corpus root.
 
 Adjust file lookups based on type.
 

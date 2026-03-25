@@ -13,8 +13,10 @@ Detect whether a corpus index is current with its upstream sources. Operates at 
 
 ## Prerequisites
 
-- `config.yaml` with `sources[].last_commit_sha`, `sources[].repo_owner`, `sources[].repo_name`, `sources[].branch`
-- `gh` CLI authenticated
+- `config.yaml` with `sources[].last_commit_sha`
+  - For `git`/`generated-docs`: also needs `repo_owner`, `repo_name`, `branch`
+  - For `self`: uses local `git log` (no remote needed)
+- `gh` CLI authenticated (not required for self sources)
 - `yq` 4.0+ (mikefarah/yq)
 
 ---
@@ -46,6 +48,34 @@ fi
 | SHAs differ | Warn user: corpus indexed at `{short_sha}`, source now at `{current_short_sha}`. Suggest refresh. Proceed with cached index |
 | Check fails (network, permissions) | Skip silently — do not block navigate |
 
+### Self Source Navigate Freshness Check
+
+Self sources use local `git log` instead of `gh api` since the source is the current repo:
+
+```bash
+DOCS_ROOT=$(yq '.sources[] | select(.type == "self") | .docs_root // "."' config.yaml)
+INDEXED_SHA=$(yq '.sources[] | select(.type == "self") | .last_commit_sha' config.yaml)
+
+# Normalize "." to empty for git log scoping
+[ "$DOCS_ROOT" = "." ] && DOCS_ROOT=""
+
+if [ -n "$DOCS_ROOT" ]; then
+  CURRENT_SHA=$(git log -1 --format=%H -- "$DOCS_ROOT")
+else
+  CURRENT_SHA=$(git log -1 --format=%H)
+fi
+
+if [ "$CURRENT_SHA" != "$INDEXED_SHA" ]; then
+  # Warn: corpus was indexed at {short_sha}, repo is now at {current_short_sha}
+fi
+```
+
+| Condition | Behavior |
+|-----------|----------|
+| SHAs match | Proceed silently |
+| SHAs differ | Warn user, suggest refresh |
+| Not a git repo | Skip silently |
+
 ### What Navigate Does NOT Do
 
 - Does not trigger refresh — only suggests it
@@ -65,6 +95,7 @@ The CI workflow performs a full differential refresh when the source has changed
 2. Compare config.yaml last_commit_sha against current source SHA via gh api
 3. If unchanged → exit (no work)
 4. If changed → compute file diff between old and new SHA
+   > **Self sources:** Replace `gh api` SHA lookup with `git log -1 --format=%H -- {docs_root}`. File diff uses `git diff {old_sha}..{new_sha} -- {docs_root}`.
 5. For each added file:
    - Add entry to index.yaml with stale: true and placeholder metadata:
      - id: "{source_id}:{path}"
