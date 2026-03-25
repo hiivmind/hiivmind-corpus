@@ -229,6 +229,7 @@ Examples:
 - `polars:reference/expressions.md` → Git source "polars", file at `reference/expressions.md`
 - `local:team-docs/coding-guidelines.md` → Local source "local", file at `team-docs/coding-guidelines.md`
 - `web:kent-blog/testing-article.md` → Web source "web", cached file
+- `vault:notes/architecture.md` → Self source "vault", file at `notes/architecture.md` (resolved relative to repo root)
 
 ---
 
@@ -332,6 +333,7 @@ Given a source reference like `polars:reference/hooks.md`, resolve to actual fil
    - `git`: `{corpus}/.source/{source_id}/{docs_root}/{relative_path}`
    - `local`: `{corpus}/uploads/{source_id}/{relative_path}` (data-only) or `{corpus}/data/uploads/{source_id}/{relative_path}` (legacy)
    - `web`: `{corpus}/.cache/web/{source_id}/{filename}`
+   - `self`: `{repo_root}/{docs_root}/{relative_path}` (docs_root `"."` normalized to empty)
 
 **Using bash (with yq):**
 ```bash
@@ -375,6 +377,17 @@ resolve_source_ref() {
         web)
             echo "$corpus_path/.cache/web/$source_id/$relative_path"
             ;;
+        self)
+            # Normalize "." to empty
+            [ "$docs_root" = "." ] && docs_root=""
+            local repo_root
+            repo_root=$(git -C "$corpus_path" rev-parse --show-toplevel 2>/dev/null || echo "$corpus_path/../..")
+            if [ -n "$docs_root" ]; then
+                echo "$repo_root/$docs_root/$relative_path"
+            else
+                echo "$repo_root/$relative_path"
+            fi
+            ;;
     esac
 }
 ```
@@ -412,6 +425,15 @@ elif source_type == 'local':
     print(f'{uploads_base}/{source_id}/{relative_path}')
 elif source_type == 'web':
     print(f'{corpus_path}/.cache/web/{source_id}/{relative_path}')
+elif source_type == 'self':
+    docs_root = source.get('docs_root', '.')
+    if docs_root == '.':
+        docs_root = ''
+    repo_root = os.popen(f'git -C {corpus_path} rev-parse --show-toplevel 2>/dev/null').read().strip() or os.path.join(corpus_path, '..', '..')
+    if docs_root:
+        print(f'{repo_root}/{docs_root}/{relative_path}')
+    else:
+        print(f'{repo_root}/{relative_path}')
 "
 ```
 
