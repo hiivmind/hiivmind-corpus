@@ -72,7 +72,9 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
 │   ├── hiivmind-corpus-navigate/     # Global navigation across all corpora
 │   ├── hiivmind-corpus-register/     # Register corpus with project
-│   └── hiivmind-corpus-status/       # Check corpus health and freshness
+│   ├── hiivmind-corpus-status/       # Check corpus health and freshness
+│   ├── hiivmind-corpus-graph/        # View, validate, edit concept graphs
+│   └── hiivmind-corpus-bridge/       # Cross-corpus concept bridges
 │
 ├── agents/                           # Agent definitions for parallel operations
 │   └── source-scanner.md             # Parallel scanning of documentation sources
@@ -166,7 +168,7 @@ hiivmind-corpus-{project}/
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
 - Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`
-- Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`
+- Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`, `hiivmind-corpus-graph`, `hiivmind-corpus-bridge`
 - Gateway command: `/hiivmind-corpus`
 - Generated corpora: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-flyio`, `hiivmind-corpus-polars`)
 
@@ -222,6 +224,7 @@ Using bash with yq:
 - **Forked context execution**: Navigate skills run in isolated sub-agent (`context: fork`) to keep main conversation clean (ADR-007)
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
 - **Embedded corpora**: Documentation repos can contain their own corpus at `.hiivmind/corpus/`, powered by `type: self` sources — see spec at `docs/superpowers/specs/2026-03-25-embedded-corpus-design.md`
+- **Cross-corpus bridges**: Projects with 2+ registered corpora can create concept bridges in `registry-graph.yaml`, with query-routing aliases — see spec at `docs/superpowers/specs/2026-03-26-graph-editing-and-bridge-design.md`
 
 ## Index Format
 
@@ -270,6 +273,7 @@ These features span multiple skills and must stay synchronized:
 | Config schema | all skills | Schema fields, validation |
 | Discovery locations | discover, navigate, gateway command | All 5 location types scanned consistently (including embedded at `.hiivmind/corpus/`) |
 | Embedded corpora | init, discover, navigate, build, refresh, status, add-source, enhance, source-scanner | `type: self` source type, `.hiivmind/corpus/` discovery, `docs_root` normalization |
+| Cross-corpus bridges | bridge, navigate, graph, discover | registry-graph.yaml schema, Tier 4 traversal, alias routing, graph.yaml prerequisite |
 | Corpus status detection | discover, navigate, gateway command | placeholder/built/stale logic |
 | Parallel scanning | build, refresh, source-scanner agent | Multi-source detection, agent invocation |
 | Entry keywords | enhance, refresh, navigate (template) | Keyword line format, search logic, preserve on refresh |
