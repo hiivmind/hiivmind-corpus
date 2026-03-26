@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -176,9 +176,7 @@ def strip_headers_footers(
 
         # Skip header zone
         if y_pos <= header_zone_top:
-            if header_pattern and re.search(header_pattern, block.text):
-                continue
-            elif y_pos <= header_zone_top:
+            if header_pattern is None or re.search(header_pattern, block.text):
                 continue
 
         result.append(block)
