@@ -61,6 +61,10 @@ If not found, suggest running `hiivmind-corpus-init` and `hiivmind-corpus-add-so
 - Check if `uploads/{source_id}/` directory exists
 - Verify it contains at least one file (`.md`, `.mdx`, or `.pdf`)
 - If empty, warn user and ask whether to continue or skip this source
+- Note: `.md` files may contain YAML frontmatter with `tags`, `headings`, and provenance
+  metadata produced by the PDF extraction pipeline (see `lib/corpus/patterns/sources/pdf.md`).
+  During scanning, extract `tags` and `headings` from frontmatter when present to enrich
+  index entries rather than deriving them solely from file content.
 
 **Web source:**
 - Check if `.cache/web/{source_id}/` directory exists

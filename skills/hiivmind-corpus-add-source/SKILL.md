@@ -112,14 +112,13 @@ re-enter the detection flow above.
 
 If the URL/path ends with `.pdf`:
 
-1. Check if `pymupdf` is installed (`python -c "import pymupdf"`)
-2. If available:
-   - Run chapter detection per `lib/corpus/patterns/sources/pdf.md` § "Detect Chapters"
-   - If chapters found, ask: "Split into chapters? (Recommended for large PDFs) / Keep as single file"
-   - If user wants split → execute split per pdf.md § "Split PDF"
-3. If pymupdf missing:
-   - Ask: "PDF splitting requires pymupdf. Add as single file? / Cancel (I'll install pymupdf first)"
-4. After split (or if no split), configure as a `local` source
+1. Use the three-stage extraction pipeline from `lib/corpus/patterns/sources/pdf.md`:
+   - LLM inspects the PDF to produce an extraction profile
+   - LLM writes a bespoke extraction script using `pdf_utils.py` building blocks
+   - Run the script to produce markdown files in `uploads/{source_id}/`
+2. After extraction completes, configure as a `local` source referencing the `.md` output files
+3. Check if `pymupdf` is installed (`python -c "import pymupdf"`) before running — if missing, prompt:
+   - "PDF extraction requires pymupdf. Install it? / Cancel (I'll install pymupdf first)"
 
 ---
 

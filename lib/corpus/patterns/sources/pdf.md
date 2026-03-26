@@ -1,242 +1,151 @@
-# Pattern: PDF Pre-Processing
+# Pattern: PDF-to-Markdown Extraction
 
-PDF documents require splitting before corpus import. This is a pre-processing step - the resulting chapters become a `local` source.
+PDF documents are extracted to markdown with YAML frontmatter and wikilinks via a three-stage pipeline. The output files become a `local` source.
 
 ## When to Use
 
-- User provides a `.pdf` file
-- PDF has multiple chapters (detected via TOC or text patterns)
-- Large PDFs (> ~50 pages) benefit from chapter-based indexing
-- PDF contains structured content (books, manuals, technical specs)
+- User provides a `.pdf` file (book, manual, technical spec)
+- PDF has structured content with chapters, sections, code examples
+- Content will benefit from being Grep-searchable with metadata
 
-## Tool Location
+## Pipeline Overview
 
-`lib/corpus/tools/split_pdf.py`
+```
+Stage 1: LLM Inspection
+    Source PDF → extraction-profile.yaml
+
+Stage 2: LLM writes bespoke extraction script
+    extraction-profile.yaml + pdf_utils.py → tools/extract_{source}.py
+    tools/extract_{source}.py + Source PDF → *.md files with frontmatter
+
+Stage 3: LLM Cleanup (optional)
+    Spot-check generated markdown, fix edge cases
+```
+
+## Stage 1: LLM Inspection
+
+Read sample pages from the source PDF to discover formatting patterns. Produce an extraction profile YAML file.
+
+**What to discover:**
+
+| Pattern | How to Find |
+|---------|-------------|
+| Font → heading mapping | Compare font sizes across chapter titles, section headers, body text |
+| Code block detection | Identify monospace font name and size |
+| Callout conventions | Look for Note/Tip/Caution formatting (bold keyword, boxed, indented) |
+| Cross-reference patterns | Find "Chapter N", "page NNN", "see X on page Y" text |
+| Table styles | Check if pymupdf native table extraction works |
+| Running headers/footers | Identify repeated text at page margins |
+| Chapter boundaries | Check for TOC bookmarks; if absent, identify chapter-start font patterns |
+| Book structure | Identify parts, chapters, appendixes; note which sections to skip |
+| Significant diagrams | Note page number and write description (image extraction deferred) |
+
+**Output:** `tools/extraction-profile-{source_id}.yaml`
+
+**See:** `pdf-extraction-profile.md` for the full profile schema.
+
+## Stage 2: Bespoke Extraction Script
+
+The LLM writes a Python script specific to this source document. The script imports
+building blocks from `lib/corpus/tools/pdf_utils.py` and hardcodes document-specific
+configuration from the extraction profile.
+
+**Building blocks library:** `lib/corpus/tools/pdf_utils.py`
 
 **Requirements:** `pip install pymupdf`
 
-## Storage Location
+**Key building blocks:**
 
-Split chapters: `data/uploads/{source_id}/`
-Output format: Individual chapter PDFs + `manifest.json`
-
-## Operations
-
-### Check PDF Page Count
-
-**Using Python:**
 ```python
-import pymupdf
-doc = pymupdf.open(input_path)
-page_count = len(doc)
-doc.close()
+from lib.corpus.tools.pdf_utils import (
+    # Document analysis
+    open_pdf, get_toc, get_page_count,
+    # Text extraction
+    extract_text_blocks, strip_headers_footers,
+    # Chapter detection
+    detect_chapters_from_toc, detect_chapters_from_fonts,
+    # Markdown emission
+    emit_heading, emit_code_block, emit_table, emit_callout, emit_frontmatter,
+    # Cross-references
+    find_cross_references, resolve_cross_ref, make_wikilink,
+    # File output
+    write_chapter_markdown, sanitize_filename,
+)
 ```
 
-**Using bash with pdfinfo (if available):**
-```bash
-pdfinfo "$input_path" | grep "Pages:" | awk '{print $2}'
-```
-
----
-
-### Detect Chapters
-
-Detect chapter boundaries from TOC bookmarks or text patterns.
-
-**Using the split tool:**
-```bash
-python -m lib.corpus.tools.split_pdf detect book.pdf
-python -m lib.corpus.tools.split_pdf detect book.pdf -l 2  # Level 2 (sections)
-```
-
-**Output example:**
-```
-Detected 12 chapters in book.pdf:
-
-    #  Title                                          Pages         Size
-  ---  --------------------------------------------- ---------- ------------
-    1  Introduction                                      1-15       15 pages
-    2  Getting Started                                  16-42       27 pages
-    3  Core Concepts                                    43-89       47 pages
-  ...
-```
-
-**Detection methods:**
-1. **TOC/Bookmarks** (preferred): Most PDFs with chapters have embedded bookmarks
-2. **Text patterns** (fallback): Searches for "Chapter X" patterns on page starts
-
----
-
-### Split into Chapters
-
-Execute the split, creating individual chapter PDFs and a manifest.
-
-**Using the split tool:**
-```bash
-# With confirmation prompt
-python -m lib.corpus.tools.split_pdf split book.pdf
-
-# To specific directory
-python -m lib.corpus.tools.split_pdf split book.pdf -o data/uploads/programming-book
-
-# Skip confirmation
-python -m lib.corpus.tools.split_pdf split book.pdf --yes -o data/uploads/programming-book
-```
+**Script characteristics:**
+- Lives in the corpus: `tools/extract_{source}.py`
+- Hardcodes document-specific config (fonts, patterns, skip ranges)
+- Runs once to produce markdown files
+- Disposable — modify and re-run if extraction needs tweaking
 
 **Output structure:**
 ```
-data/uploads/programming-book/
-├── 01_Introduction.pdf
-├── 02_Getting_Started.pdf
-├── 03_Core_Concepts.pdf
-├── ...
-└── manifest.json
+uploads/{source_id}/
+├── {source}.pdf          # Original full PDF (authoritative copy)
+├── 01_Introduction.md
+├── 02_Getting_Started.md
+├── 03_Core_Concepts.md
+└── ...
 ```
 
----
+## Stage 3: LLM Cleanup (Optional)
 
-### Manifest Format
+Spot-check generated markdown for:
+- Misidentified code blocks
+- Broken table formatting
+- Unresolved cross-references
+- Diagram descriptions that need enrichment
 
-The split tool generates a `manifest.json` describing all chapters:
+## Output Format
 
-```json
-{
-  "source": "book.pdf",
-  "chapters": [
-    {
-      "index": 1,
-      "title": "Introduction",
-      "file": "01_Introduction.pdf",
-      "pages": "1-15"
-    },
-    {
-      "index": 2,
-      "title": "Getting Started",
-      "file": "02_Getting_Started.pdf",
-      "pages": "16-42"
-    }
-  ]
-}
-```
+Each markdown file has YAML frontmatter:
 
-This manifest can be used to:
-- Generate index entries automatically
-- Track original page numbers
-- Verify split completeness
-
----
-
-### Import via Local Source
-
-After splitting, add as a `local` source with the manifest-provided file list.
-
-**Config entry:**
 ```yaml
-- id: "{source_id}"
-  type: "local"
-  path: "uploads/{source_id}/"
-  description: "Split from {original_filename} ({N} chapters)"
-  files:
-    - "01_Introduction.pdf"
-    - "02_Getting_Started.pdf"
-    # ... from manifest
-  last_indexed_at: null
-```
-
-**Index entries:**
-```markdown
-## {Book Title} (from {source_id})
-
-- **Introduction** `{source_id}:01_Introduction.pdf` - Overview and motivation (pages 1-15)
-- **Getting Started** `{source_id}:02_Getting_Started.pdf` - Initial setup (pages 16-42)
-```
-
 ---
+source_document: "Full Book Title"
+source_id: "source-id"
+original_pdf: "source.pdf"
+chapter_number: 3
+chapter_title: "Chapter Title"
+part: "Part Name"
+page_range: "27-44"
+headings:
+  - "Section 1"
+  - "Section 2"
+tags:
+  - tag1
+  - tag2
+links_to:
+  - target: "other_chapter_filename"
+    context: "Chapter N, Title"
+---
+```
+
+**Wikilink conventions:**
+- Same book: `[[16_Scopes_of_Macro_Variables|Scopes of Macro Variables]]`
+- Cross book: `[[source-id:filename|Display Text]]`
 
 ## Integration with Add-Source Workflow
 
 When the add-source skill detects a PDF file:
 
-1. **Check file size/page count**
-   - Small PDFs (< 50 pages): Offer to add directly as local source
-   - Large PDFs: Suggest chapter splitting
+1. **Check file size** — small PDFs (< 20 pages) can be added directly as a local source
+2. **Run LLM inspection** — read sample pages, produce extraction profile
+3. **Write bespoke script** — LLM composes extraction script using pdf_utils building blocks
+4. **Execute extraction** — run the script to produce markdown files
+5. **Configure as local source** — add source entry to config.yaml referencing `.md` files
+6. **Build index** — frontmatter tags and headings feed into index generation
 
-2. **Detect chapters**
-   - Run `detect` command to show proposed splits
-   - Show chapter count and page ranges to user
+## Deferred Features
 
-3. **User decision**
-   - Accept proposed splits → proceed to split
-   - Decline → add as single local file
-   - Adjust level (use `-l 2` for sections instead of chapters)
-
-4. **Execute split**
-   - Run `split` command with user-confirmed settings
-   - Chapters saved to `data/uploads/{source_id}/`
-
-5. **Configure as local source**
-   - Read manifest.json for file list
-   - Add source entry to config.yaml
-   - Files listed come from manifest
-
-6. **Offer indexing**
-   - Use manifest to suggest index entries
-   - Include original page ranges in descriptions
-
----
-
-## Usage Notes
-
-- **PDF is NOT a source type** - it's a pre-processing step before `local` source
-- Split PDFs are treated the same as any other local uploads
-- The manifest.json is for human reference and index generation, not runtime config
-- Chapter splitting only makes sense for structured documents (books, manuals)
-- For PDFs without TOC, the tool attempts text-based chapter detection
-- If no chapters detected, user should add the PDF as a single local file
-
-## Handling PDFs Without Chapters
-
-If `detect` finds no chapters:
-
-```
-No chapters detected in document.pdf
-
-Possible reasons:
-  - The PDF has no bookmarks/TOC
-  - No entries at the requested level (-l option)
-  - Chapter text patterns not recognized
-
-Consider specifying manual page ranges or adding bookmarks first.
-```
-
-**Options:**
-1. Add as single local file (no splitting)
-2. User manually defines page ranges (future enhancement)
-3. User adds bookmarks to PDF externally and re-runs
-
----
-
-### Extraction Support
-
-PDF sources have minimal extraction support. PDFs are converted to text and lack native markdown features. Extraction is available but unlikely to produce useful results.
-
-**Default extraction config:**
-
-```yaml
-extraction:
-  wikilinks: false      # PDFs do not contain wikilinks
-  frontmatter: false    # PDFs do not have YAML frontmatter
-  tags: false           # No hashtag convention in PDF content
-  dataview: false       # Not applicable
-```
-
-To override defaults: add `extraction:` block to the source entry in config.yaml.
-
-**See:** [../extraction.md](../extraction.md) for full pipeline documentation
+- **Image extraction:** Currently description-only. Future enhancement to extract images
+  as files and generate alt-text descriptions. Track in the extraction profile under
+  `images.handling: "description_only"`.
 
 ## Related Patterns
 
-- `local.md` - Where split chapters are stored
-- `../scanning.md` - File discovery after splitting
-- `shared.md` - Path utilities
-- [../extraction.md](../extraction.md) — Cross-cutting extraction pipeline
+- `local.md` — Where output markdown files are stored
+- `pdf-extraction-profile.md` — Extraction profile schema
+- `../scanning.md` — File discovery after extraction
+- `shared.md` — Path utilities

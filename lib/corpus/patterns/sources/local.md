@@ -62,19 +62,17 @@ count_local_files() {
 
 ## PDF Document Handling
 
-For large PDF files with chapters, see `pdf.md` for splitting into smaller files before adding as a local source.
-
-**When to split:**
-- PDFs with 50+ pages
-- Documents with TOC/bookmarks (books, manuals)
-- Content that benefits from chapter-level indexing
+For PDF files, use the three-stage extraction pipeline to produce markdown with
+YAML frontmatter and wikilinks. See `pdf.md` for the full pipeline.
 
 **Workflow:**
-1. Detect chapters: `python -m lib.corpus.tools.split_pdf detect book.pdf`
-2. Split with confirmation: `python -m lib.corpus.tools.split_pdf split book.pdf -o data/uploads/{source_id}`
-3. Add as local source using files from `manifest.json`
+1. LLM inspects source PDF → extraction profile
+2. LLM writes bespoke extraction script using `pdf_utils.py` building blocks
+3. Run script → markdown files in `uploads/{source_id}/`
+4. Add as local source referencing `.md` files
 
-Split chapters are stored in `data/uploads/{source_id}/` just like other local files.
+Output markdown files have YAML frontmatter with provenance metadata,
+headings, tags, and cross-reference wikilinks.
 
 ---
 
