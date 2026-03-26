@@ -121,3 +121,73 @@ def test_detect_chapters_from_toc_entries_filters_level():
     assert len(chapters) == 2
     assert chapters[0].title == "Part 1"
     assert chapters[1].title == "Part 2"
+
+
+def test_emit_heading():
+    from lib.corpus.tools.pdf_utils import emit_heading
+    assert emit_heading("Macro Variables", 1) == "# Macro Variables"
+    assert emit_heading("Using Macros", 3) == "### Using Macros"
+
+def test_emit_code_block():
+    from lib.corpus.tools.pdf_utils import emit_code_block
+    result = emit_code_block("%let x=1;", "sas")
+    assert result == "```sas\n%let x=1;\n```"
+
+def test_emit_code_block_no_language():
+    from lib.corpus.tools.pdf_utils import emit_code_block
+    result = emit_code_block("some output")
+    assert result == "```\nsome output\n```"
+
+def test_emit_table():
+    from lib.corpus.tools.pdf_utils import emit_table
+    result = emit_table(
+        headers=["Name", "Type"],
+        rows=[["SYSDATE", "Read-only"], ["SYSERR", "Read and Write"]],
+    )
+    assert "| Name | Type |" in result
+    assert "| SYSDATE | Read-only |" in result
+    assert "| --- | --- |" in result
+
+def test_emit_callout():
+    from lib.corpus.tools.pdf_utils import emit_callout
+    result = emit_callout("Only printable characters should be used.", "note")
+    assert result == "> **Note:** Only printable characters should be used."
+
+def test_emit_frontmatter():
+    from lib.corpus.tools.pdf_utils import emit_frontmatter
+    result = emit_frontmatter({"title": "Test", "tags": ["a", "b"]})
+    assert result.startswith("---\n")
+    assert result.endswith("---\n")
+    assert "title: Test" in result
+
+def test_make_wikilink():
+    from lib.corpus.tools.pdf_utils import make_wikilink
+    assert make_wikilink("16_Scopes", "Scopes of Macro Variables") == "[[16_Scopes|Scopes of Macro Variables]]"
+
+def test_find_cross_references():
+    from lib.corpus.tools.pdf_utils import find_cross_references
+    text = 'See Chapter 5, \u201cScopes of Macro Variables,\u201d on page 57.'
+    patterns = [
+        (r'Chapter (\d+), ["\u201c](.+?)["\u201d],? on page (\d+)', "chapter_reference"),
+    ]
+    refs = find_cross_references(text, patterns)
+    assert len(refs) == 1
+    assert refs[0].display_text == "Scopes of Macro Variables"
+    assert refs[0].page_number == 57
+
+def test_resolve_cross_ref():
+    from lib.corpus.tools.pdf_utils import resolve_cross_ref, CrossRef, ChapterBoundary
+    chapters = [
+        ChapterBoundary(1, "Intro", 0, 20),
+        ChapterBoundary(2, "Scopes", 20, 60),
+        ChapterBoundary(3, "Advanced", 60, 80),
+    ]
+    ref = CrossRef("see page 57", "section_reference", "Scopes", page_number=57)
+    result = resolve_cross_ref(ref, chapters, filename_pattern="{index:02d}_{title}")
+    assert result is not None
+    assert "Scopes" in result
+
+def test_sanitize_filename():
+    from lib.corpus.tools.pdf_utils import sanitize_filename
+    assert sanitize_filename("Chapter 3: Macro Variables!") == "Chapter_3_Macro_Variables"
+    assert len(sanitize_filename("A" * 100, max_length=50)) <= 50

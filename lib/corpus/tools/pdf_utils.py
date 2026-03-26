@@ -318,3 +318,143 @@ def detect_chapters_from_fonts(
             end_page=end,
         ))
     return chapters
+
+
+# ---------------------------------------------------------------------------
+# Markdown emission
+# ---------------------------------------------------------------------------
+
+def emit_heading(text: str, level: int) -> str:
+    """Emit a markdown heading."""
+    return f"{'#' * level} {text}"
+
+
+def emit_code_block(text: str, language: str = "") -> str:
+    """Emit a fenced code block."""
+    return f"```{language}\n{text}\n```"
+
+
+def emit_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Emit a markdown table."""
+    header_row = "| " + " | ".join(headers) + " |"
+    separator = "| " + " | ".join("---" for _ in headers) + " |"
+    data_rows = "\n".join("| " + " | ".join(row) + " |" for row in rows)
+    return f"{header_row}\n{separator}\n{data_rows}"
+
+
+def emit_callout(text: str, callout_type: str) -> str:
+    """Emit a blockquote-style callout."""
+    label = callout_type.capitalize()
+    return f"> **{label}:** {text}"
+
+
+def emit_frontmatter(metadata: dict[str, Any]) -> str:
+    """Emit YAML frontmatter block.
+
+    Uses simple serialization — no external YAML library required.
+    Handles strings, lists of strings, and lists of dicts.
+    """
+    lines = ["---"]
+    for key, value in metadata.items():
+        if isinstance(value, list):
+            lines.append(f"{key}:")
+            for item in value:
+                if isinstance(item, dict):
+                    first = True
+                    for k, v in item.items():
+                        prefix = "  - " if first else "    "
+                        lines.append(f"{prefix}{k}: {_yaml_quote(v)}")
+                        first = False
+                else:
+                    lines.append(f"  - {_yaml_quote(item)}")
+        else:
+            lines.append(f"{key}: {_yaml_quote(value)}")
+    lines.append("---")
+    return "\n".join(lines) + "\n"
+
+
+def _yaml_quote(value: Any) -> str:
+    """Quote a YAML value if it contains special characters."""
+    s = str(value)
+    if any(c in s for c in ":#{}[]|>&*!%@`"):
+        return f'"{s}"'
+    return s
+
+
+# ---------------------------------------------------------------------------
+# Cross-reference handling
+# ---------------------------------------------------------------------------
+
+def find_cross_references(text: str, patterns: list[tuple[str, str]]) -> list[CrossRef]:
+    """Find cross-references in text using regex patterns.
+
+    Args:
+        text: Document text to search.
+        patterns: List of (regex_pattern, ref_type) tuples.
+            Expected group layout:
+            - chapter_reference: (chapter_num, display_text, page_number)
+            - section_reference: (display_text, page_number)
+            - see_reference: (display_text, page_number)
+    """
+    refs = []
+    for pattern, ref_type in patterns:
+        for match in re.finditer(pattern, text):
+            groups = match.groups()
+            if ref_type == "chapter_reference" and len(groups) >= 3:
+                refs.append(CrossRef(
+                    original_text=match.group(0),
+                    ref_type=ref_type,
+                    display_text=groups[1].rstrip(",").strip(),
+                    page_number=int(groups[2]),
+                ))
+            elif len(groups) >= 2:
+                refs.append(CrossRef(
+                    original_text=match.group(0),
+                    ref_type=ref_type,
+                    display_text=groups[0],
+                    page_number=int(groups[1]),
+                ))
+    return refs
+
+
+def resolve_cross_ref(
+    ref: CrossRef,
+    chapters: list[ChapterBoundary],
+    filename_pattern: str = "{index:02d}_{title}",
+) -> str | None:
+    """Resolve a cross-reference to a target filename.
+
+    Looks up which chapter contains the referenced page number.
+    """
+    if ref.page_number is None:
+        return None
+
+    for ch in chapters:
+        # page_number is 1-indexed in source text, start_page is 0-indexed
+        if ch.start_page <= (ref.page_number - 1) < ch.end_page:
+            safe_title = sanitize_filename(ch.title)
+            return filename_pattern.format(index=ch.index, title=safe_title)
+    return None
+
+
+def make_wikilink(target_file: str, display_text: str) -> str:
+    """Create an Obsidian-style wikilink."""
+    return f"[[{target_file}|{display_text}]]"
+
+
+# ---------------------------------------------------------------------------
+# File output
+# ---------------------------------------------------------------------------
+
+def write_chapter_markdown(path: Path, frontmatter: dict[str, Any], body: str) -> None:
+    """Write a markdown file with YAML frontmatter."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = emit_frontmatter(frontmatter) + "\n" + body
+    path.write_text(content, encoding="utf-8")
+
+
+def sanitize_filename(title: str, max_length: int = 50) -> str:
+    """Convert a chapter title to a safe filename."""
+    safe = re.sub(r"[^\w\s-]", "", title)
+    safe = re.sub(r"[\s]+", "_", safe)
+    return safe[:max_length].strip("_")
