@@ -114,3 +114,109 @@ def get_toc(doc: pymupdf.Document) -> list[TocEntry]:
 def get_page_count(doc: pymupdf.Document) -> int:
     """Return total page count."""
     return len(doc)
+
+
+# ---------------------------------------------------------------------------
+# Text extraction
+# ---------------------------------------------------------------------------
+
+def extract_text_blocks(page: pymupdf.Page) -> list[TextBlock]:
+    """Extract text blocks from a page with font metadata.
+
+    Uses pymupdf's dict-based extraction to get font info per span.
+    Groups spans into blocks based on their block membership.
+    """
+    blocks = []
+    page_dict = page.get_text("dict", flags=pymupdf.TEXT_PRESERVE_WHITESPACE)
+
+    for block in page_dict.get("blocks", []):
+        if block.get("type") != 0:  # skip image blocks
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                text = span.get("text", "").strip()
+                if not text:
+                    continue
+                blocks.append(TextBlock(
+                    text=text,
+                    font=span.get("font", ""),
+                    size=round(span.get("size", 0), 1),
+                    flags=span.get("flags", 0),
+                    bbox=tuple(span.get("bbox", (0, 0, 0, 0))),
+                    page_num=page.number,
+                ))
+    return blocks
+
+
+def strip_headers_footers(
+    blocks: list[TextBlock],
+    header_pattern: str | None = None,
+    header_zone_top: float = 50,
+    footer_zone_bottom: float = 40,
+    page_height: float = 842,  # A4 default in points
+) -> list[TextBlock]:
+    """Remove running headers and footers from extracted blocks.
+
+    Args:
+        blocks: Text blocks from a page.
+        header_pattern: Regex to match header text. If None, uses zone only.
+        header_zone_top: Points from top of page — blocks above this are headers.
+        footer_zone_bottom: Points from bottom — blocks below (page_height - this) are footers.
+        page_height: Page height in points.
+    """
+    result = []
+    footer_threshold = page_height - footer_zone_bottom
+
+    for block in blocks:
+        y_pos = block.bbox[1]  # y0 of bounding box
+
+        # Skip footer zone
+        if y_pos >= footer_threshold:
+            continue
+
+        # Skip header zone
+        if y_pos <= header_zone_top:
+            if header_pattern and re.search(header_pattern, block.text):
+                continue
+            elif y_pos <= header_zone_top:
+                continue
+
+        result.append(block)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Font analysis
+# ---------------------------------------------------------------------------
+
+def _aggregate_font_info(blocks: list[TextBlock]) -> dict[str, FontInfo]:
+    """Aggregate font usage statistics from text blocks."""
+    fonts: dict[str, FontInfo] = {}
+    for block in blocks:
+        key = f"{block.font}:{block.size}"
+        if key not in fonts:
+            fonts[key] = FontInfo(name=block.font, size=block.size, flags=block.flags, count=0)
+        fonts[key].count += 1
+    return fonts
+
+
+def analyze_fonts(doc: pymupdf.Document, sample_page_nums: list[int] | None = None) -> dict[str, FontInfo]:
+    """Analyze font usage across sample pages.
+
+    Args:
+        doc: Open PDF document.
+        sample_page_nums: Pages to sample (0-indexed). Defaults to first 10 pages.
+
+    Returns:
+        Dict mapping "fontname:size" to FontInfo with usage counts.
+    """
+    if sample_page_nums is None:
+        sample_page_nums = list(range(min(10, len(doc))))
+
+    all_blocks: list[TextBlock] = []
+    for page_num in sample_page_nums:
+        if 0 <= page_num < len(doc):
+            all_blocks.extend(extract_text_blocks(doc[page_num]))
+
+    return _aggregate_font_info(all_blocks)

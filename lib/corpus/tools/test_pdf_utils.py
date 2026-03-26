@@ -47,3 +47,48 @@ def test_font_info_dataclass():
     info = FontInfo(name="Arial", size=12.0, flags=0, count=5)
     assert info.name == "Arial"
     assert info.count == 5
+
+
+def test_extract_text_blocks_returns_list():
+    """Integration test — requires a real PDF. Skip if not available."""
+    from lib.corpus.tools.pdf_utils import open_pdf, extract_text_blocks
+    # Use any available PDF for integration testing
+    test_pdf = Path(__file__).parent.parent.parent.parent / "tests" / "fixtures" / "sample.pdf"
+    if not test_pdf.exists():
+        pytest.skip("No test PDF available")
+    doc = open_pdf(test_pdf)
+    blocks = extract_text_blocks(doc[0])
+    assert isinstance(blocks, list)
+    if blocks:
+        assert hasattr(blocks[0], "text")
+        assert hasattr(blocks[0], "font")
+    doc.close()
+
+def test_analyze_fonts_returns_font_map():
+    from lib.corpus.tools.pdf_utils import FontInfo
+    # Unit test with mock data — just test the aggregation logic
+    from lib.corpus.tools.pdf_utils import _aggregate_font_info, TextBlock
+    blocks = [
+        TextBlock("Hello", "Arial", 12.0, 0, (0,0,100,20), 0),
+        TextBlock("World", "Arial", 12.0, 0, (0,20,100,40), 0),
+        TextBlock("Code", "Courier", 10.0, 8, (0,40,100,60), 0),
+    ]
+    result = _aggregate_font_info(blocks)
+    assert "Arial" in result or any("Arial" in k for k in result)
+
+def test_strip_headers_footers():
+    from lib.corpus.tools.pdf_utils import TextBlock, strip_headers_footers
+    blocks = [
+        TextBlock("Chapter 3 / Macro Variables", "Arial", 8.0, 0, (0, 10, 500, 20), 0),  # header at y=10
+        TextBlock("Body text here", "Times", 12.0, 0, (0, 100, 500, 120), 0),  # body
+        TextBlock("42", "Arial", 8.0, 0, (250, 780, 270, 790), 0),  # footer page number
+    ]
+    result = strip_headers_footers(
+        blocks,
+        header_pattern=r"Chapter \d+",
+        header_zone_top=50,
+        footer_zone_bottom=40,
+        page_height=800,
+    )
+    assert len(result) == 1
+    assert result[0].text == "Body text here"
