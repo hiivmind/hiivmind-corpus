@@ -92,3 +92,32 @@ def test_strip_headers_footers():
     )
     assert len(result) == 1
     assert result[0].text == "Body text here"
+
+def test_detect_chapters_from_toc_entries():
+    from lib.corpus.tools.pdf_utils import detect_chapters_from_toc_entries, TocEntry
+    entries = [
+        TocEntry(level=1, title="Introduction", page=0),
+        TocEntry(level=1, title="Getting Started", page=15),
+        TocEntry(level=1, title="Advanced Topics", page=42),
+    ]
+    chapters = detect_chapters_from_toc_entries(entries, total_pages=60)
+    assert len(chapters) == 3
+    assert chapters[0].title == "Introduction"
+    assert chapters[0].start_page == 0
+    assert chapters[0].end_page == 15
+    assert chapters[1].start_page == 15
+    assert chapters[1].end_page == 42
+    assert chapters[2].end_page == 60
+
+def test_detect_chapters_from_toc_entries_filters_level():
+    from lib.corpus.tools.pdf_utils import detect_chapters_from_toc_entries, TocEntry
+    entries = [
+        TocEntry(level=1, title="Part 1", page=0),
+        TocEntry(level=2, title="Chapter 1.1", page=0),
+        TocEntry(level=2, title="Chapter 1.2", page=10),
+        TocEntry(level=1, title="Part 2", page=20),
+    ]
+    chapters = detect_chapters_from_toc_entries(entries, total_pages=40, level=1)
+    assert len(chapters) == 2
+    assert chapters[0].title == "Part 1"
+    assert chapters[1].title == "Part 2"

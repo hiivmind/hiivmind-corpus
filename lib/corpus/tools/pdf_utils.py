@@ -220,3 +220,101 @@ def analyze_fonts(doc: pymupdf.Document, sample_page_nums: list[int] | None = No
             all_blocks.extend(extract_text_blocks(doc[page_num]))
 
     return _aggregate_font_info(all_blocks)
+
+
+# ---------------------------------------------------------------------------
+# Chapter detection
+# ---------------------------------------------------------------------------
+
+def detect_chapters_from_toc(doc: pymupdf.Document, level: int = 1) -> list[ChapterBoundary]:
+    """Detect chapters from PDF TOC bookmarks.
+
+    Args:
+        doc: Open PDF document.
+        level: TOC level to use (1 = top-level chapters).
+
+    Returns:
+        List of ChapterBoundary objects. Empty if no TOC.
+    """
+    toc_entries = get_toc(doc)
+    if not toc_entries:
+        return []
+    return detect_chapters_from_toc_entries(toc_entries, get_page_count(doc), level)
+
+
+def detect_chapters_from_toc_entries(
+    entries: list[TocEntry],
+    total_pages: int,
+    level: int = 1,
+) -> list[ChapterBoundary]:
+    """Build chapter boundaries from TOC entries at a given level.
+
+    Args:
+        entries: TOC entries from get_toc().
+        total_pages: Total pages in the document.
+        level: TOC level to filter to.
+
+    Returns:
+        List of ChapterBoundary with start/end pages.
+    """
+    filtered = [(e.title, e.page) for e in entries if e.level == level]
+    if not filtered:
+        return []
+
+    chapters = []
+    for i, (title, start) in enumerate(filtered):
+        end = filtered[i + 1][1] if i + 1 < len(filtered) else total_pages
+        chapters.append(ChapterBoundary(
+            index=i + 1,
+            title=title,
+            start_page=start,
+            end_page=end,
+        ))
+    return chapters
+
+
+def detect_chapters_from_fonts(
+    doc: pymupdf.Document,
+    h1_font: str,
+    h1_size_min: float,
+    top_zone: float = 150,
+) -> list[ChapterBoundary]:
+    """Detect chapters by finding H1-sized text near the top of pages.
+
+    Fallback when PDF has no TOC bookmarks. Uses the extraction profile's
+    font rules to identify chapter title text.
+
+    Args:
+        doc: Open PDF document.
+        h1_font: Font name for chapter titles (substring match).
+        h1_size_min: Minimum font size for chapter titles.
+        top_zone: Only consider text within this many points of page top.
+
+    Returns:
+        List of ChapterBoundary objects.
+    """
+    chapter_starts: list[tuple[str, int]] = []
+
+    for page_num in range(len(doc)):
+        blocks = extract_text_blocks(doc[page_num])
+        for block in blocks:
+            if (block.bbox[1] <= top_zone
+                    and block.size >= h1_size_min
+                    and h1_font.lower() in block.font.lower()):
+                chapter_starts.append((block.text.strip(), page_num))
+                break  # only first match per page
+
+    if not chapter_starts:
+        return []
+
+    total = len(doc)
+    chapters = []
+    for i, (title, start) in enumerate(chapter_starts):
+        end = chapter_starts[i + 1][1] if i + 1 < len(chapter_starts) else total
+        chapters.append(ChapterBoundary(
+            index=i + 1,
+            title=title,
+            start_page=start,
+            end_page=end,
+        ))
+    return chapters
