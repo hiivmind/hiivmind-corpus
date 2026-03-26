@@ -13,6 +13,14 @@ Requirements:
     pip install pymupdf
 """
 
+import warnings
+warnings.warn(
+    "split_pdf.py is deprecated. Use the three-stage PDF extraction pipeline instead. "
+    "See lib/corpus/patterns/sources/pdf.md for the new workflow.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 import json
 import re
 import sys
