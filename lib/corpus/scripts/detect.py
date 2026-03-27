@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
-"""Check fastembed availability and model status.
+"""Check fastembed and lancedb availability and model status.
 
 Usage: python3 detect.py
 
 Output (stdout, one line):
-  "ready"         - fastembed installed, model downloaded
-  "no-model"      - fastembed installed, model not yet downloaded
-  "not-installed" - fastembed not importable
+  "ready"         - fastembed + lancedb installed, model downloaded
+  "no-model"      - fastembed + lancedb installed, model not yet downloaded
+  "not-installed" - fastembed or lancedb not importable
 
 Exit codes:
-  0 - fastembed importable (ready or no-model)
-  1 - fastembed not installed
+  0 - dependencies importable (ready or no-model)
+  1 - dependencies not installed
   2 - python error
 """
 import sys
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
 def main():
     try:
         import fastembed  # noqa: F401
+    except ImportError:
+        print("not-installed")
+        sys.exit(1)
+
+    try:
+        import lancedb  # noqa: F401
     except ImportError:
         print("not-installed")
         sys.exit(1)
@@ -33,13 +39,14 @@ def main():
         from pathlib import Path
 
         cache_path = Path.home() / ".cache" / "fastembed"
-        model_dirs = list(cache_path.glob("*MiniLM*")) if cache_path.exists() else []
+        model_dirs = (
+            list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
+        )
         if model_dirs:
             print("ready")
         else:
             print("no-model")
     except Exception:
-        # fastembed is importable but we can't determine model status
         print("no-model")
 
     sys.exit(0)
