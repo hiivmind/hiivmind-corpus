@@ -357,6 +357,33 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ---
 
+## Phase 5c: Generate Embeddings (optional)
+
+**Inputs:** `computed.index` (index.yaml written), entry count
+**Outputs:** `index-embeddings.lance/` (if user opts in)
+
+**Note on phase numbering:** Phase 5 is index generation, Phase 5b is graph generation. This phase continues that sequence.
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+
+### Procedure
+
+1. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+2. Check heuristic: `entry_count > 150` OR corpus has tiered indexes (index-*.md files exist)
+3. If heuristic not met: skip silently, proceed to Phase 6
+4. If heuristic met:
+   a. If detect.py reports "ready" or "no-model":
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it?"
+   b. If detect.py exits 1 (not installed):
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
+   c. If user declines: skip, proceed to Phase 6
+   d. If user accepts and fastembed not installed: run `pip install fastembed lancedb pyyaml`
+   e. If detect.py reports "no-model": inform user "Downloading embedding model (~80MB, one-time)..."
+5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+6. Display: "Generated embeddings for {entry_count} entries"
+
+---
+
 ## Phase 6: Save and Complete
 
 **Inputs:** `computed.index`, `computed.segmentation`
@@ -385,6 +412,7 @@ Build complete!
 Index: index.yaml ({entry_count} entries)
 Rendered: index.md
 {if graph: Graph: graph.yaml ({concept_count} concepts, {relationship_count} relationships)}
+{if embeddings: Embeddings: index-embeddings.lance/ ({entry_count} entries)}
 {if tiered: Sub-indexes: {count} files}
 Strategy: {segmentation_strategy}
 Sources indexed: {source_count}
@@ -417,6 +445,7 @@ Sources indexed: {source_count}
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Freshness:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+- **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ## Agent
 

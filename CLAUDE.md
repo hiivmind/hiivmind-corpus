@@ -98,6 +98,10 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │       │   ├── llms-txt.md           # llms.txt manifest sources
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
+│   └── scripts/                     # Python scripts for embedding operations
+│       ├── detect.py                # Check fastembed availability
+│       ├── embed.py                 # Generate embeddings into SQLite
+│       └── search.py               # Query embeddings by cosine similarity
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -225,6 +229,7 @@ Using bash with yq:
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
 - **Embedded corpora**: Documentation repos can contain their own corpus at `.hiivmind/corpus/`, powered by `type: self` sources — see spec at `docs/superpowers/specs/2026-03-25-embedded-corpus-design.md`
 - **Cross-corpus bridges**: Projects with 2+ registered corpora can create concept bridges in `registry-graph.yaml`, with query-routing aliases — see spec at `docs/superpowers/specs/2026-03-26-graph-editing-and-bridge-design.md`
+- **Optional embeddings**: Entry-level semantic embeddings (`index-embeddings.lance/`) via fastembed enhance retrieval for large/tiered corpora. Cross-corpus concept embeddings (`registry-embeddings.lance/`) improve query routing. Opt-in during build with heuristic-based advice. Graceful fallback to keyword/LLM approach when fastembed unavailable — see specs at `docs/superpowers/specs/2026-03-27-rag-embeddings-design.md` and `docs/superpowers/specs/2026-03-27-lancedb-revision-design.md`
 
 ## Index Format
 
@@ -281,6 +286,7 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template) | Frontmatter: context, agent, allowed-tools |
+| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status | `index-embeddings.lance/` generation/query, `registry-embeddings.lance/` generation, fastembed detection, heuristic prompt, graph-boost, graceful fallback |
 
 ### When Adding New Features
 
@@ -311,6 +317,13 @@ build ◄─────────────┤ ──► source-scanner age
 enhance ◄───────────┤ (must know all features to validate)
                      │
 refresh ◄───────────┘ ──► source-scanner agent (parallel multi-source)
+
+build ──► index-embeddings.lance/ (optional, Phase 5c)
+enhance ──► index-embeddings.lance/ (incremental update)
+refresh ──► index-embeddings.lance/ (incremental update, if model ready)
+bridge ──► registry-embeddings.lance/ (cross-corpus concepts)
+navigate ◄── index-embeddings.lance/ + registry-embeddings.lance/ (retrieval enhancement)
+graph ◄── index-embeddings.lance/ (relationship candidate detection)
 ```
 
 ### Reference Sections
