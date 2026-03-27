@@ -378,6 +378,8 @@ Loop back to showing the draft after each refinement until the user is satisfied
 5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
 6. Display: "Generated embeddings for {entry_count} entries"
 
+**Commit guidance:** `index-embeddings.lance/` MUST be committed alongside `index.yaml` and `index.md`. It is a distributable artifact, not a cache. Do NOT add to `.gitignore`.
+
 ---
 
 ## Phase 6: Save and Complete

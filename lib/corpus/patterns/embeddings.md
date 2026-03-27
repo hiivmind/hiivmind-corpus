@@ -92,8 +92,9 @@ Generate entry embeddings from index.yaml:
 python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/
 ```
 
-Stored alongside index.yaml in the corpus root. **Committed to repo** — enables remote
-consumers to benefit from pre-computed embeddings.
+Stored alongside index.yaml in the corpus root. **MUST be committed to the repo** — this is a
+distributable artifact, not a cache. Consumers get pre-computed embeddings without needing
+fastembed installed. Do NOT add to .gitignore. Treat it the same as index.yaml and index.md.
 
 ### Cross-corpus: registry-embeddings.lance/
 
@@ -105,8 +106,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode concepts concep
 
 ID format: `{corpus_id}:{concept-id}`
 
-Stored at `.hiivmind/corpus/registry-embeddings.lance/`. **Not committed** — project-local,
-must be gitignored.
+Stored at `.hiivmind/corpus/registry-embeddings.lance/`. **Not committed** — this is
+project-local (derived from the combination of registered corpora). Must be gitignored.
+Rebuilt locally from `concepts.yaml` by the bridge skill.
+
+**Important distinction:** `index-embeddings.lance/` is committed (per-corpus distributable).
+`registry-embeddings.lance/` is gitignored (per-project derived). Do not confuse the two.
 
 ### Concepts YAML schema (for --mode concepts)
 

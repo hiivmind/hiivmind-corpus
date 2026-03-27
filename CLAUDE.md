@@ -42,8 +42,9 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   │                                                          │       │
 │   │  Each contains:                                          │       │
 │   │    • config.yaml  (source definitions + keywords)        │       │
-│   │    • index.md     (main index)                           │       │
-│   │    • index-*.md   (sub-indexes for tiered corpora)       │       │
+│   │    • index.yaml   (structured index, machine-queryable)  │       │
+│   │    • index.md     (human-readable, rendered from yaml)   │       │
+│   │    • index-embeddings.lance/ (semantic search, COMMITTED)│       │
 │   └─────────────────────────────────────────────────────────┘       │
 │                                                                      │
 │   ┌─────────────────────────────────────────────────────────┐       │
@@ -156,8 +157,12 @@ Agents enable parallel processing of multi-source corpora. When a corpus has 2+ 
 ```
 hiivmind-corpus-{project}/
 ├── config.yaml              # Source definitions + keywords
-├── index.md                 # Human-readable markdown index
+├── index.yaml               # Structured index (v2, machine-queryable)
+├── index.md                 # Human-readable markdown index (rendered from index.yaml)
 ├── index-*.md               # Sub-indexes (tiered corpora only)
+├── graph.yaml               # Concept graph (if extraction enabled)
+├── index-embeddings.lance/  # Semantic search embeddings (COMMITTED, not gitignored)
+├── render-index.sh          # Deterministic index.yaml → index.md renderer
 ├── .source/                 # Local clones (gitignored)
 ├── uploads/                 # Local document sources
 ├── .cache/                  # Web/llms-txt cached content

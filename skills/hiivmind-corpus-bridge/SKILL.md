@@ -129,7 +129,7 @@ Detect bridge candidates and present for user confirmation.
      - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode concepts concepts.yaml .hiivmind/corpus/registry-embeddings.lance/`
      - Clean up temporary `concepts.yaml`
      - Display: "Generated cross-corpus embeddings for {n} concepts across {m} corpora"
-   - **Gitignore:** Ensure `.hiivmind/corpus/registry-embeddings.lance/` is in the project's `.gitignore`. The bridge skill is the sole owner of this file.
+   - **Gitignore:** Ensure `.hiivmind/corpus/registry-embeddings.lance/` is in the project's `.gitignore`. This is project-local (derived from registered corpora), unlike `index-embeddings.lance/` which is committed to each corpus repo.
 
 **Regeneration triggers:**
 - New corpus registered → rebuild registry-embeddings.lance/
