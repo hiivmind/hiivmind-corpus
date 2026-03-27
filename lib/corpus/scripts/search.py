@@ -1,32 +1,43 @@
 #!/usr/bin/env python3
-"""Query embeddings.db by cosine similarity.
+"""Query a Lance embedding dataset by cosine similarity with optional SQL filtering.
 
 Usage:
-  python3 search.py <embeddings.db> <query> [--top-k 10] [--json]
+  python3 search.py <dataset.lance> <query> [--top-k 10] [--where "SQL"] [--json]
+
+The dataset path (e.g., index-embeddings.lance/) is the LanceDB database directory.
+A fixed table name "embeddings" is expected inside it. Model metadata is read from
+a _meta.json sidecar file.
 
 Exit codes:
   0 - success (even if no results)
-  1 - fastembed not installed
-  2 - embeddings.db not found
+  1 - fastembed/lancedb not installed
+  2 - dataset not found
   3 - other error
-  4 - model mismatch (db built with different model)
+  4 - model mismatch
 """
 import argparse
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-DIMENSIONS = 384
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
+TABLE_NAME = "embeddings"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Search embeddings")
-    parser.add_argument("db", help="Path to embeddings.db")
+    parser.add_argument("dataset", help="Path to Lance dataset directory")
     parser.add_argument("query", help="Query string to search for")
     parser.add_argument(
-        "--top-k", type=int, default=10, help="Number of results (default: 10)"
+        "--top-k",
+        type=int,
+        default=10,
+        help="Number of results (default: 10)",
+    )
+    parser.add_argument(
+        "--where",
+        default=None,
+        help="SQL predicate for hybrid filtering",
     )
     parser.add_argument(
         "--json",
@@ -37,85 +48,86 @@ def parse_args():
     return parser.parse_args()
 
 
-def check_model_match(conn):
-    """Check if db was built with the current model."""
-    cursor = conn.execute("SELECT value FROM meta WHERE key = 'model'")
-    row = cursor.fetchone()
-    if row is None:
-        return True
-    return row[0] == MODEL_NAME
-
-
 def main():
     args = parse_args()
 
-    # Check db exists
-    if not Path(args.db).exists():
-        print(f"Error: embeddings.db not found: {args.db}", file=sys.stderr)
+    dataset_path = Path(args.dataset)
+    if not dataset_path.exists():
+        print(f"Error: dataset not found: {args.dataset}", file=sys.stderr)
         sys.exit(2)
 
-    # Import fastembed and numpy (numpy is a transitive dependency of fastembed)
     try:
         from fastembed import TextEmbedding
     except ImportError:
         print(
-            "Error: fastembed not installed. Run: pip install fastembed pyyaml",
+            "Error: fastembed not installed. "
+            "Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    import numpy as np
-
-    # Open db and check model
-    conn = sqlite3.connect(args.db)
-    if not check_model_match(conn):
-        existing = conn.execute(
-            "SELECT value FROM meta WHERE key = 'model'"
-        ).fetchone()[0]
+    try:
+        import lancedb
+    except ImportError:
         print(
-            f"Error: embeddings.db was built with {existing}, "
-            f"current model is {MODEL_NAME}.",
+            "Error: lancedb not installed. "
+            "Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
-        conn.close()
-        sys.exit(4)
+        sys.exit(1)
 
-    # Load vectors
-    cursor = conn.execute("SELECT id, vector FROM embeddings")
-    ids = []
-    vectors = []
-    for row_id, vector_blob in cursor:
-        ids.append(row_id)
-        vec = np.frombuffer(vector_blob, dtype=np.float32)
-        vectors.append(vec)
-    conn.close()
+    # Open dataset
+    db = lancedb.connect(str(dataset_path))
 
-    if not ids:
+    try:
+        table = db.open_table(TABLE_NAME)
+    except Exception as e:
+        print(f"Error: could not open dataset: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    # Check model match via JSON sidecar
+    meta_path = dataset_path / "_meta.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
+        existing_model = meta.get("model", "")
+        if existing_model and existing_model != MODEL_NAME:
+            print(
+                f"Error: dataset was built with {existing_model}, "
+                f"current model is {MODEL_NAME}.",
+                file=sys.stderr,
+            )
+            sys.exit(4)
+
+    # Embed query with query: prefix
+    model = TextEmbedding(model_name=MODEL_NAME)
+    query_embedding = list(model.embed([f"query: {args.query}"]))[0]
+
+    # Build search query with cosine metric
+    search = (
+        table.search(query_embedding.tolist(), vector_column_name="vector")
+        .metric("cosine")
+        .limit(args.top_k)
+    )
+
+    # Add SQL predicate if provided
+    if args.where:
+        search = search.where(args.where)
+
+    # Execute
+    results_df = search.to_pandas()
+
+    if results_df.empty:
         if args.json_output:
             print("[]")
         sys.exit(0)
 
-    db_vectors = np.stack(vectors)
-
-    # Embed query
-    model = TextEmbedding(model_name=MODEL_NAME)
-    query_embedding = list(model.embed([args.query]))[0].astype("float32")
-
-    # Compute cosine similarity
-    query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-10)
-    db_norms = db_vectors / (
-        np.linalg.norm(db_vectors, axis=1, keepdims=True) + 1e-10
-    )
-    scores = db_norms @ query_norm
-
-    # Rank and return top-k
-    top_indices = np.argsort(scores)[::-1][: args.top_k]
-
+    # Format results
+    # Cosine distance is in [0, 2], similarity = 1 - distance
     results = []
-    for idx in top_indices:
-        score = float(scores[idx])
+    for _, row in results_df.iterrows():
+        score = 1.0 - float(row.get("_distance", 0))
         if score > 0:
-            results.append({"id": ids[idx], "score": round(score, 4)})
+            results.append({"id": row["id"], "score": round(score, 4)})
 
     if args.json_output:
         print(json.dumps(results))
