@@ -113,21 +113,24 @@ def main():
     if args.where:
         search = search.where(args.where)
 
-    # Execute
-    results_df = search.to_pandas()
+    # Execute — use to_arrow() to avoid pandas dependency
+    arrow_result = search.to_arrow()
 
-    if results_df.empty:
+    if arrow_result.num_rows == 0:
         if args.json_output:
             print("[]")
         sys.exit(0)
 
     # Format results
     # Cosine distance is in [0, 2], similarity = 1 - distance
+    ids = arrow_result.column("id").to_pylist()
+    distances = arrow_result.column("_distance").to_pylist()
+
     results = []
-    for _, row in results_df.iterrows():
-        score = 1.0 - float(row.get("_distance", 0))
+    for entry_id, distance in zip(ids, distances):
+        score = 1.0 - float(distance)
         if score > 0:
-            results.append({"id": row["id"], "score": round(score, 4)})
+            results.append({"id": entry_id, "score": round(score, 4)})
 
     if args.json_output:
         print(json.dumps(results))

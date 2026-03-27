@@ -202,9 +202,11 @@ def main():
     arrow_table = pa.Table.from_pylist(records, schema=schema)
 
     # Write Lance dataset
+    # Check if table exists before connect (connect creates the directory)
+    is_new = not output_path.exists()
     db = lancedb.connect(str(output_path))
 
-    if args.force or not output_path.exists():
+    if args.force or is_new or TABLE_NAME not in db.table_names():
         db.create_table(TABLE_NAME, data=arrow_table, mode="overwrite")
     else:
         table = db.open_table(TABLE_NAME)
