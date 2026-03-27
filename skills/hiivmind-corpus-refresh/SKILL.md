@@ -291,6 +291,21 @@ After index changes are saved (applies to both v1 and v2):
    - Update `manifest.last_hash` (llms-txt)
 3. Save config.yaml
 
+### Embedding Update (if applicable)
+
+After updating index.yaml and config metadata:
+
+1. If `embeddings.db` exists in corpus root:
+   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+   - If output is "ready" (model already downloaded):
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml embeddings.db`
+     - (Incremental — only re-embeds entries with changed summaries)
+   - If output is "no-model": skip (do not trigger 80MB download during automated refresh)
+   - If exit 1: skip (fastembed not installed)
+2. If `embeddings.db` does not exist: no action (refresh does not prompt for opt-in)
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+
 ### Completion
 
 Display summary:
@@ -300,6 +315,7 @@ Refresh complete.
 Updated sources: {count}
 Index entries: {added} added, {modified} modified, {removed} removed
 {if v2: Stale entries: {stale_count} (run build or dispatch LLM re-scan to update)}
+{if embeddings updated: Embeddings: updated ({n} entries re-embedded)}
 ```
 
 ---
@@ -329,6 +345,7 @@ Index entries: {added} added, {modified} modified, {removed} removed
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+- **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ## Agent
 
