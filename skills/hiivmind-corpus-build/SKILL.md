@@ -356,7 +356,7 @@ Loop back to showing the draft after each refinement until the user is satisfied
 ## Phase 5c: Generate Embeddings (optional)
 
 **Inputs:** `computed.index` (index.yaml written), entry count
-**Outputs:** `embeddings.db` (if user opts in)
+**Outputs:** `index-embeddings.lance/` (if user opts in)
 
 **Note on phase numbering:** Phase 5 is index generation, Phase 5b is graph generation. This phase continues that sequence.
 
@@ -371,11 +371,11 @@ Loop back to showing the draft after each refinement until the user is satisfied
    a. If detect.py reports "ready" or "no-model":
       Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it?"
    b. If detect.py exits 1 (not installed):
-      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed pyyaml` (~120MB)"
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
    c. If user declines: skip, proceed to Phase 6
-   d. If user accepts and fastembed not installed: run `pip install fastembed pyyaml`
+   d. If user accepts and fastembed not installed: run `pip install fastembed lancedb pyyaml`
    e. If detect.py reports "no-model": inform user "Downloading embedding model (~80MB, one-time)..."
-5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml embeddings.db`
+5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
 6. Display: "Generated embeddings for {entry_count} entries"
 
 ---
@@ -408,7 +408,7 @@ Build complete!
 Index: index.yaml ({entry_count} entries)
 Rendered: index.md
 {if graph: Graph: graph.yaml ({concept_count} concepts, {relationship_count} relationships)}
-{if embeddings: Embeddings: embeddings.db ({entry_count} entries)}
+{if embeddings: Embeddings: index-embeddings.lance/ ({entry_count} entries)}
 {if tiered: Sub-indexes: {count} files}
 Strategy: {segmentation_strategy}
 Sources indexed: {source_count}

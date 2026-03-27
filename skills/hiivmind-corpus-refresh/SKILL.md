@@ -295,14 +295,14 @@ After index changes are saved (applies to both v1 and v2):
 
 After updating index.yaml and config metadata:
 
-1. If `embeddings.db` exists in corpus root:
+1. If `index-embeddings.lance/` exists in corpus root:
    - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
    - If output is "ready" (model already downloaded):
-     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml embeddings.db`
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
      - (Incremental — only re-embeds entries with changed summaries)
    - If output is "no-model": skip (do not trigger 80MB download during automated refresh)
    - If exit 1: skip (fastembed not installed)
-2. If `embeddings.db` does not exist: no action (refresh does not prompt for opt-in)
+2. If `index-embeddings.lance/` does not exist: no action (refresh does not prompt for opt-in)
 
 **See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 

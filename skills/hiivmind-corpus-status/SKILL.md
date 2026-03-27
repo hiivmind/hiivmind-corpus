@@ -135,7 +135,7 @@ corpora_status:
       has_db: true
       generated_at: "2026-01-08T12:00:00Z"
       entry_count: 747
-      model: "all-MiniLM-L6-v2"
+      model: "BAAI/bge-small-en-v1.5"
       freshness: "current"      # current | stale | missing
 
   - id: polars
@@ -190,7 +190,7 @@ flyio, fly.io, deployment, hosting, edge, cloud
 ### Embeddings
 - **Status:** current
 - **Entries:** 747
-- **Model:** all-MiniLM-L6-v2
+- **Model:** BAAI/bge-small-en-v1.5
 - **Generated:** 2026-01-08T12:00:00Z
 ```
 
@@ -199,9 +199,9 @@ flyio, fly.io, deployment, hosting, edge, cloud
 | Status | Meaning | Action |
 |--------|---------|--------|
 | `healthy` | Index exists, sources current | None needed |
-| `embeddings current` | embeddings.db generated_at >= index.yaml generated_at | Healthy |
-| `embeddings stale` | embeddings.db generated_at < index.yaml generated_at | Warning — re-run build or embed.py |
-| `no embeddings` | No embeddings.db | Info — optional feature |
+| `embeddings current` | index-embeddings.lance/ generated_at >= index.yaml generated_at | Healthy |
+| `embeddings stale` | index-embeddings.lance/ generated_at < index.yaml generated_at | Warning — re-run build or embed.py |
+| `no embeddings` | No index-embeddings.lance/ | Info — optional feature |
 | `stale` | Upstream has new commits | Run `/hiivmind-corpus refresh` |
 | `outdated` | Schema version is old | Update config.yaml manually |
 | `no-index` | Config exists but no index | Run `/hiivmind-corpus build` |

@@ -65,8 +65,8 @@ Arguments: "flyio how to deploy"
 
 **If corpus not specified:**
 1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
-2. **Embedding routing** (if `.hiivmind/corpus/registry-embeddings.db` exists and fastembed available):
-   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py .hiivmind/corpus/registry-embeddings.db "{query}" --top-k 3 --json`
+2. **Embedding routing** (if `.hiivmind/corpus/registry-embeddings.lance/` exists and fastembed available):
+   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py .hiivmind/corpus/registry-embeddings.lance/ "{query}" --top-k 3 --json`
    - Parse results: each result ID is `{corpus_id}:{concept-id}`
    - Extract corpus IDs from top results
    - If top score > 0.6 and top score > second score + 0.15: use that corpus
@@ -165,12 +165,16 @@ Read: {source.path}/index.md
 
 #### If index.yaml was fetched (v2 flow):
 
-**Step 4a: Embedding pre-filter** (if embeddings.db exists)
+**Step 4a: Embedding pre-filter** (if index-embeddings.lance/ exists)
 
-If `embeddings.db` exists for the selected corpus and fastembed is available:
+If `index-embeddings.lance/` exists for the selected corpus and fastembed is available:
 
-1. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/embeddings.db "{query}" --top-k 15 --json`
-2. If search.py exits 0 with results:
+1. LLM extracts search terms and optionally constructs SQL predicate:
+   - Tag matches: `"array_has_any(tags, ['term1', 'term2'])"`
+   - Title matches: `"title LIKE '%term%'"`
+   - Or no predicate (pure semantic search)
+2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 15 --where "{predicate}" --json`
+3. If search.py exits 0 with results:
    - Parse ranked entry IDs with cosine scores
    - **Graph-boost** (if graph.yaml exists):
      - For each result entry, check if it belongs to a concept in graph.yaml
@@ -317,10 +321,10 @@ Search the index for relevant entries:
 | Freshness check fails | Skip silently, proceed with cached index |
 | Stale entries in results | Include them but note "this entry may be outdated" |
 | No registry-graph.yaml | Skip cross-corpus bridges and aliases |
-| No embeddings.db for corpus | Skip embedding pre-filter, use yq/keyword approach |
-| No fastembed but embeddings.db exists | Skip embedding search, fall back to keywords |
+| No index-embeddings.lance/ for corpus | Skip embedding pre-filter, use yq/keyword approach |
+| No fastembed but index-embeddings.lance/ exists | Skip embedding search, fall back to keywords |
 | Stale embeddings (index newer than embeddings) | Use stale embeddings, note in output |
-| No registry-embeddings.db | Skip embedding routing, use keyword scoring |
+| No registry-embeddings.lance/ | Skip embedding routing, use keyword scoring |
 
 ### Phase 5: Fetch Documentation
 

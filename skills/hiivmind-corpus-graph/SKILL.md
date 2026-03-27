@@ -179,7 +179,7 @@ Add a typed relationship between two existing concepts. Supports explicit (args)
    - **Tag overlap:** Concepts sharing 2+ tags → strong candidate
    - **Entry cross-references:** If entries in concept A link to entries in concept B
    - **Label/description keyword similarity:** Fuzzy match on descriptions
-   - **Embedding similarity** (if `embeddings.db` exists and fastembed available): For each concept, query `embeddings.db` with the concept's label+description. Concepts with entries that are semantically similar (score > 0.7) but not yet linked are relationship candidates.
+   - **Embedding similarity** (if `index-embeddings.lance/` exists and fastembed available): For each concept, query `index-embeddings.lance/` with the concept's label+description. Concepts with entries that are semantically similar (score > 0.7) but not yet linked are relationship candidates.
 3. Present candidates:
    ```
    These concept pairs look related — confirm or skip each:
