@@ -108,43 +108,45 @@ Add a new concept to graph.yaml with semi-automated entry suggestion.
 4. **User selects entries** — present numbered list, user confirms/deselects
 5. **Suggest tags** — based on selected entries' metadata (if available from index.yaml)
 6. **Suggest description** — one-line summary based on selected entries' summaries
-7. **Write concept to graph.yaml:**
+7. **Write concept to graph.yaml** (v2 schema — no entry lists):
    ```yaml
    {concept-id}:
      label: "{User-Provided Label}"
      description: "{description}"
-     entries:
-       - "{source_id}:{path}"
      tags: ["{tag1}", "{tag2}"]
-     entry_count: {n}
    ```
-8. **Update meta** — increment `concept_count`, recompute `entry_count` (total across all concepts), set `generated_at` to current ISO-8601 timestamp
+8. **Update index.yaml entries with concept reference:**
+   For each selected entry, update its `concepts` array in index.yaml:
+   - Read index.yaml
+   - Find entry by ID
+   - Append `"{concept-id}"` to entry's `concepts` list (create list if missing)
+   - Save index.yaml
+   - Re-run embed.py if `index-embeddings.lance/` exists (incremental update)
+   Display: "Updated {n} entries in index.yaml with concept '{concept-id}'"
+9. **Update meta** — increment `concept_count`, set `generated_at` to current ISO-8601 timestamp
 
 **Empty graph bootstrap:** If `graph.yaml` doesn't exist, create a new one:
 
 ```yaml
-schema_version: 1
+schema_version: 2
 
 concepts:
   {concept-id}:
     label: "{label}"
     description: "{description}"
-    entries:
-      - "{source_id}:{path}"
     tags: []
-    entry_count: {n}
 
 relationships: []
 
 meta:
   generated_at: "{ISO-8601}"
-  entry_count: {n}
   concept_count: 1
   relationship_count: 0
-  sources_extracted: []
 ```
 
-**Output:** "Added concept '{label}' with {n} entries to graph.yaml"
+**graph.yaml v1 compatibility:** If existing `graph.yaml` has `schema_version: 1` (concepts with `entries[]` lists), migrate on edit: move entry lists to index.yaml `concepts[]`, remove `entries` and `entry_count` from graph.yaml, set `schema_version: 2`.
+
+**Output:** "Added concept '{label}' with {n} entries to graph.yaml and index.yaml"
 
 ### add-relationship
 

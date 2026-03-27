@@ -15,20 +15,23 @@ Define the strict schema for `graph.yaml` — a concept-centric relationship gra
 
 ### Schema Definition (Strict)
 
+**Schema version 2** (current): Concepts define labels, descriptions, and tags only.
+Entry membership is stored in index.yaml entries via `concepts[]` field (bidirectional link).
+Schema version 1 (legacy) included `entries[]` and `entry_count` per concept — these are
+migrated to index.yaml `concepts[]` on next build or graph edit.
+
 ```yaml
-schema_version: 1
+schema_version: 2
 
 # Concepts: knowledge graph nodes
 # Key: concept ID (slugified label — lowercase, hyphens, no spaces)
+# Entry membership is in index.yaml — query with:
+#   yq '.entries[] | select(.concepts[] == "{concept-id}")' index.yaml
 concepts:
   {concept-id}:
     label: "{Human-Readable Label}"           # Required. Display name.
     description: "{One-line description}"      # Required. What this concept covers.
-    entries:                                    # Required. List of index entries belonging to this concept.
-      - "{source_id}:{path}"                   #   Standard entry reference
-      - "{source_id}:{path}#{anchor}"          #   Sub-file anchor (optional)
     tags: ["{tag1}", "{tag2}"]                 # Optional. From extracted #tags. Used for concept matching.
-    entry_count: {integer}                    # Optional. Count of entries. Lightweight signal for navigate prioritization.
 
 # Relationships: typed edges between concepts
 relationships:
@@ -41,10 +44,8 @@ relationships:
 # Metadata about graph state
 meta:
   generated_at: "{ISO-8601 timestamp}"         # Required. When graph was last generated/updated.
-  entry_count: {integer}                       # Required. Total entries across all concepts.
   concept_count: {integer}                     # Required. Number of concepts.
   relationship_count: {integer}                # Required. Number of relationships.
-  sources_extracted: ["{source_id}"]           # Required. Which sources contributed extraction data.
 ```
 
 ---
@@ -125,13 +126,12 @@ slugify() {
 
 The `graph validate` subcommand checks:
 
-1. **Schema compliance** — all required fields present, correct types
-2. **Dangling entries** — entries reference paths that exist in the corpus index
+1. **Schema compliance** — all required fields present, correct types, schema_version is 2
+2. **Dangling concept references** — entries in index.yaml reference concept IDs that don't exist in graph.yaml (query: `yq '.entries[].concepts[]' index.yaml | sort -u` vs graph.yaml concept keys)
 3. **Dangling relationships** — `from` and `to` reference defined concept IDs
-4. **Orphan concepts** — concepts with empty entries lists (warning, not error)
-5. **Duplicate entries** — same entry appearing in multiple concepts (allowed but flagged)
-6. **Relationship type vocabulary** — only controlled types used
-7. **Origin type vocabulary** — only defined origins used
+4. **Orphan concepts** — concepts not referenced by any entry in index.yaml (warning, not error)
+5. **Relationship type vocabulary** — only controlled types used
+6. **Origin type vocabulary** — only defined origins used
 
 ---
 
@@ -141,14 +141,14 @@ The `graph validate` subcommand checks:
 # Find concepts by tag
 yq '.concepts | to_entries[] | select(.value.tags[] == "performance") | .key' graph.yaml
 
-# Find concepts containing an entry
-yq '.concepts | to_entries[] | select(.value.entries[] == "polars:optimizations/lazy.md") | .key' graph.yaml
+# Find entries belonging to a concept (query index.yaml, not graph.yaml)
+yq '.entries[] | select(.concepts[] == "lazy-evaluation") | {id, title}' index.yaml
+
+# Find entries belonging to multiple concepts
+yq '.entries[] | select(.concepts | length > 1) | {id, concepts}' index.yaml
 
 # Follow relationships from a concept (1 hop)
 yq '.relationships[] | select(.from == "query-optimization") | .to' graph.yaml
-
-# Get all entries for a related concept
-yq '.concepts["lazy-frames"].entries[]' graph.yaml
 
 # Find manually curated relationships (preserved on refresh)
 yq '.relationships[] | select(.origin == "manual")' graph.yaml

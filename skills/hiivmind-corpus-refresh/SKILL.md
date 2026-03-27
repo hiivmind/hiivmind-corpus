@@ -245,7 +245,7 @@ For each selected source, execute the type-specific update:
 
 If `computed.index_format == "v2"`:
 
-1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords.
+1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords, and `concepts`.
 2. **For added entries**: Add placeholder entries with `stale: true`, `category: "unknown"`, `summary: "Pending re-scan"`. Full metadata populated on next build or LLM re-scan.
 3. **For deleted entries**: Remove entry from index.yaml. Remove from graph.yaml concept entries if referenced.
 4. Update `meta.generated_at` and `meta.entry_count` in index.yaml.
@@ -253,6 +253,9 @@ If `computed.index_format == "v2"`:
 6. Show preview of changes (entries added/modified/removed, stale count).
 
 **Note:** `links_from` is NOT updated during refresh — requires a full build to recompute cross-references.
+
+**Note:** `concepts` is preserved as-is during differential refresh. Full concept remapping
+requires running the graph skill's add-concept with updated entry selection.
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 

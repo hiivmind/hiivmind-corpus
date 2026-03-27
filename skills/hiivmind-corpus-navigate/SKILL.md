@@ -65,14 +65,14 @@ Arguments: "flyio how to deploy"
 
 **If corpus not specified:**
 1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
-2. **Embedding routing** (if `.hiivmind/corpus/registry-embeddings.lance/` exists and fastembed available):
-   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py .hiivmind/corpus/registry-embeddings.lance/ "{query}" --top-k 3 --json`
-   - Parse results: each result ID is `{corpus_id}:{concept-id}`
-   - Extract corpus IDs from top results
-   - If top score > 0.6 and top score > second score + 0.15: use that corpus
+2. **Embedding routing** (if registered corpora have `index-embeddings.lance/` and fastembed available):
+   - For each registered corpus with `index-embeddings.lance/`:
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 3 --json`
+     - Corpus score = max score across returned entries
+   - If top corpus score > 0.6 and > second corpus score + 0.15: use that corpus
    - If top score > 0.6 but within 0.15 of second: present top 2-3 corpora to user
    - If top score <= 0.6: fall through to keyword scoring
-   - If search.py exits non-zero: fall through to keyword scoring
+   - If search.py exits non-zero for all corpora: fall through to keyword scoring
 3. Load keywords from each corpus config
 4. Score query against keywords (alias matches count as additional keyword hits)
 5. If single match → use that corpus
@@ -321,10 +321,9 @@ Search the index for relevant entries:
 | Freshness check fails | Skip silently, proceed with cached index |
 | Stale entries in results | Include them but note "this entry may be outdated" |
 | No registry-graph.yaml | Skip cross-corpus bridges and aliases |
-| No index-embeddings.lance/ for corpus | Skip embedding pre-filter, use yq/keyword approach |
+| No index-embeddings.lance/ for corpus | Skip embedding pre-filter and cross-corpus routing, use yq/keyword approach |
 | No fastembed but index-embeddings.lance/ exists | Skip embedding search, fall back to keywords |
 | Stale embeddings (index newer than embeddings) | Use stale embeddings, note in output |
-| No registry-embeddings.lance/ | Skip embedding routing, use keyword scoring |
 
 ### Phase 5: Fetch Documentation
 

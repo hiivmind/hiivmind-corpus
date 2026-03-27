@@ -516,6 +516,9 @@ git commit -m "Enhance {topic} section in docs index"
 
 ### Embedding Update
 
+**Note:** When enhance adds new entries to index.yaml, initialize their `concepts` field
+as `[]`. Concept assignment is handled separately via the graph skill.
+
 After saving updated index.yaml:
 
 1. If `index-embeddings.lance/` exists in corpus root:

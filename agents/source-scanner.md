@@ -102,6 +102,7 @@ entries:
     summary: "{1-2 sentence description of file content}"
     tags: ["{curated_tag1}", "{curated_tag2}"]
     keywords: ["{extracted_term1}", "{extracted_term2}"]
+    concepts: []  # Populated later by graph skill or build Phase 5b
     category: "{reference|tutorial|guide|api|config|navigation|journal}"
     content_type: "{markdown|yaml|json|text|rst}"
     size: "{standard|large}"
