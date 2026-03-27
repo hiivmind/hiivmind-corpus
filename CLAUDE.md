@@ -234,7 +234,7 @@ Using bash with yq:
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
 - **Embedded corpora**: Documentation repos can contain their own corpus at `.hiivmind/corpus/`, powered by `type: self` sources — see spec at `docs/superpowers/specs/2026-03-25-embedded-corpus-design.md`
 - **Cross-corpus bridges**: Projects with 2+ registered corpora can create concept bridges in `registry-graph.yaml`, with query-routing aliases — see spec at `docs/superpowers/specs/2026-03-26-graph-editing-and-bridge-design.md`
-- **Optional embeddings**: Entry-level semantic embeddings (`index-embeddings.lance/`) via fastembed enhance retrieval for large/tiered corpora. Cross-corpus concept embeddings (`registry-embeddings.lance/`) improve query routing. Opt-in during build with heuristic-based advice. Graceful fallback to keyword/LLM approach when fastembed unavailable — see specs at `docs/superpowers/specs/2026-03-27-rag-embeddings-design.md` and `docs/superpowers/specs/2026-03-27-lancedb-revision-design.md`
+- **Optional embeddings**: Entry-level semantic embeddings (`index-embeddings.lance/`) via fastembed enhance retrieval for large/tiered corpora. Entries include `concepts[]` field for zettelkasten-enriched embedding text. Cross-corpus routing searches per-corpus embeddings directly. Opt-in during build with heuristic-based advice. Graceful fallback to keyword/LLM approach when fastembed unavailable — see specs at `docs/superpowers/specs/2026-03-27-rag-embeddings-design.md`, `docs/superpowers/specs/2026-03-27-lancedb-revision-design.md`, and `docs/superpowers/specs/2026-03-27-corpus-consolidation-design.md`
 
 ## Index Format
 
@@ -291,7 +291,8 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template) | Frontmatter: context, agent, allowed-tools |
-| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status | `index-embeddings.lance/` generation/query, `registry-embeddings.lance/` generation, fastembed detection, heuristic prompt, graph-boost, graceful fallback |
+| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status | `index-embeddings.lance/` generation/query, fastembed detection, heuristic prompt, graph-boost, graceful fallback, cross-corpus routing via per-corpus embeddings |
+| Concept membership | build, graph, enhance, refresh, navigate | `concepts[]` field in index.yaml entries, bidirectional with graph.yaml concept definitions, enriches embedding text |
 
 ### When Adding New Features
 
@@ -326,8 +327,8 @@ refresh ◄───────────┘ ──► source-scanner agent (
 build ──► index-embeddings.lance/ (optional, Phase 5c)
 enhance ──► index-embeddings.lance/ (incremental update)
 refresh ──► index-embeddings.lance/ (incremental update, if model ready)
-bridge ──► registry-embeddings.lance/ (cross-corpus concepts)
-navigate ◄── index-embeddings.lance/ + registry-embeddings.lance/ (retrieval enhancement)
+bridge ──► queries per-corpus index-embeddings.lance/ (cross-corpus concept detection)
+navigate ◄── index-embeddings.lance/ (retrieval + cross-corpus routing)
 graph ◄── index-embeddings.lance/ (relationship candidate detection)
 ```
 
