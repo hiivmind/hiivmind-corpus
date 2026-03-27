@@ -514,6 +514,20 @@ git add index.md index-{section}.md
 git commit -m "Enhance {topic} section in docs index"
 ```
 
+### Embedding Update
+
+After saving updated index.yaml:
+
+1. If `embeddings.db` exists in corpus root:
+   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml embeddings.db`
+   - (Incremental — only re-embeds changed/new entries)
+   - Display: "Updated embeddings for {n} modified entries"
+
+2. If `embeddings.db` does not exist:
+   - Check heuristic: entry_count > 150 OR tiered indexes exist
+   - If met: prompt user with same opt-in question as build Phase 5c
+   - See `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` § Heuristic for Opt-in
+
 ---
 
 ## Next Steps Guidance
@@ -660,6 +674,7 @@ User: "The detailed actions sub-index"
 - `lib/corpus/patterns/paths.md` - Path resolution
 - `lib/corpus/patterns/scanning.md` - File discovery and analysis
 - `lib/corpus/patterns/sources/` - Source type operations (git, local, web, generated-docs, self)
+- `lib/corpus/patterns/embeddings.md` - Embedding generation, detection, search, heuristics
 
 ## Related Skills
 
