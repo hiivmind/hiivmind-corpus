@@ -172,16 +172,19 @@ The consuming agent picks up the issue or event, runs LLM re-scan on stale entri
 
 ## Embedding Freshness
 
-When `embeddings.db` exists alongside `index.yaml`, check staleness by comparing timestamps:
+When `index-embeddings.lance/` exists alongside `index.yaml`, check staleness by comparing timestamps:
 
 ```bash
-# Extract generated_at from embeddings.db
+# Extract generated_at from Lance dataset metadata sidecar
 python3 -c "
-import sqlite3, sys
-conn = sqlite3.connect(sys.argv[1])
-row = conn.execute(\"SELECT value FROM meta WHERE key='generated_at'\").fetchone()
-print(row[0] if row else 'none')
-" embeddings.db
+import json, sys
+from pathlib import Path
+meta_path = Path(sys.argv[1]) / '_meta.json'
+if meta_path.exists():
+    print(json.loads(meta_path.read_text()).get('generated_at', 'none'))
+else:
+    print('none')
+" index-embeddings.lance
 ```
 
 Compare against `meta.generated_at` in `index.yaml`. If index.yaml timestamp is newer,
@@ -189,9 +192,9 @@ embeddings are stale.
 
 | State | Meaning | Action |
 |-------|---------|--------|
-| Current | embeddings.db generated_at >= index.yaml generated_at | Use normally |
-| Stale | embeddings.db generated_at < index.yaml generated_at | Use anyway, note in output |
-| Missing | No embeddings.db | Skip embedding retrieval |
+| Current | Lance generated_at >= index.yaml generated_at | Use normally |
+| Stale | Lance generated_at < index.yaml generated_at | Use anyway, note in output |
+| Missing | No index-embeddings.lance/ | Skip embedding retrieval |
 
 **See:** `embeddings.md` for full embedding patterns including graph-boost and graceful degradation.
 

@@ -36,7 +36,7 @@ Establish available tool capabilities at the start of corpus operations, enablin
 
 - **rg** (ripgrep) - Faster search for large codebases, but Claude's Grep tool works well
 - **jq** - JSON parsing, rarely needed in corpus operations
-- **fastembed** (Python) - ONNX-based embedding generation for semantic search. Required for generating and querying `embeddings.db`. Without it, corpus retrieval falls back to keyword/LLM approach. Install: `pip install fastembed pyyaml` (~120MB). Detection: `python3 -c "import fastembed; print('fastembed:available')" 2>/dev/null`. See `embeddings.md` for full detection flow via `detect.py`.
+- **fastembed + lancedb** (Python) - ONNX-based embedding generation and Lance vector storage for semantic search. Required for generating and querying `index-embeddings.lance/`. Without it, corpus retrieval falls back to keyword/LLM approach. Install: `pip install fastembed lancedb pyyaml` (~260MB). Detection: `python3 -c "import fastembed; import lancedb; print('available')" 2>/dev/null`. See `embeddings.md` for full detection flow via `detect.py`.
 
 ## Detection Commands
 
