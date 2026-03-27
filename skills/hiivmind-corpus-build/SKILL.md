@@ -256,7 +256,8 @@ For each entry from each source-scanner report:
 4. Set `links_to` from extraction wikilinks (if extraction was enabled)
 5. Compute `links_from` by cross-referencing all entries' `links_to` lists
 6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
-7. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
+7. Set `concepts` to empty list `[]` (populated later by Phase 5b if graph extraction is enabled, or manually via graph add-concept)
+8. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
 
 Construct `meta`:
 - `generated_at`: current timestamp
@@ -347,9 +348,24 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 5. **Write graph.yaml**
 
-   Write `graph.yaml` to the same directory as `index.md`, following the strict schema in `graph.md` § "Schema Definition (Strict)". Set `meta.generated_at` to current timestamp, populate `meta.sources_extracted` with source IDs that contributed extraction data.
+   Write `graph.yaml` to the same directory as `index.md`, following the strict schema in `graph.md` § "Schema Definition (Strict)" (schema_version: 2 — no entry lists in concepts). Set `meta.generated_at` to current timestamp.
 
    Display: "Graph generated: graph.yaml ({concept_count} concepts, {relationship_count} relationships)"
+
+6. **Populate concepts in index.yaml entries:**
+
+   After graph.yaml concepts are confirmed, update index.yaml entries with concept membership:
+   - For each concept, identify which entries belong to it (from extraction clustering)
+   - Set `concepts: ["{concept-id}"]` on each matched entry in index.yaml
+   - Entries may belong to multiple concepts
+   - Re-render index.md after updating index.yaml
+
+   **graph.yaml v1 compatibility:** If an existing `graph.yaml` with `schema_version: 1` is detected (concepts have `entries[]` lists):
+   1. Read the entry lists from each concept
+   2. For each entry ID, find the entry in index.yaml and add the concept ID to its `concepts[]` field
+   3. Remove `entries` and `entry_count` from each concept in graph.yaml
+   4. Set `schema_version: 2`
+   5. Save both files
 
 ---
 
