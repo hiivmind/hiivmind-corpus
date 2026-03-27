@@ -131,6 +131,12 @@ corpora_status:
       strategy: fetch
       cached: false
     keywords: ["flyio", "fly.io", "deployment"]
+    embeddings:
+      has_db: true
+      generated_at: "2026-01-08T12:00:00Z"
+      entry_count: 747
+      model: "all-MiniLM-L6-v2"
+      freshness: "current"      # current | stale | missing
 
   - id: polars
     status: stale
@@ -180,6 +186,12 @@ To update stale corpora:
 
 ### Keywords
 flyio, fly.io, deployment, hosting, edge, cloud
+
+### Embeddings
+- **Status:** current
+- **Entries:** 747
+- **Model:** all-MiniLM-L6-v2
+- **Generated:** 2026-01-08T12:00:00Z
 ```
 
 ## Status Classifications
@@ -187,6 +199,9 @@ flyio, fly.io, deployment, hosting, edge, cloud
 | Status | Meaning | Action |
 |--------|---------|--------|
 | `healthy` | Index exists, sources current | None needed |
+| `embeddings current` | embeddings.db generated_at >= index.yaml generated_at | Healthy |
+| `embeddings stale` | embeddings.db generated_at < index.yaml generated_at | Warning — re-run build or embed.py |
+| `no embeddings` | No embeddings.db | Info — optional feature |
 | `stale` | Upstream has new commits | Run `/hiivmind-corpus refresh` |
 | `outdated` | Schema version is old | Update config.yaml manually |
 | `no-index` | Config exists but no index | Run `/hiivmind-corpus build` |
@@ -324,6 +339,11 @@ Documentation may be outdated.
 
 [Proceed with current index] [Refresh first]
 ```
+
+## Pattern Documentation
+
+- `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` — Embedding freshness detection
+- `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md` — Index and embedding staleness
 
 ## Related Skills
 
