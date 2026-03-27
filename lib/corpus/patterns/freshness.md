@@ -170,6 +170,33 @@ The consuming agent picks up the issue or event, runs LLM re-scan on stale entri
 
 ---
 
+## Embedding Freshness
+
+When `embeddings.db` exists alongside `index.yaml`, check staleness by comparing timestamps:
+
+```bash
+# Extract generated_at from embeddings.db
+python3 -c "
+import sqlite3, sys
+conn = sqlite3.connect(sys.argv[1])
+row = conn.execute(\"SELECT value FROM meta WHERE key='generated_at'\").fetchone()
+print(row[0] if row else 'none')
+" embeddings.db
+```
+
+Compare against `meta.generated_at` in `index.yaml`. If index.yaml timestamp is newer,
+embeddings are stale.
+
+| State | Meaning | Action |
+|-------|---------|--------|
+| Current | embeddings.db generated_at >= index.yaml generated_at | Use normally |
+| Stale | embeddings.db generated_at < index.yaml generated_at | Use anyway, note in output |
+| Missing | No embeddings.db | Skip embedding retrieval |
+
+**See:** `embeddings.md` for full embedding patterns including graph-boost and graceful degradation.
+
+---
+
 ## Related Patterns
 
 - `index-format-v2.md` — `index.yaml` schema including the `stale` and `stale_since` fields
