@@ -43,6 +43,7 @@ entries:
     summary: "Arithmetic, comparisons, Boolean operations, counting unique values"
     tags: [expressions, arithmetic, comparisons, boolean]
     keywords: [add, subtract, multiply, divide, filter, unique, n_unique]
+    concepts: [data-transformation, expressions]
     category: reference
     content_type: markdown
     size: standard
@@ -77,6 +78,7 @@ meta:
 | `summary` | string | yes | 1-2 sentence description of content. LLM-generated during build |
 | `tags` | string[] | yes | Curated search facets — from frontmatter tags, LLM-assigned, or extraction. Controlled vocabulary where possible |
 | `keywords` | string[] | yes | Auto-extracted significant terms from content body. Broader than tags — includes function names, API terms, domain-specific identifiers |
+| `concepts` | string[] | no | Concept IDs this entry belongs to (keys from graph.yaml). Populated by build Phase 5b or graph add-concept. Empty list if not yet mapped. Enriches embedding text for RAG retrieval. |
 | `category` | enum | yes | Coarse classifier. Values: `reference`, `tutorial`, `guide`, `api`, `config`, `navigation`, `journal`, `unknown` (CI placeholder — replaced on LLM re-scan) |
 | `content_type` | enum | yes | File format. Values: `markdown`, `yaml`, `json`, `text`, `rst` |
 | `size` | enum | yes | `standard` or `large`. Large = file exceeds 1000 lines |
