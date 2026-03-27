@@ -245,7 +245,7 @@ For each selected source, execute the type-specific update:
 
 If `computed.index_format == "v2"`:
 
-1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords.
+1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords, and `concepts`.
 2. **For added entries**: Add placeholder entries with `stale: true`, `category: "unknown"`, `summary: "Pending re-scan"`. Full metadata populated on next build or LLM re-scan.
 3. **For deleted entries**: Remove entry from index.yaml. Remove from graph.yaml concept entries if referenced.
 4. Update `meta.generated_at` and `meta.entry_count` in index.yaml.
@@ -253,6 +253,9 @@ If `computed.index_format == "v2"`:
 6. Show preview of changes (entries added/modified/removed, stale count).
 
 **Note:** `links_from` is NOT updated during refresh — requires a full build to recompute cross-references.
+
+**Note:** `concepts` is preserved as-is during differential refresh. Full concept remapping
+requires running the graph skill's add-concept with updated entry selection.
 
 **Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 
@@ -291,6 +294,21 @@ After index changes are saved (applies to both v1 and v2):
    - Update `manifest.last_hash` (llms-txt)
 3. Save config.yaml
 
+### Embedding Update (if applicable)
+
+After updating index.yaml and config metadata:
+
+1. If `index-embeddings.lance/` exists in corpus root:
+   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+   - If output is "ready" (model already downloaded):
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+     - (Incremental — only re-embeds entries with changed summaries)
+   - If output is "no-model": skip (do not trigger 80MB download during automated refresh)
+   - If exit 1: skip (fastembed not installed)
+2. If `index-embeddings.lance/` does not exist: no action (refresh does not prompt for opt-in)
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+
 ### Completion
 
 Display summary:
@@ -300,6 +318,7 @@ Refresh complete.
 Updated sources: {count}
 Index entries: {added} added, {modified} modified, {removed} removed
 {if v2: Stale entries: {stale_count} (run build or dispatch LLM re-scan to update)}
+{if embeddings updated: Embeddings: updated ({n} entries re-embedded)}
 ```
 
 ---
@@ -329,6 +348,7 @@ Index entries: {added} added, {modified} modified, {removed} removed
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
+- **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ## Agent
 

@@ -42,8 +42,9 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   │                                                          │       │
 │   │  Each contains:                                          │       │
 │   │    • config.yaml  (source definitions + keywords)        │       │
-│   │    • index.md     (main index)                           │       │
-│   │    • index-*.md   (sub-indexes for tiered corpora)       │       │
+│   │    • index.yaml   (structured index, machine-queryable)  │       │
+│   │    • index.md     (human-readable, rendered from yaml)   │       │
+│   │    • index-embeddings.lance/ (semantic search, COMMITTED)│       │
 │   └─────────────────────────────────────────────────────────┘       │
 │                                                                      │
 │   ┌─────────────────────────────────────────────────────────┐       │
@@ -98,6 +99,10 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │       │   ├── llms-txt.md           # llms.txt manifest sources
 │       │   └── shared.md             # Cross-type utilities
 │       └── scanning.md               # File discovery and analysis
+│   └── scripts/                     # Python scripts for embedding operations
+│       ├── detect.py                # Check fastembed availability
+│       ├── embed.py                 # Generate embeddings into SQLite
+│       └── search.py               # Query embeddings by cosine similarity
 │
 ├── templates/                        # Templates for generating new corpus skills
 │
@@ -152,8 +157,12 @@ Agents enable parallel processing of multi-source corpora. When a corpus has 2+ 
 ```
 hiivmind-corpus-{project}/
 ├── config.yaml              # Source definitions + keywords
-├── index.md                 # Human-readable markdown index
+├── index.yaml               # Structured index (v2, machine-queryable)
+├── index.md                 # Human-readable markdown index (rendered from index.yaml)
 ├── index-*.md               # Sub-indexes (tiered corpora only)
+├── graph.yaml               # Concept graph (if extraction enabled)
+├── index-embeddings.lance/  # Semantic search embeddings (COMMITTED, not gitignored)
+├── render-index.sh          # Deterministic index.yaml → index.md renderer
 ├── .source/                 # Local clones (gitignored)
 ├── uploads/                 # Local document sources
 ├── .cache/                  # Web/llms-txt cached content
@@ -225,6 +234,7 @@ Using bash with yq:
 - **llms.txt support**: Sites with llms.txt manifests get efficient manifest-driven discovery with hash-based change detection (ADR-008)
 - **Embedded corpora**: Documentation repos can contain their own corpus at `.hiivmind/corpus/`, powered by `type: self` sources — see spec at `docs/superpowers/specs/2026-03-25-embedded-corpus-design.md`
 - **Cross-corpus bridges**: Projects with 2+ registered corpora can create concept bridges in `registry-graph.yaml`, with query-routing aliases — see spec at `docs/superpowers/specs/2026-03-26-graph-editing-and-bridge-design.md`
+- **Optional embeddings**: Entry-level semantic embeddings (`index-embeddings.lance/`) via fastembed enhance retrieval for large/tiered corpora. Entries include `concepts[]` field for zettelkasten-enriched embedding text. Cross-corpus routing searches per-corpus embeddings directly. Opt-in during build with heuristic-based advice. Graceful fallback to keyword/LLM approach when fastembed unavailable — see specs at `docs/superpowers/specs/2026-03-27-rag-embeddings-design.md`, `docs/superpowers/specs/2026-03-27-lancedb-revision-design.md`, and `docs/superpowers/specs/2026-03-27-corpus-consolidation-design.md`
 
 ## Index Format
 
@@ -281,6 +291,8 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template) | Frontmatter: context, agent, allowed-tools |
+| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status | `index-embeddings.lance/` generation/query, fastembed detection, heuristic prompt, graph-boost, graceful fallback, cross-corpus routing via per-corpus embeddings |
+| Concept membership | build, graph, enhance, refresh, navigate | `concepts[]` field in index.yaml entries, bidirectional with graph.yaml concept definitions, enriches embedding text |
 
 ### When Adding New Features
 
@@ -311,6 +323,13 @@ build ◄─────────────┤ ──► source-scanner age
 enhance ◄───────────┤ (must know all features to validate)
                      │
 refresh ◄───────────┘ ──► source-scanner agent (parallel multi-source)
+
+build ──► index-embeddings.lance/ (optional, Phase 5c)
+enhance ──► index-embeddings.lance/ (incremental update)
+refresh ──► index-embeddings.lance/ (incremental update, if model ready)
+bridge ──► queries per-corpus index-embeddings.lance/ (cross-corpus concept detection)
+navigate ◄── index-embeddings.lance/ (retrieval + cross-corpus routing)
+graph ◄── index-embeddings.lance/ (relationship candidate detection)
 ```
 
 ### Reference Sections

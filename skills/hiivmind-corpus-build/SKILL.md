@@ -260,7 +260,8 @@ For each entry from each source-scanner report:
 4. Set `links_to` from extraction wikilinks (if extraction was enabled)
 5. Compute `links_from` by cross-referencing all entries' `links_to` lists
 6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
-7. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
+7. Set `concepts` to empty list `[]` (populated later by Phase 5b if graph extraction is enabled, or manually via graph add-concept)
+8. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
 
 Construct `meta`:
 - `generated_at`: current timestamp
@@ -351,9 +352,53 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 5. **Write graph.yaml**
 
-   Write `graph.yaml` to the same directory as `index.md`, following the strict schema in `graph.md` § "Schema Definition (Strict)". Set `meta.generated_at` to current timestamp, populate `meta.sources_extracted` with source IDs that contributed extraction data.
+   Write `graph.yaml` to the same directory as `index.md`, following the strict schema in `graph.md` § "Schema Definition (Strict)" (schema_version: 2 — no entry lists in concepts). Set `meta.generated_at` to current timestamp.
 
    Display: "Graph generated: graph.yaml ({concept_count} concepts, {relationship_count} relationships)"
+
+6. **Populate concepts in index.yaml entries:**
+
+   After graph.yaml concepts are confirmed, update index.yaml entries with concept membership:
+   - For each concept, identify which entries belong to it (from extraction clustering)
+   - Set `concepts: ["{concept-id}"]` on each matched entry in index.yaml
+   - Entries may belong to multiple concepts
+   - Re-render index.md after updating index.yaml
+
+   **graph.yaml v1 compatibility:** If an existing `graph.yaml` with `schema_version: 1` is detected (concepts have `entries[]` lists):
+   1. Read the entry lists from each concept
+   2. For each entry ID, find the entry in index.yaml and add the concept ID to its `concepts[]` field
+   3. Remove `entries` and `entry_count` from each concept in graph.yaml
+   4. Set `schema_version: 2`
+   5. Save both files
+
+---
+
+## Phase 5c: Generate Embeddings (optional)
+
+**Inputs:** `computed.index` (index.yaml written), entry count
+**Outputs:** `index-embeddings.lance/` (if user opts in)
+
+**Note on phase numbering:** Phase 5 is index generation, Phase 5b is graph generation. This phase continues that sequence.
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+
+### Procedure
+
+1. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+2. Check heuristic: `entry_count > 150` OR corpus has tiered indexes (index-*.md files exist)
+3. If heuristic not met: skip silently, proceed to Phase 6
+4. If heuristic met:
+   a. If detect.py reports "ready" or "no-model":
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it?"
+   b. If detect.py exits 1 (not installed):
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
+   c. If user declines: skip, proceed to Phase 6
+   d. If user accepts and fastembed not installed: run `pip install fastembed lancedb pyyaml`
+   e. If detect.py reports "no-model": inform user "Downloading embedding model (~80MB, one-time)..."
+5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+6. Display: "Generated embeddings for {entry_count} entries"
+
+**Commit guidance:** `index-embeddings.lance/` MUST be committed alongside `index.yaml` and `index.md`. It is a distributable artifact, not a cache. Do NOT add to `.gitignore`.
 
 ---
 
@@ -385,6 +430,7 @@ Build complete!
 Index: index.yaml ({entry_count} entries)
 Rendered: index.md
 {if graph: Graph: graph.yaml ({concept_count} concepts, {relationship_count} relationships)}
+{if embeddings: Embeddings: index-embeddings.lance/ ({entry_count} entries)}
 {if tiered: Sub-indexes: {count} files}
 Strategy: {segmentation_strategy}
 Sources indexed: {source_count}
@@ -417,6 +463,7 @@ Sources indexed: {source_count}
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Freshness:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
+- **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ## Agent
 

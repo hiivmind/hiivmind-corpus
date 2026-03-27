@@ -62,12 +62,18 @@ Detect bridge candidates and present for user confirmation.
    a. **Label similarity** — concepts with similar labels across corpora (shared words after removing stop words like "the", "and", "of")
    b. **Tag overlap** — concepts sharing tags across corpora
    c. **Keyword overlap** — corpus-level keywords that appear in another corpus's concept labels
+   d. **Embedding similarity** (if corpora have `index-embeddings.lance/` and fastembed available):
+      - For each concept in corpus A's graph.yaml:
+        - Search corpus B's `index-embeddings.lance/`: `python3 search.py {B}/index-embeddings.lance/ "{concept.label} {concept.description}" --top-k 5 --json`
+        - For high-scoring entries: read the Lance dataset directly (Python) to access the `concepts` column
+        - If entry belongs to a concept in corpus B → bridge candidate pair
+      - Merge with candidates from label/tag/keyword matching (deduplicate)
 2. **Present candidates** grouped by corpus pair:
    ```
    Between Polars and Ibis (3 candidates):
 
    1. polars:lazy-evaluation ↔ ibis:deferred-execution
-      Match: tag overlap [performance, lazy], label similarity
+      Match: embedding similarity 0.84, tag overlap [performance, lazy]
       Suggested type: see-also
       [Confirm / Change type / Skip]
 
@@ -107,6 +113,12 @@ Detect bridge candidates and present for user confirmation.
      corpora_linked: ["polars", "ibis"]
    ```
 6. **Confirm:** "Created {n} bridges and {m} aliases in registry-graph.yaml"
+
+**Note:** Cross-corpus semantic search uses each corpus's `index-embeddings.lance/` directly.
+No separate `registry-embeddings.lance/` is needed. Bridge candidate detection (step 1d) queries
+per-corpus embeddings and reads the `concepts` column to identify concept relationships.
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ### show
 
@@ -193,6 +205,7 @@ Manually add a query-routing alias.
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/registry-loading.md` — Registry loading patterns
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/corpus-routing.md` — Query routing (aliases enhance this)
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md` — Corpus location discovery
+- `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` — Embedding generation for cross-corpus concepts
 
 ## Related Skills
 

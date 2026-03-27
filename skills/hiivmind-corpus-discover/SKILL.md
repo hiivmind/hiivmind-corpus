@@ -188,10 +188,10 @@ Present discovered corpora in a structured format:
 
 ### Registered (via registry.yaml)
 
-| ID | Display | Source | Keywords | Status |
-|----|---------|--------|----------|--------|
-| flyio | Fly.io | github:hiivmind/hiivmind-corpus-flyio | flyio, deployment | healthy |
-| polars | Polars | github:hiivmind/hiivmind-corpus-data/.../polars | polars, dataframe | healthy |
+| ID | Display | Source | Keywords | Status | Embeddings |
+|----|---------|--------|----------|--------|------------|
+| flyio | Fly.io | github:hiivmind/hiivmind-corpus-flyio | flyio, deployment | healthy | yes (312 entries) |
+| polars | Polars | github:hiivmind/hiivmind-corpus-data/.../polars | polars, dataframe | healthy | no |
 
 ### Legacy Plugins (backward compatibility)
 
@@ -350,6 +350,10 @@ corpora:
     sources: 1
     last_indexed: "2025-12-10"
     navigate_skill: hiivmind-corpus-navigate-polars
+    embeddings:
+      has_db: true
+      entry_count: 147
+      model: "BAAI/bge-small-en-v1.5"
 ```
 
 ## Error Handling
@@ -372,6 +376,7 @@ Skip and note in output:
 - `lib/corpus/patterns/config-parsing.md` - YAML config extraction
 - `lib/corpus/patterns/status.md` - Index status checking
 - `lib/corpus/patterns/paths.md` - Path resolution
+- `lib/corpus/patterns/embeddings.md` - Embedding status reporting
 
 ## Related Skills
 

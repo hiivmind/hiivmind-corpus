@@ -65,11 +65,19 @@ Arguments: "flyio how to deploy"
 
 **If corpus not specified:**
 1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
-2. Load keywords from each corpus config
-3. Score query against keywords (alias matches count as additional keyword hits)
-4. If single match → use that corpus
-5. If multiple matches → ask user to clarify
-6. If no matches → list available corpora
+2. **Embedding routing** (if registered corpora have `index-embeddings.lance/` and fastembed available):
+   - For each registered corpus with `index-embeddings.lance/`:
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 3 --json`
+     - Corpus score = max score across returned entries
+   - If top corpus score > 0.6 and > second corpus score + 0.15: use that corpus
+   - If top score > 0.6 but within 0.15 of second: present top 2-3 corpora to user
+   - If top score <= 0.6: fall through to keyword scoring
+   - If search.py exits non-zero for all corpora: fall through to keyword scoring
+3. Load keywords from each corpus config
+4. Score query against keywords (alias matches count as additional keyword hits)
+5. If single match → use that corpus
+6. If multiple matches → ask user to clarify
+7. If no matches → list available corpora
 
 ### Phase 3: Fetch Corpus Index
 
@@ -157,7 +165,28 @@ Read: {source.path}/index.md
 
 #### If index.yaml was fetched (v2 flow):
 
-**Step 4a: yq pre-filter**
+**Step 4a: Embedding pre-filter** (if index-embeddings.lance/ exists)
+
+If `index-embeddings.lance/` exists for the selected corpus and fastembed is available:
+
+1. LLM extracts search terms and optionally constructs SQL predicate:
+   - Tag matches: `"array_has_any(tags, ['term1', 'term2'])"`
+   - Title matches: `"title LIKE '%term%'"`
+   - Or no predicate (pure semantic search)
+2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 15 --where "{predicate}" --json`
+3. If search.py exits 0 with results:
+   - Parse ranked entry IDs with cosine scores
+   - **Graph-boost** (if graph.yaml exists):
+     - For each result entry, check if it belongs to a concept in graph.yaml
+     - If that concept has relationships to other concepts, entries in related concepts get +0.05 score boost (once per entry, capped at 1.0, no duplicates)
+     - Re-sort by boosted scores
+   - Feed top 15 entries to Step 4b (LLM semantic judgment)
+   - Skip the yq pre-filter below
+3. If search.py exits non-zero or no results: fall through to yq pre-filter
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` § Graph-Boost
+
+**Step 4a fallback: yq pre-filter**
 
 Extract 2-5 search terms from the user's query. Construct yq filters:
 
@@ -292,6 +321,9 @@ Search the index for relevant entries:
 | Freshness check fails | Skip silently, proceed with cached index |
 | Stale entries in results | Include them but note "this entry may be outdated" |
 | No registry-graph.yaml | Skip cross-corpus bridges and aliases |
+| No index-embeddings.lance/ for corpus | Skip embedding pre-filter and cross-corpus routing, use yq/keyword approach |
+| No fastembed but index-embeddings.lance/ exists | Skip embedding search, fall back to keywords |
+| Stale embeddings (index newer than embeddings) | Use stale embeddings, note in output |
 
 ### Phase 5: Fetch Documentation
 
@@ -430,6 +462,7 @@ The documentation may have moved. Try:
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Registry graph:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/registry-graph.md`
+- **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ## Related Skills
 
