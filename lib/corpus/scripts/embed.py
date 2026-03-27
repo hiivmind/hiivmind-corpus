@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Generate embeddings from index.yaml or concepts YAML into a Lance dataset.
+"""Generate embeddings from index.yaml into a Lance dataset.
 
 Usage:
-  python3 embed.py [--mode entries|concepts] [--force] <input.yaml> <output.lance>
+  python3 embed.py [--force] <index.yaml> <output.lance>
 
-Modes:
-  entries (default): Reads index.yaml, embeds title + summary + tags per entry
-  concepts: Reads concepts YAML, embeds label + description + tags per concept
+Reads entries from index.yaml including their concepts[] field.
+Embedding text: "passage: {title} | {summary} | {tags} | {concepts}"
 
 The output path (e.g., index-embeddings.lance/) is the LanceDB database directory.
 A fixed table name "embeddings" is used inside it. Model metadata is stored in a
@@ -32,13 +31,13 @@ TABLE_NAME = "embeddings"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate embeddings")
-    parser.add_argument("input", help="Path to index.yaml or concepts YAML")
+    parser.add_argument("input", help="Path to index.yaml")
     parser.add_argument("output", help="Path to output Lance dataset directory")
     parser.add_argument(
         "--mode",
         choices=["entries", "concepts"],
         default="entries",
-        help="Embedding mode (default: entries)",
+        help=argparse.SUPPRESS,  # Deprecated, hidden from help
     )
     parser.add_argument(
         "--force",
@@ -64,41 +63,19 @@ def load_entries(input_path):
         tags = entry.get("tags", [])
         if not isinstance(tags, list):
             tags = []
-        metadata_text = f"{title} | {summary} | {', '.join(tags)}"
+        concepts = entry.get("concepts", [])
+        if not isinstance(concepts, list):
+            concepts = []
+        metadata_text = (
+            f"{title} | {summary} | {', '.join(tags)} | {', '.join(concepts)}"
+        )
         items.append(
             {
                 "id": entry_id,
                 "source": source,
                 "title": title,
                 "tags": tags,
-                "metadata_text": metadata_text.strip(),
-            }
-        )
-    return items
-
-
-def load_concepts(input_path):
-    """Load concepts from concepts YAML, return list of dicts."""
-    import yaml
-
-    with open(input_path) as f:
-        data = yaml.safe_load(f)
-
-    items = []
-    for concept in data.get("concepts", []):
-        concept_id = concept.get("id", "")
-        label = concept.get("label", "")
-        description = concept.get("description", "")
-        tags = concept.get("tags", [])
-        if not isinstance(tags, list):
-            tags = []
-        metadata_text = f"{label} | {description} | {', '.join(tags)}"
-        items.append(
-            {
-                "id": concept_id,
-                "source": concept_id.split(":")[0] if ":" in concept_id else "",
-                "title": label,
-                "tags": tags,
+                "concepts": concepts,
                 "metadata_text": metadata_text.strip(),
             }
         )
@@ -107,6 +84,16 @@ def load_concepts(input_path):
 
 def main():
     args = parse_args()
+
+    # Handle deprecated --mode concepts
+    if args.mode == "concepts":
+        print(
+            "Warning: --mode concepts is deprecated. "
+            "Concepts are now in index.yaml entries' concepts[] field.",
+            file=sys.stderr,
+        )
+        print(json.dumps({"total": 0, "embedded": 0, "dataset": ""}))
+        sys.exit(0)
 
     if not Path(args.input).exists():
         print(f"Error: input file not found: {args.input}", file=sys.stderr)
@@ -135,10 +122,7 @@ def main():
 
     # Load items
     try:
-        if args.mode == "entries":
-            items = load_entries(args.input)
-        else:
-            items = load_concepts(args.input)
+        items = load_entries(args.input)
     except Exception as e:
         print(f"Error: failed to parse input file: {e}", file=sys.stderr)
         sys.exit(2)
@@ -179,6 +163,7 @@ def main():
             pa.field("source", pa.string()),
             pa.field("title", pa.string()),
             pa.field("tags", pa.list_(pa.string())),
+            pa.field("concepts", pa.list_(pa.string())),
             pa.field("metadata_text", pa.string()),
             pa.field("vector", pa.list_(pa.float32(), DIMENSIONS)),
             pa.field("updated_at", pa.string()),
@@ -193,6 +178,7 @@ def main():
                 "source": item["source"],
                 "title": item["title"],
                 "tags": item["tags"],
+                "concepts": item["concepts"],
                 "metadata_text": item["metadata_text"],
                 "vector": embedding.tolist(),
                 "updated_at": now,
@@ -224,7 +210,7 @@ def main():
         "dimensions": DIMENSIONS,
         "generated_at": now,
         "entry_count": len(records),
-        "mode": args.mode,
+        "mode": "entries",
     }
     meta_path.write_text(json.dumps(metadata, indent=2))
 
