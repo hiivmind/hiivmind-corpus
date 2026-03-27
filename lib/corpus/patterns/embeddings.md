@@ -54,6 +54,7 @@ Each Lance dataset uses a fixed table name `embeddings` with this schema:
 | `source` | string | Source ID from index.yaml entry's `source` field |
 | `title` | string | Entry title |
 | `tags` | list[string] | Entry tags |
+| `concepts` | list[string] | Concept IDs from index.yaml entry's `concepts` field |
 | `metadata_text` | string | Concatenated text that was embedded |
 | `vector` | vector[384] | Dense embedding (bge-small-en-v1.5) |
 | `updated_at` | string | ISO-8601 timestamp when embedding was generated |
@@ -76,8 +77,9 @@ Uses asymmetric retrieval with `passage:`/`query:` prefixes. bge-small is traine
 to distinguish between document text and query text:
 
 **Indexing (passage):**
-- Entries mode: `"passage: {title} | {summary} | {', '.join(tags)}"`
-- Concepts mode: `"passage: {label} | {description} | {', '.join(tags)}"`
+- `"passage: {title} | {summary} | {', '.join(tags)} | {', '.join(concepts)}"`
+- Concept IDs in the embedding text mean searching for "lazy evaluation" finds entries
+  assigned to that concept even if those words don't appear in the title or summary.
 
 **Querying (query):**
 - `"query: {user_query}"`
@@ -96,32 +98,14 @@ Stored alongside index.yaml in the corpus root. **MUST be committed to the repo*
 distributable artifact, not a cache. Consumers get pre-computed embeddings without needing
 fastembed installed. Do NOT add to .gitignore. Treat it the same as index.yaml and index.md.
 
-### Cross-corpus: registry-embeddings.lance/
+### Cross-corpus routing
 
-Generate concept embeddings from all registered corpora's graph.yaml files:
+Cross-corpus routing does not require a separate embedding dataset. Navigate Phase 2
+searches each registered corpus's `index-embeddings.lance/` directly and compares top
+scores to select the best corpus. See navigate skill Phase 2 for details.
 
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode concepts concepts.yaml .hiivmind/corpus/registry-embeddings.lance/
-```
-
-ID format: `{corpus_id}:{concept-id}`
-
-Stored at `.hiivmind/corpus/registry-embeddings.lance/`. **Not committed** — this is
-project-local (derived from the combination of registered corpora). Must be gitignored.
-Rebuilt locally from `concepts.yaml` by the bridge skill.
-
-**Important distinction:** `index-embeddings.lance/` is committed (per-corpus distributable).
-`registry-embeddings.lance/` is gitignored (per-project derived). Do not confuse the two.
-
-### Concepts YAML schema (for --mode concepts)
-
-```yaml
-concepts:
-  - id: "polars:lazy-evaluation"
-    label: "Lazy Evaluation"
-    description: "Deferred query execution for optimization"
-    tags: [performance, lazy, optimization]
-```
+For bridge candidate detection, the bridge skill queries each corpus's embeddings directly
+and reads the `concepts` column from results to identify cross-corpus concept relationships.
 
 ### Incremental updates
 
@@ -170,7 +154,7 @@ At navigate time: use stale embeddings, include note "Embeddings may be outdated
 
 When navigate Phase 4a returns embedding results and graph.yaml exists:
 
-1. For each result entry, check if it belongs to a concept in graph.yaml
+1. For each result entry, read `concepts[]` from the Lance result row (concepts column)
 2. If that concept has relationships to other concepts:
    - Entries in related concepts get +0.05 score boost
    - Once per entry (regardless of number of connecting relationships)
@@ -183,9 +167,8 @@ When navigate Phase 4a returns embedding results and graph.yaml exists:
 | Condition | Behavior |
 |---|---|
 | No index-embeddings.lance/ | Existing keyword/yq approach (no change) |
-| No fastembed/lancedb installed | Skip embedding search, fall back to keywords |
+| No fastembed/lancedb installed | Skip embedding search and cross-corpus routing, fall back to keywords |
 | Stale embeddings | Use them, note in output |
-| No registry-embeddings.lance/ | Skip cross-corpus routing, use keyword scoring |
 | Model mismatch (exit code 4) | Skip embedding search, fall back to keywords |
 
 ## Exit Codes (all scripts)
