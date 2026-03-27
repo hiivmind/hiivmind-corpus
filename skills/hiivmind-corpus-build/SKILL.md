@@ -39,6 +39,12 @@ corpora with tiered indexing for large (500+ file) corpora.
 A `config.yaml` must exist with at least one source configured.
 If not found, suggest running `hiivmind-corpus-init` and `hiivmind-corpus-add-source`.
 
+## Process
+
+```
+1. PREPARE → 2. SCAN → 3. SEGMENT → 4. PREFERENCES → 5. INDEX → 6. GRAPH → 7. EMBEDDINGS → 8. SAVE
+```
+
 ---
 
 ## Phase 1: Prepare Sources
@@ -91,6 +97,13 @@ Display: "Sources prepared: {count} ready, {skipped} skipped"
 
 **Inputs:** prepared sources
 **Outputs:** `computed.scan_results`
+
+```pseudocode
+GUARD_PHASE_2():
+  IF computed.sources IS null OR len(computed.sources) == 0:
+    DISPLAY "Cannot proceed: Phase 1 (Prepare Sources) has not completed."
+    EXIT
+```
 
 **See:** `lib/corpus/patterns/scanning.md`
 
@@ -156,6 +169,13 @@ Total: {total_files} files across {source_count} sources
 **Inputs:** `computed.scan_results`, total file count
 **Outputs:** `computed.segmentation`
 
+```pseudocode
+GUARD_PHASE_3():
+  IF computed.scan_results IS null:
+    DISPLAY "Cannot proceed: Phase 2 (Scan Sources) has not completed."
+    EXIT
+```
+
 ### Large corpus (500+ files)
 
 Present segmentation options:
@@ -182,8 +202,15 @@ Default to single file. No segmentation prompt needed.
 
 ## Phase 4: Collect User Preferences
 
-**Inputs:** `computed.scan_results`
+**Inputs:** `computed.scan_results`, `computed.segmentation`
 **Outputs:** `computed.user_preferences`
+
+```pseudocode
+GUARD_PHASE_4():
+  IF computed.segmentation IS null:
+    DISPLAY "Cannot proceed: Phase 3 (Determine Segmentation) has not completed."
+    EXIT
+```
 
 ### Use case
 
@@ -223,6 +250,13 @@ Allow comma-separated section names or "none".
 **Inputs:** `computed.scan_results`, `computed.user_preferences`, `computed.segmentation`
 **Outputs:** `computed.index`
 
+```pseudocode
+GUARD_PHASE_5():
+  IF computed.user_preferences IS null:
+    DISPLAY "Cannot proceed: Phase 4 (Collect User Preferences) has not completed."
+    EXIT
+```
+
 ### Index path format
 
 All file paths in the index use: `{source_id}:{relative_path}`
@@ -260,7 +294,7 @@ For each entry from each source-scanner report:
 4. Set `links_to` from extraction wikilinks (if extraction was enabled)
 5. Compute `links_from` by cross-referencing all entries' `links_to` lists
 6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
-7. Set `concepts` to empty list `[]` (populated later by Phase 5b if graph extraction is enabled, or manually via graph add-concept)
+7. Set `concepts` to empty list `[]` (populated later by Phase 6 if graph extraction is enabled, or manually via graph add-concept)
 8. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
 
 Construct `meta`:
@@ -297,10 +331,17 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ---
 
-## Phase 5b: Graph Generation
+## Phase 6: Graph Generation
 
 **Inputs:** `computed.scan_results` (with extraction data from sources that had it enabled)
 **Outputs:** `graph.yaml` written alongside `index.md`
+
+```pseudocode
+GUARD_PHASE_6():
+  IF computed.index IS null:
+    DISPLAY "Cannot proceed: Phase 5 (Generate Index) has not completed."
+    EXIT
+```
 
 **Precondition:** At least one source in `computed.scan_results` has an `extraction:` block in its scan report.
 
@@ -373,12 +414,17 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ---
 
-## Phase 5c: Generate Embeddings (optional)
+## Phase 7: Generate Embeddings (optional)
 
 **Inputs:** `computed.index` (index.yaml written), entry count
 **Outputs:** `index-embeddings.lance/` (if user opts in)
 
-**Note on phase numbering:** Phase 5 is index generation, Phase 5b is graph generation. This phase continues that sequence.
+```pseudocode
+GUARD_PHASE_7():
+  IF computed.index IS null:
+    DISPLAY "Cannot proceed: Phase 5 (Generate Index) has not completed."
+    EXIT
+```
 
 **See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
@@ -386,13 +432,13 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 1. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
 2. Check heuristic: `entry_count > 150` OR corpus has tiered indexes (index-*.md files exist)
-3. If heuristic not met: skip silently, proceed to Phase 6
+3. If heuristic not met: skip silently, proceed to Phase 8
 4. If heuristic met:
    a. If detect.py reports "ready" or "no-model":
       Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it?"
    b. If detect.py exits 1 (not installed):
       Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
-   c. If user declines: skip, proceed to Phase 6
+   c. If user declines: skip, proceed to Phase 8
    d. If user accepts and fastembed not installed: run `pip install fastembed lancedb pyyaml`
    e. If detect.py reports "no-model": inform user "Downloading embedding model (~80MB, one-time)..."
 5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
@@ -402,9 +448,20 @@ Loop back to showing the draft after each refinement until the user is satisfied
 
 ---
 
-## Phase 6: Save and Complete
+## Phase 8: Save and Complete
 
 **Inputs:** `computed.index`, `computed.segmentation`
+
+```pseudocode
+GUARD_PHASE_8():
+  IF computed.index IS null:
+    DISPLAY "Cannot proceed: Phase 5 (Generate Index) has not completed."
+    EXIT
+  # Phase 6 (Graph) and Phase 7 (Embeddings) are optional —
+  # but verify they were evaluated, not skipped silently.
+  # Graph: skip condition is "no extraction data" (checked in Phase 6)
+  # Embeddings: skip condition is "heuristic not met" (checked in Phase 7)
+```
 
 ### Save index files
 
