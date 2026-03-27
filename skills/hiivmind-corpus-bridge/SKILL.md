@@ -62,12 +62,17 @@ Detect bridge candidates and present for user confirmation.
    a. **Label similarity** — concepts with similar labels across corpora (shared words after removing stop words like "the", "and", "of")
    b. **Tag overlap** — concepts sharing tags across corpora
    c. **Keyword overlap** — corpus-level keywords that appear in another corpus's concept labels
+   d. **Embedding similarity** (if `registry-embeddings.db` exists and fastembed available):
+      - For each concept, run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py .hiivmind/corpus/registry-embeddings.db "{concept.label} {concept.description}" --top-k 5 --json`
+      - Filter results to exclude same-corpus matches
+      - Concepts from other corpora with score > 0.7 are bridge candidates
+      - Merge with candidates from label/tag/keyword matching (deduplicate)
 2. **Present candidates** grouped by corpus pair:
    ```
    Between Polars and Ibis (3 candidates):
 
    1. polars:lazy-evaluation ↔ ibis:deferred-execution
-      Match: tag overlap [performance, lazy], label similarity
+      Match: embedding similarity 0.84, tag overlap [performance, lazy]
       Suggested type: see-also
       [Confirm / Change type / Skip]
 
@@ -107,6 +112,31 @@ Detect bridge candidates and present for user confirmation.
      corpora_linked: ["polars", "ibis"]
    ```
 6. **Confirm:** "Created {n} bridges and {m} aliases in registry-graph.yaml"
+7. **Generate registry-embeddings.db** (if fastembed available):
+   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+   - If exit 1 and project has 2+ registered corpora:
+     Ask: "Cross-corpus semantic routing improves query accuracy for multi-corpus projects. Enable it? Requires: `pip install fastembed pyyaml` (~120MB)"
+   - If fastembed available:
+     - For each registered corpus with `graph.yaml`, extract concepts (namespaced as `{corpus_id}:{concept-id}`)
+     - Write to temporary `concepts.yaml`:
+       ```yaml
+       concepts:
+         - id: "{corpus_id}:{concept-id}"
+           label: "{label}"
+           description: "{description}"
+           tags: ["{tag1}", "{tag2}"]
+       ```
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode concepts concepts.yaml .hiivmind/corpus/registry-embeddings.db`
+     - Clean up temporary `concepts.yaml`
+     - Display: "Generated cross-corpus embeddings for {n} concepts across {m} corpora"
+   - **Gitignore:** Ensure `.hiivmind/corpus/registry-embeddings.db` is in the project's `.gitignore`. The bridge skill is the sole owner of this file.
+
+**Regeneration triggers:**
+- New corpus registered → rebuild registry-embeddings.db
+- Any corpus's graph.yaml updated (after build/enhance) → rebuild
+- Bridge manually adds/removes concepts → rebuild
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
 
 ### show
 
@@ -193,6 +223,7 @@ Manually add a query-routing alias.
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/registry-loading.md` — Registry loading patterns
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/corpus-routing.md` — Query routing (aliases enhance this)
 - `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/discovery.md` — Corpus location discovery
+- `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` — Embedding generation for cross-corpus concepts
 
 ## Related Skills
 
