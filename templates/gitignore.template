@@ -4,6 +4,9 @@
 # Cached web content
 .cache/
 
+# Embedding cache for remote corpora
+.hiivmind/corpus/cache/
+
 # OS files
 .DS_Store
 Thumbs.db
