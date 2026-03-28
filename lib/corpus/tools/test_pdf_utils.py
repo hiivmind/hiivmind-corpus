@@ -363,3 +363,45 @@ def test_emit_layout_table_merges_continuations():
     assert "missing values" in result
     lines = [l for l in result.strip().split("\n") if l.startswith("|")]
     assert len(lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# tex_math_map tests
+# ---------------------------------------------------------------------------
+
+def test_decode_math_text_oml_greek():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("\u02DB", "MT2MIT") == "α"
+    assert decode_math_text("\u02C7", "MT2MIT") == "β"
+    assert decode_math_text("\uFFFD", "MT2MIT") == "π"
+
+def test_decode_math_text_oms_operators():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("C", "MT2SYT") == "+"
+    assert decode_math_text("D", "MT2SYT") == "="
+    assert decode_math_text("j", "MT2SYT") == "|"
+
+def test_decode_math_text_preserves_ascii():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("x", "MT2MIT") == "x"
+    assert decode_math_text("Y", "MT2MIT") == "Y"
+
+def test_decode_math_text_unknown_font():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("hello", "NimbusRomNo9L-Regu") == "hello"
+
+def test_is_math_font():
+    from lib.corpus.tools.tex_math_map import is_math_font
+    assert is_math_font("MT2MIT") is True
+    assert is_math_font("MT2SYT") is True
+    assert is_math_font("MT2BMIT") is True
+    assert is_math_font("NimbusRomNo9L-Regu") is False
+    assert is_math_font("AlbanyAMT,Bold") is False
+
+def test_decode_math_text_bold_beta():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("\u02C7", "MT2BMIT") == "β"
+
+def test_decode_math_text_prime():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("0", "MT2SYS") == "′"
