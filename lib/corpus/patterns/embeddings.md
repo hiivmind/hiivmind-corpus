@@ -104,6 +104,25 @@ scores to select the best corpus. See navigate skill Phase 2 for details.
 For bridge candidate detection, the bridge skill queries each corpus's embeddings directly
 and reads the `concepts` column from results to identify cross-corpus concept relationships.
 
+### Remote corpus embedding cache
+
+LanceDB only supports local paths and object storage (S3/GCS/Azure) — not HTTPS. For
+remote GitHub-hosted corpora, the navigate skill caches `index-embeddings.lance/` locally
+at `.hiivmind/corpus/cache/{corpus_id}/`.
+
+**Cache lifecycle:**
+1. **First query:** sparse-clone from GitHub (~1MB, ~5 seconds). Cache written atomically.
+2. **Subsequent queries:** freshness check against TTL (default 7 days from `registry.yaml`).
+3. **Stale check:** compare cached commit SHA vs remote HEAD. If unchanged, touch timestamp.
+   If changed, re-clone. If network fails, use stale cache silently.
+4. **Cache metadata:** `.hiivmind/corpus/cache/{corpus_id}/_cache_meta.json` tracks
+   corpus_id, source_repo, source_ref, cached_at, cached_commit_sha, ttl_days.
+
+**Gitignore:** `.hiivmind/corpus/cache/` must be gitignored — it's a local cache.
+
+See navigate skill § Remote Embedding Cache for the full freshness check algorithm
+and sparse clone procedure.
+
 ### Incremental updates
 
 embed.py uses Lance merge-insert (upsert by `id`). On subsequent runs:
