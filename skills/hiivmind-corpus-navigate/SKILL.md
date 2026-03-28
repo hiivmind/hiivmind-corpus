@@ -173,18 +173,20 @@ If `index-embeddings.lance/` exists for the selected corpus and fastembed is ava
    - Tag matches: `"array_has_any(tags, ['term1', 'term2'])"`
    - Title matches: `"title LIKE '%term%'"`
    - Or no predicate (pure semantic search)
-2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 15 --where "{predicate}" --json`
-3. If search.py exits 0 with results:
+2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 15 --where "{predicate}" --select "concepts" --json`
+3. **Reranking decision:** If top 3 scores are within 0.05 of each other OR query is ambiguous, re-run with `--rerank` for better precision. Do NOT rerank if top score > 0.8 or during Phase 2 cross-corpus routing.
+4. If search.py exits 0 with results:
    - Parse ranked entry IDs with cosine scores
    - **Graph-boost** (if graph.yaml exists):
-     - For each result entry, check if it belongs to a concept in graph.yaml
-     - If that concept has relationships to other concepts, entries in related concepts get +0.05 score boost (once per entry, capped at 1.0, no duplicates)
+     - Read `concepts` from each result entry (returned by `--select "concepts"`)
+     - For each concept, look up relationships in graph.yaml
+     - Entries in related concepts get +0.05 score boost (once per entry, capped at 1.0, no duplicates)
      - Re-sort by boosted scores
    - Feed top 15 entries to Step 4b (LLM semantic judgment)
    - Skip the yq pre-filter below
-3. If search.py exits non-zero or no results: fall through to yq pre-filter
+5. If search.py exits non-zero or no results: fall through to yq pre-filter
 
-**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` § Graph-Boost
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` § Graph-Boost, Reranking
 
 **Step 4a fallback: yq pre-filter**
 

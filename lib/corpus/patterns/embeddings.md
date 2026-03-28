@@ -59,16 +59,13 @@ Each Lance dataset uses a fixed table name `embeddings` with this schema:
 | `vector` | vector[384] | Dense embedding (bge-small-en-v1.5) |
 | `updated_at` | string | ISO-8601 timestamp when embedding was generated |
 
-Model metadata is stored in a `_meta.json` sidecar file alongside the Lance data:
+Model metadata is stored in a `_meta` Lance table within the same database (key-value pairs):
 
-```json
-{
-  "model": "BAAI/bge-small-en-v1.5",
-  "dimensions": 384,
-  "generated_at": "2026-03-27T10:00:00Z",
-  "entry_count": 312,
-  "mode": "entries"
-}
+```
+model       = BAAI/bge-small-en-v1.5
+dimensions  = 384
+generated_at = 2026-03-27T10:00:00Z
+entry_count = 312
 ```
 
 ## Embedding Strategy
@@ -114,6 +111,14 @@ embed.py uses Lance merge-insert (upsert by `id`). On subsequent runs:
 - Adds new entries
 - Use `--force` to rebuild entirely (e.g., after model change)
 
+### Indexes
+
+embed.py automatically creates:
+- **FTS index** on `metadata_text` — enables hybrid search (vector + keyword) via `--where` or native FTS queries
+- **Vector index** (IVF_PQ) for corpora with >500 entries — faster ANN search vs brute-force scan
+
+Both indexes are created inside the Lance dataset directory. No extra files.
+
 ## Querying Embeddings
 
 ```bash
@@ -121,6 +126,39 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py index-embeddings.lanc
 ```
 
 Output: `[{"id": "polars:expressions.md", "score": 0.8432}, ...]`
+
+### Reranking
+
+For better precision on ambiguous queries, use `--rerank`:
+
+```bash
+python3 search.py index-embeddings.lance/ "query" --top-k 15 --rerank --json
+```
+
+Uses CrossEncoderReranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`, ~100MB, downloads on first use).
+Slower but more precise — re-scores results using cross-attention between query and document.
+
+**When to use `--rerank`:**
+- Query is ambiguous or broad (e.g., "how do I use this?")
+- Top 3 result scores are within 0.05 of each other (low differentiation)
+- User explicitly asks for more relevant results
+
+**When NOT to use `--rerank`:**
+- Query has specific keywords (e.g., "LazyFrame predicate pushdown")
+- Top result score > 0.8 (high confidence)
+- Cross-corpus routing (Phase 2) — speed matters more than precision
+
+### Column selection
+
+Return extra columns in JSON output with `--select` (requires `--json`):
+
+```bash
+python3 search.py index-embeddings.lance/ "query" --select "concepts,title" --json
+```
+
+Output: `[{"id": "...", "score": 0.84, "concepts": ["lazy-evaluation"], "title": "Lazy Frames"}]`
+
+`--select` is silently ignored in plain text output mode.
 
 ### Hybrid Search
 
