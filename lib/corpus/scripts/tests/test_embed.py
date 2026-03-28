@@ -7,9 +7,9 @@ Unit tests (no fastembed/lancedb required):
 
 Integration tests (require fastembed + lancedb):
   - End-to-end embedding generation
+  - _meta table verification
+  - FTS index creation
   - Concepts in Lance schema
-  - Incremental updates
-  - Deprecated --mode concepts
 """
 import json
 import subprocess
@@ -71,21 +71,6 @@ meta:
 
 
 @pytest.fixture
-def sample_concepts_yaml(tmp_path):
-    """Legacy concepts YAML for deprecation testing."""
-    content = """
-concepts:
-  - id: "polars:lazy-evaluation"
-    label: "Lazy Evaluation"
-    description: "Deferred query execution for optimization"
-    tags: [performance, lazy]
-"""
-    path = tmp_path / "concepts.yaml"
-    path.write_text(content)
-    return path
-
-
-@pytest.fixture
 def empty_yaml(tmp_path):
     """Create a YAML file with no entries."""
     path = tmp_path / "empty.yaml"
@@ -129,7 +114,6 @@ class TestYAMLParsing:
         from embed import load_entries
 
         items = load_entries(str(sample_index_yaml))
-        # doc3 has concepts: [performance, optimization]
         assert "performance, optimization" in items[2]["metadata_text"]
 
     def test_missing_concepts_defaults_to_empty(self, sample_index_yaml):
@@ -138,9 +122,7 @@ class TestYAMLParsing:
         from embed import load_entries
 
         items = load_entries(str(sample_index_yaml))
-        # doc4 has no concepts field
         assert items[3]["concepts"] == []
-        # metadata_text ends with empty concepts section
         assert items[3]["metadata_text"].endswith("|")
 
     def test_missing_tags_defaults_to_empty(self, tmp_path):
@@ -203,8 +185,10 @@ def deps_available():
 class TestEmbeddingPipeline:
     """End-to-end tests requiring fastembed + lancedb."""
 
-    def test_full_build(self, sample_index_yaml, tmp_path):
-        """Build embeddings from index.yaml, verify output structure."""
+    def test_full_build_with_meta_table(self, sample_index_yaml, tmp_path):
+        """Build embeddings, verify _meta table (not _meta.json)."""
+        import lancedb
+
         output = tmp_path / "index-embeddings.lance"
         result = subprocess.run(
             [sys.executable, SCRIPT, str(sample_index_yaml), str(output)],
@@ -217,25 +201,34 @@ class TestEmbeddingPipeline:
         assert output_json["total"] == 4
         assert output_json["embedded"] == 4
 
-        meta = json.loads((output / "_meta.json").read_text())
+        # Verify _meta table exists (not _meta.json)
+        db = lancedb.connect(str(output))
+        assert "_meta" in db.table_names()
+        meta_table = db.open_table("_meta")
+        meta_arrow = meta_table.to_arrow()
+        keys = meta_arrow.column("key").to_pylist()
+        values = meta_arrow.column("value").to_pylist()
+        meta = dict(zip(keys, values))
         assert meta["model"] == "BAAI/bge-small-en-v1.5"
-        assert meta["dimensions"] == 384
-        assert meta["entry_count"] == 4
-        assert meta["mode"] == "entries"
+        assert meta["dimensions"] == "384"
+        assert meta["entry_count"] == "4"
 
-    def test_concepts_mode_deprecated(self, sample_concepts_yaml, tmp_path):
-        """--mode concepts prints deprecation warning and exits 0."""
-        output = tmp_path / "registry-embeddings.lance"
-        result = subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "concepts",
-             str(sample_concepts_yaml), str(output)],
+        # No _meta.json should exist
+        assert not (output / "_meta.json").exists()
+
+    def test_fts_index_created(self, sample_index_yaml, tmp_path):
+        """FTS index is created on metadata_text column."""
+        import lancedb
+
+        output = tmp_path / "index-embeddings.lance"
+        subprocess.run(
+            [sys.executable, SCRIPT, str(sample_index_yaml), str(output)],
             capture_output=True,
-            text=True,
         )
-        assert result.returncode == 0
-        assert "deprecated" in result.stderr.lower()
-        output_json = json.loads(result.stdout)
-        assert output_json["total"] == 0
+
+        db = lancedb.connect(str(output))
+        table = db.open_table("embeddings")
+        assert "metadata_text" in table.schema.names
 
     def test_force_rebuild(self, sample_index_yaml, tmp_path):
         """--force re-embeds everything even if dataset exists."""
@@ -275,6 +268,37 @@ class TestEmbeddingPipeline:
         assert "concepts" in table.schema.names
         assert "metadata_text" in table.schema.names
         assert table.count_rows() == 4
+
+    def test_meta_json_migration(self, sample_index_yaml, tmp_path):
+        """_meta.json is migrated to _meta table on rebuild."""
+        import lancedb
+
+        output = tmp_path / "index-embeddings.lance"
+
+        # First build creates _meta table
+        subprocess.run(
+            [sys.executable, SCRIPT, str(sample_index_yaml), str(output)],
+            capture_output=True,
+        )
+
+        # Simulate old format: create _meta.json and remove _meta table
+        db = lancedb.connect(str(output))
+        db.drop_table("_meta")
+        meta_json = output / "_meta.json"
+        meta_json.write_text(json.dumps({"model": "BAAI/bge-small-en-v1.5", "dimensions": 384}))
+
+        # Rebuild should migrate
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(sample_index_yaml), str(output)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+
+        # _meta.json should be gone, _meta table should exist
+        assert not meta_json.exists()
+        db2 = lancedb.connect(str(output))
+        assert "_meta" in db2.table_names()
 
 
 if __name__ == "__main__":

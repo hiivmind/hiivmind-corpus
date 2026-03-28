@@ -64,8 +64,8 @@ Detect bridge candidates and present for user confirmation.
    c. **Keyword overlap** — corpus-level keywords that appear in another corpus's concept labels
    d. **Embedding similarity** (if corpora have `index-embeddings.lance/` and fastembed available):
       - For each concept in corpus A's graph.yaml:
-        - Search corpus B's `index-embeddings.lance/`: `python3 search.py {B}/index-embeddings.lance/ "{concept.label} {concept.description}" --top-k 5 --json`
-        - For high-scoring entries: read the Lance dataset directly (Python) to access the `concepts` column
+        - Search corpus B's `index-embeddings.lance/`: `python3 search.py {B}/index-embeddings.lance/ "{concept.label} {concept.description}" --top-k 5 --select "concepts" --json`
+        - Read `concepts` from each result entry (returned by `--select`)
         - If entry belongs to a concept in corpus B → bridge candidate pair
       - Merge with candidates from label/tag/keyword matching (deduplicate)
 2. **Present candidates** grouped by corpus pair:

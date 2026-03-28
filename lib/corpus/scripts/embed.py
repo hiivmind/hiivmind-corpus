@@ -9,7 +9,7 @@ Embedding text: "passage: {title} | {summary} | {tags} | {concepts}"
 
 The output path (e.g., index-embeddings.lance/) is the LanceDB database directory.
 A fixed table name "embeddings" is used inside it. Model metadata is stored in a
-_meta.json sidecar file alongside the Lance data.
+"_meta" table within the same Lance database.
 
 Exit codes:
   0 - success
@@ -27,18 +27,16 @@ from pathlib import Path
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 DIMENSIONS = 384
 TABLE_NAME = "embeddings"
+META_TABLE = "_meta"
+PASSAGE_PREFIX = "passage: "  # bge-small asymmetric retrieval prefix for documents
+QUERY_PREFIX = "query: "  # bge-small asymmetric retrieval prefix for queries
+VECTOR_INDEX_THRESHOLD = 500  # Create IVF_PQ index above this entry count
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate embeddings")
     parser.add_argument("input", help="Path to index.yaml")
     parser.add_argument("output", help="Path to output Lance dataset directory")
-    parser.add_argument(
-        "--mode",
-        choices=["entries", "concepts"],
-        default="entries",
-        help=argparse.SUPPRESS,  # Deprecated, hidden from help
-    )
     parser.add_argument(
         "--force",
         action="store_true",
@@ -82,18 +80,48 @@ def load_entries(input_path):
     return items
 
 
+def read_meta(db):
+    """Read metadata from _meta table. Returns dict or None."""
+    try:
+        if META_TABLE not in db.table_names():
+            return None
+        meta_table = db.open_table(META_TABLE)
+        meta_arrow = meta_table.to_arrow()
+        keys = meta_arrow.column("key").to_pylist()
+        values = meta_arrow.column("value").to_pylist()
+        return dict(zip(keys, values))
+    except Exception:
+        return None
+
+
+def write_meta(db, metadata, pa):
+    """Write metadata to _meta table."""
+    meta_records = [{"key": k, "value": str(v)} for k, v in metadata.items()]
+    meta_schema = pa.schema(
+        [
+            pa.field("key", pa.string()),
+            pa.field("value", pa.string()),
+        ]
+    )
+    meta_table = pa.Table.from_pylist(meta_records, schema=meta_schema)
+    db.create_table(META_TABLE, data=meta_table, mode="overwrite")
+
+
+def migrate_meta_json(output_path, db, pa):
+    """Migrate _meta.json sidecar to _meta table if needed."""
+    meta_json_path = output_path / "_meta.json"
+    if meta_json_path.exists() and META_TABLE not in db.table_names():
+        try:
+            meta = json.loads(meta_json_path.read_text())
+            write_meta(db, meta, pa)
+            meta_json_path.unlink()
+            print("Migrated _meta.json to _meta table", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: failed to migrate _meta.json: {e}", file=sys.stderr)
+
+
 def main():
     args = parse_args()
-
-    # Handle deprecated --mode concepts
-    if args.mode == "concepts":
-        print(
-            "Warning: --mode concepts is deprecated. "
-            "Concepts are now in index.yaml entries' concepts[] field.",
-            file=sys.stderr,
-        )
-        print(json.dumps({"total": 0, "embedded": 0, "dataset": ""}))
-        sys.exit(0)
 
     if not Path(args.input).exists():
         print(f"Error: input file not found: {args.input}", file=sys.stderr)
@@ -133,28 +161,32 @@ def main():
 
     # Check for existing dataset and model mismatch
     output_path = Path(args.output)
-    if output_path.exists() and not args.force:
-        meta_path = output_path / "_meta.json"
-        if meta_path.exists():
-            existing_meta = json.loads(meta_path.read_text())
-            existing_model = existing_meta.get("model", "")
-            if existing_model and existing_model != MODEL_NAME:
-                print(
-                    f"Error: dataset was built with {existing_model}, "
-                    f"current model is {MODEL_NAME}. "
-                    f"Re-embed with: python3 embed.py --force "
-                    f"{args.input} {args.output}",
-                    file=sys.stderr,
-                )
-                sys.exit(4)
+    if output_path.exists():
+        db = lancedb.connect(str(output_path))
+        # Migrate _meta.json -> _meta table if needed
+        migrate_meta_json(output_path, db, pa)
+
+        if not args.force:
+            meta = read_meta(db)
+            if meta:
+                existing_model = meta.get("model", "")
+                if existing_model and existing_model != MODEL_NAME:
+                    print(
+                        f"Error: dataset was built with {existing_model}, "
+                        f"current model is {MODEL_NAME}. "
+                        f"Re-embed with: python3 embed.py --force "
+                        f"{args.input} {args.output}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(4)
 
     # Generate embeddings
     print(f"Embedding {len(items)} items with {MODEL_NAME}...", file=sys.stderr)
     model = TextEmbedding(model_name=MODEL_NAME)
-    texts = [f"passage: {item['metadata_text']}" for item in items]
+    texts = [f"{PASSAGE_PREFIX}{item['metadata_text']}" for item in items]
     embeddings = list(model.embed(texts))
 
-    # Build PyArrow table with explicit schema to avoid type inference issues
+    # Build PyArrow table with explicit schema
     now = datetime.now(timezone.utc).isoformat()
 
     schema = pa.schema(
@@ -188,31 +220,47 @@ def main():
     arrow_table = pa.Table.from_pylist(records, schema=schema)
 
     # Write Lance dataset
-    # Check if table exists before connect (connect creates the directory)
     is_new = not output_path.exists()
-    db = lancedb.connect(str(output_path))
+    if is_new:
+        db = lancedb.connect(str(output_path))
 
     if args.force or is_new or TABLE_NAME not in db.table_names():
-        db.create_table(TABLE_NAME, data=arrow_table, mode="overwrite")
+        tbl = db.create_table(TABLE_NAME, data=arrow_table, mode="overwrite")
     else:
-        table = db.open_table(TABLE_NAME)
+        tbl = db.open_table(TABLE_NAME)
         (
-            table.merge_insert("id")
+            tbl.merge_insert("id")
             .when_matched_update_all()
             .when_not_matched_insert_all()
             .execute(arrow_table)
         )
 
-    # Write model metadata as JSON sidecar
-    meta_path = output_path / "_meta.json"
+    # Create FTS index on metadata_text for hybrid search
+    try:
+        tbl.create_fts_index("metadata_text", replace=True)
+    except Exception as e:
+        print(f"Warning: FTS index creation failed: {e}", file=sys.stderr)
+
+    # Create vector index for large corpora
+    if len(records) > VECTOR_INDEX_THRESHOLD:
+        try:
+            tbl.create_index(metric="cosine")
+            print(
+                f"Created vector index ({len(records)} entries "
+                f"> {VECTOR_INDEX_THRESHOLD})",
+                file=sys.stderr,
+            )
+        except Exception as e:
+            print(f"Warning: vector index creation failed: {e}", file=sys.stderr)
+
+    # Write metadata to _meta table
     metadata = {
         "model": MODEL_NAME,
         "dimensions": DIMENSIONS,
         "generated_at": now,
         "entry_count": len(records),
-        "mode": "entries",
     }
-    meta_path.write_text(json.dumps(metadata, indent=2))
+    write_meta(db, metadata, pa)
 
     total = len(records)
     print(json.dumps({"total": total, "embedded": total, "dataset": str(output_path)}))

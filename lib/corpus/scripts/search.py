@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-"""Query a Lance embedding dataset by cosine similarity with optional SQL filtering.
+"""Query a Lance embedding dataset by cosine similarity with optional filtering and reranking.
 
 Usage:
-  python3 search.py <dataset.lance> <query> [--top-k 10] [--where "SQL"] [--json]
-
-The dataset path (e.g., index-embeddings.lance/) is the LanceDB database directory.
-A fixed table name "embeddings" is expected inside it. Model metadata is read from
-a _meta.json sidecar file.
+  python3 search.py <dataset.lance> <query> [--top-k 10] [--where "SQL"] [--rerank] [--select "cols"] [--json]
 
 Exit codes:
   0 - success (even if no results)
@@ -22,6 +18,8 @@ from pathlib import Path
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 TABLE_NAME = "embeddings"
+META_TABLE = "_meta"
+QUERY_PREFIX = "query: "
 
 
 def parse_args():
@@ -40,12 +38,49 @@ def parse_args():
         help="SQL predicate for hybrid filtering",
     )
     parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Rerank results with CrossEncoder for better precision",
+    )
+    parser.add_argument(
+        "--select",
+        default=None,
+        help="Comma-separated extra columns to include in JSON output "
+        "(e.g., 'concepts,title')",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
         help="Output as JSON",
     )
     return parser.parse_args()
+
+
+def read_model_from_meta(db, dataset_path):
+    """Read model name from _meta table or _meta.json fallback."""
+    # Try _meta table first
+    try:
+        if META_TABLE in db.table_names():
+            meta_table = db.open_table(META_TABLE)
+            meta_arrow = meta_table.to_arrow()
+            keys = meta_arrow.column("key").to_pylist()
+            values = meta_arrow.column("value").to_pylist()
+            meta = dict(zip(keys, values))
+            return meta.get("model", "")
+    except Exception:
+        pass
+
+    # Fallback to _meta.json for backward compat
+    meta_path = dataset_path / "_meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text())
+            return meta.get("model", "")
+        except Exception:
+            pass
+
+    return ""
 
 
 def main():
@@ -85,22 +120,19 @@ def main():
         print(f"Error: could not open dataset: {e}", file=sys.stderr)
         sys.exit(2)
 
-    # Check model match via JSON sidecar
-    meta_path = dataset_path / "_meta.json"
-    if meta_path.exists():
-        meta = json.loads(meta_path.read_text())
-        existing_model = meta.get("model", "")
-        if existing_model and existing_model != MODEL_NAME:
-            print(
-                f"Error: dataset was built with {existing_model}, "
-                f"current model is {MODEL_NAME}.",
-                file=sys.stderr,
-            )
-            sys.exit(4)
+    # Check model match
+    existing_model = read_model_from_meta(db, dataset_path)
+    if existing_model and existing_model != MODEL_NAME:
+        print(
+            f"Error: dataset was built with {existing_model}, "
+            f"current model is {MODEL_NAME}.",
+            file=sys.stderr,
+        )
+        sys.exit(4)
 
-    # Embed query with query: prefix
+    # Embed query
     model = TextEmbedding(model_name=MODEL_NAME)
-    query_embedding = list(model.embed([f"query: {args.query}"]))[0]
+    query_embedding = list(model.embed([f"{QUERY_PREFIX}{args.query}"]))[0]
 
     # Build search query with cosine metric
     search = (
@@ -113,7 +145,22 @@ def main():
     if args.where:
         search = search.where(args.where)
 
-    # Execute — use to_arrow() to avoid pandas dependency
+    # Apply reranking if requested
+    if args.rerank:
+        try:
+            from lancedb.rerank import CrossEncoderReranker
+
+            search = search.rerank(reranker=CrossEncoderReranker())
+        except ImportError:
+            print(
+                "Warning: reranking not available "
+                "(lancedb rerank module missing)",
+                file=sys.stderr,
+            )
+        except Exception as e:
+            print(f"Warning: reranking failed: {e}", file=sys.stderr)
+
+    # Execute
     arrow_result = search.to_arrow()
 
     if arrow_result.num_rows == 0:
@@ -122,15 +169,25 @@ def main():
         sys.exit(0)
 
     # Format results
-    # Cosine distance is in [0, 2], similarity = 1 - distance
     ids = arrow_result.column("id").to_pylist()
     distances = arrow_result.column("_distance").to_pylist()
 
+    # Determine extra columns to include (--select requires --json)
+    select_cols = []
+    if args.select and args.json_output:
+        select_cols = [c.strip() for c in args.select.split(",")]
+
     results = []
-    for entry_id, distance in zip(ids, distances):
-        score = 1.0 - float(distance)
-        if score > 0:
-            results.append({"id": entry_id, "score": round(score, 4)})
+    for i, (entry_id, distance) in enumerate(zip(ids, distances)):
+        score = max(0.0, 1.0 - float(distance))
+        result = {"id": entry_id, "score": round(score, 4)}
+
+        # Add selected columns
+        for col in select_cols:
+            if col in arrow_result.schema.names:
+                result[col] = arrow_result.column(col)[i].as_py()
+
+        results.append(result)
 
     if args.json_output:
         print(json.dumps(results))

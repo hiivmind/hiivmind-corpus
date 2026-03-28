@@ -210,6 +210,47 @@ class TestSearchPipeline:
             f"Scores not sorted descending: {scores}"
         )
 
+    def test_scores_never_negative(self, embedded_dataset):
+        """Scores are capped at 0.0, never negative."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(embedded_dataset),
+             "completely unrelated gibberish xyzzy", "--json"],
+            capture_output=True,
+            text=True,
+        )
+        results = json.loads(result.stdout)
+        for r in results:
+            assert r["score"] >= 0.0, f"Negative score: {r['score']}"
+
+    def test_select_returns_extra_columns(self, embedded_dataset):
+        """--select with --json returns requested columns."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(embedded_dataset),
+             "database performance",
+             "--select", "concepts,title", "--json"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        results = json.loads(result.stdout)
+        assert len(results) > 0
+        assert "title" in results[0]
+        assert "concepts" in results[0]
+
+    def test_select_ignored_without_json(self, embedded_dataset):
+        """--select without --json produces normal tab output."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(embedded_dataset),
+             "anything", "--select", "title"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        lines = result.stdout.strip().split("\n")
+        assert "\t" in lines[0]
+        parts = lines[0].split("\t")
+        assert len(parts) == 2  # score + id only
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

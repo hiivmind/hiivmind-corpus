@@ -191,3 +191,217 @@ def test_sanitize_filename():
     from lib.corpus.tools.pdf_utils import sanitize_filename
     assert sanitize_filename("Chapter 3: Macro Variables!") == "Chapter_3_Macro_Variables"
     assert len(sanitize_filename("A" * 100, max_length=50)) <= 50
+
+
+# ---------------------------------------------------------------------------
+# dehyphenate tests
+# ---------------------------------------------------------------------------
+
+def test_dehyphenate_joins_split_words():
+    from lib.corpus.tools.pdf_utils import dehyphenate
+    assert dehyphenate("inde- pendent") == "independent"
+    assert dehyphenate("multi- variate analysis") == "multivariate analysis"
+
+def test_dehyphenate_preserves_intentional_hyphens():
+    from lib.corpus.tools.pdf_utils import dehyphenate
+    assert dehyphenate("end- Start") == "end- Start"
+    assert dehyphenate("least-squares") == "least-squares"
+
+def test_dehyphenate_preserves_short_fragments():
+    from lib.corpus.tools.pdf_utils import dehyphenate
+    assert dehyphenate("x- axis") == "x- axis"
+
+def test_dehyphenate_empty_and_no_hyphens():
+    from lib.corpus.tools.pdf_utils import dehyphenate
+    assert dehyphenate("") == ""
+    assert dehyphenate("no hyphens here") == "no hyphens here"
+
+
+# ---------------------------------------------------------------------------
+# Table post-processing tests
+# ---------------------------------------------------------------------------
+
+def test_split_subtables_on_empty_rows():
+    from lib.corpus.tools.pdf_utils import split_subtables
+    extract = [
+        ["Source", "DF", "SS"],
+        ["Model", "3", "91.7"],
+        [None, None, None],
+        ["R-Square", "Coeff Var"],
+        ["0.94", "9.8"],
+    ]
+    result = split_subtables(extract)
+    assert len(result) == 2
+    assert result[0] == [["Source", "DF", "SS"], ["Model", "3", "91.7"]]
+    assert result[1] == [["R-Square", "Coeff Var"], ["0.94", "9.8"]]
+
+def test_split_subtables_no_separators():
+    from lib.corpus.tools.pdf_utils import split_subtables
+    extract = [["A", "B"], ["1", "2"]]
+    result = split_subtables(extract)
+    assert len(result) == 1
+
+def test_split_subtables_empty_string_rows():
+    from lib.corpus.tools.pdf_utils import split_subtables
+    extract = [["A"], ["", ""], ["B"]]
+    result = split_subtables(extract)
+    assert len(result) == 2
+
+def test_expand_newline_cells():
+    from lib.corpus.tools.pdf_utils import expand_newline_cells
+    rows = [
+        ["Source", "DF\nSquares\nMean Square", "F Value"],
+        ["Model", "3\n91.7\n30.6", "15.29"],
+    ]
+    result = expand_newline_cells(rows)
+    assert result[0] == ["Source", "DF", "Squares", "Mean Square", "F Value"]
+    assert result[1] == ["Model", "3", "91.7", "30.6", "15.29"]
+
+def test_expand_newline_cells_normalizes_columns():
+    from lib.corpus.tools.pdf_utils import expand_newline_cells
+    rows = [["A\nB", "C"], ["D", "E"]]
+    result = expand_newline_cells(rows)
+    assert len(result[0]) == len(result[1]) == 3
+
+def test_expand_newline_cells_empty():
+    from lib.corpus.tools.pdf_utils import expand_newline_cells
+    assert expand_newline_cells([]) == []
+
+def test_merge_continuation_rows_backward():
+    from lib.corpus.tools.pdf_utils import merge_continuation_rows
+    rows = [
+        ["MANOVA", "Requests multivariate mode of eliminating observations with missing"],
+        ["", "values"],
+    ]
+    result = merge_continuation_rows(rows)
+    assert len(result) == 1
+    assert result[0][0] == "MANOVA"
+    assert "missing values" in result[0][1]
+
+def test_merge_continuation_rows_forward_sparse_header():
+    from lib.corpus.tools.pdf_utils import merge_continuation_rows
+    rows = [
+        ["", "", "Sum of", ""],
+        ["Source", "DF", "", "F Value"],
+        ["Model", "3", "91.7", "15.29"],
+    ]
+    result = merge_continuation_rows(rows)
+    assert len(result) == 2
+    assert result[0][2] == "Sum of"
+
+def test_merge_continuation_rows_preserves_normal_rows():
+    from lib.corpus.tools.pdf_utils import merge_continuation_rows
+    rows = [["A", "B"], ["C", "D"]]
+    result = merge_continuation_rows(rows)
+    assert len(result) == 2
+
+def test_strip_empty_columns():
+    from lib.corpus.tools.pdf_utils import strip_empty_columns
+    headers = ["Source", "", "DF", "", "SS"]
+    rows = [["Model", "", "3", "", "91.7"], ["Error", "", "10", "", "6.0"]]
+    h, r = strip_empty_columns(headers, rows)
+    assert h == ["Source", "DF", "SS"]
+    assert r == [["Model", "3", "91.7"], ["Error", "10", "6.0"]]
+
+def test_strip_empty_columns_keeps_nonempty():
+    from lib.corpus.tools.pdf_utils import strip_empty_columns
+    headers = ["A", "B"]
+    rows = [["1", "2"]]
+    h, r = strip_empty_columns(headers, rows)
+    assert h == ["A", "B"]
+
+
+# ---------------------------------------------------------------------------
+# emit_layout_table tests
+# ---------------------------------------------------------------------------
+
+def test_emit_layout_table_simple():
+    from lib.corpus.tools.pdf_utils import emit_layout_table
+    table_data = {
+        "extract": [
+            ["Source", "DF", "SS"],
+            ["Model", "3", "91.7"],
+            ["Error", "10", "6.0"],
+        ],
+        "col_count": 3,
+    }
+    result = emit_layout_table(table_data)
+    assert "| Source | DF | SS |" in result
+    assert "| Model | 3 | 91.7 |" in result
+
+def test_emit_layout_table_splits_subtables():
+    from lib.corpus.tools.pdf_utils import emit_layout_table
+    table_data = {
+        "extract": [
+            ["A", "B"],
+            ["1", "2"],
+            [None, None],
+            ["C", "D"],
+            ["3", "4"],
+        ],
+        "col_count": 2,
+    }
+    result = emit_layout_table(table_data)
+    assert result.count("| --- |") == 2
+
+def test_emit_layout_table_empty_returns_empty():
+    from lib.corpus.tools.pdf_utils import emit_layout_table
+    assert emit_layout_table({"extract": []}) == ""
+    assert emit_layout_table({"extract": [[None, None]]}) == ""
+
+def test_emit_layout_table_merges_continuations():
+    from lib.corpus.tools.pdf_utils import emit_layout_table
+    table_data = {
+        "extract": [
+            ["Option", "Description"],
+            ["MANOVA", "Requests multivariate mode of eliminating observations with missing"],
+            [None, "values"],
+        ],
+        "col_count": 2,
+    }
+    result = emit_layout_table(table_data)
+    assert "missing values" in result
+    lines = [l for l in result.strip().split("\n") if l.startswith("|")]
+    assert len(lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# tex_math_map tests
+# ---------------------------------------------------------------------------
+
+def test_decode_math_text_oml_greek():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("\u02DB", "MT2MIT") == "α"
+    assert decode_math_text("\u02C7", "MT2MIT") == "β"
+    assert decode_math_text("\uFFFD", "MT2MIT") == "π"
+
+def test_decode_math_text_oms_operators():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("C", "MT2SYT") == "+"
+    assert decode_math_text("D", "MT2SYT") == "="
+    assert decode_math_text("j", "MT2SYT") == "|"
+
+def test_decode_math_text_preserves_ascii():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("x", "MT2MIT") == "x"
+    assert decode_math_text("Y", "MT2MIT") == "Y"
+
+def test_decode_math_text_unknown_font():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("hello", "NimbusRomNo9L-Regu") == "hello"
+
+def test_is_math_font():
+    from lib.corpus.tools.tex_math_map import is_math_font
+    assert is_math_font("MT2MIT") is True
+    assert is_math_font("MT2SYT") is True
+    assert is_math_font("MT2BMIT") is True
+    assert is_math_font("NimbusRomNo9L-Regu") is False
+    assert is_math_font("AlbanyAMT,Bold") is False
+
+def test_decode_math_text_bold_beta():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("\u02C7", "MT2BMIT") == "β"
+
+def test_decode_math_text_prime():
+    from lib.corpus.tools.tex_math_map import decode_math_text
+    assert decode_math_text("0", "MT2SYS") == "′"
