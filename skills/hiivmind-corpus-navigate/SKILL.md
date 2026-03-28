@@ -65,9 +65,13 @@ Arguments: "flyio how to deploy"
 
 **If corpus not specified:**
 1. **Check aliases** (if registry-graph.yaml was loaded in Phase 1): match query against alias keys (exact or substring). If an alias matches, add its target corpora/concepts to routing candidates.
-2. **Embedding routing** (if registered corpora have `index-embeddings.lance/` and fastembed available):
-   - For each registered corpus with `index-embeddings.lance/`:
-     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 3 --json`
+2. **Embedding routing** (if fastembed available):
+   - For each registered corpus, resolve lance_path:
+     - **Local/embedded corpus:** `lance_path = {corpus_path}/index-embeddings.lance/`
+     - **Remote (GitHub) corpus:** `lance_path = .hiivmind/corpus/cache/{corpus_id}/index-embeddings.lance/`
+       Run cache freshness check (see § Remote Embedding Cache below). If no cache available, skip this corpus.
+   - For each corpus with a valid lance_path:
+     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 3 --json`
      - Corpus score = max score across returned entries
    - If top corpus score > 0.6 and > second corpus score + 0.15: use that corpus
    - If top score > 0.6 but within 0.15 of second: present top 2-3 corpora to user
@@ -167,13 +171,22 @@ Read: {source.path}/index.md
 
 **Step 4a: Embedding pre-filter** (if index-embeddings.lance/ exists)
 
-If `index-embeddings.lance/` exists for the selected corpus and fastembed is available:
+If fastembed is available:
+
+**Step 0: Resolve embedding path**
+
+Determine the local path to `index-embeddings.lance/` for the selected corpus:
+
+- **Local/embedded corpus:** `lance_path = {corpus_path}/index-embeddings.lance/`. If it doesn't exist → fall through to yq pre-filter.
+- **Remote (GitHub) corpus:** `lance_path = .hiivmind/corpus/cache/{corpus_id}/index-embeddings.lance/`. Run cache freshness check (see § Remote Embedding Cache below). If no cache available → fall through to yq pre-filter.
+
+Use `lance_path` in all subsequent search.py invocations in this phase.
 
 1. LLM extracts search terms and optionally constructs SQL predicate:
    - Tag matches: `"array_has_any(tags, ['term1', 'term2'])"`
    - Title matches: `"title LIKE '%term%'"`
    - Or no predicate (pure semantic search)
-2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {corpus_path}/index-embeddings.lance/ "{query}" --top-k 15 --where "{predicate}" --select "concepts" --json`
+2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 15 --where "{predicate}" --select "concepts" --json`
 3. **Reranking decision:** If top 3 scores are within 0.05 of each other OR query is ambiguous, re-run with `--rerank` for better precision. Do NOT rerank if top score > 0.8 or during Phase 2 cross-corpus routing.
 4. If search.py exits 0 with results:
    - Parse ranked entry IDs with cosine scores
@@ -313,6 +326,84 @@ Search the index for relevant entries:
 
    Annotate each fetched item with its tier in the presented response for transparency.
 
+### Remote Embedding Cache
+
+LanceDB cannot open Lance datasets over HTTPS — it only supports local paths, S3, GCS, and Azure. For remote GitHub corpora, the navigate skill caches the Lance directory locally.
+
+**Cache location:** `.hiivmind/corpus/cache/{corpus_id}/index-embeddings.lance/`
+
+**Freshness check algorithm:**
+
+```
+1. cache_path = .hiivmind/corpus/cache/{corpus_id}/index-embeddings.lance/
+2. If cache_path exists:
+   a. Read .hiivmind/corpus/cache/{corpus_id}/_cache_meta.json
+   b. If cached_at + ttl_days > now → FRESH, use cache
+   c. Else (stale):
+      - current_sha = gh api repos/{owner}/{repo}/commits/{ref} --jq '.sha'
+      - If current_sha == cached_commit_sha → rewrite _cache_meta.json with updated cached_at, use cache
+      - If current_sha != cached_commit_sha → re-clone Lance directory, update _cache_meta.json
+      - If gh api fails → use cached version silently
+3. If cache_path does not exist:
+   a. Attempt sparse clone (see below)
+   b. If clone succeeds and index-embeddings.lance/ exists → copy to cache, write _cache_meta.json
+   c. If clone fails or no Lance directory → fall through to yq pre-filter
+```
+
+**Sparse clone procedure:**
+
+```bash
+# Resolve TTL from registry.yaml (default 7 days)
+TTL_DAYS=$(yq ".corpora[] | select(.id == \"{corpus_id}\") | .cache.ttl" .hiivmind/corpus/registry.yaml 2>/dev/null | sed 's/d$//')
+TTL_DAYS=${TTL_DAYS:-7}
+
+TMPDIR=$(mktemp -d)
+git clone --depth 1 --filter=blob:none --sparse \
+  "https://github.com/{owner}/{repo}.git" "$TMPDIR" 2>/dev/null
+cd "$TMPDIR" && git sparse-checkout set index-embeddings.lance
+
+if [ ! -d "$TMPDIR/index-embeddings.lance" ]; then
+  rm -rf "$TMPDIR"
+  # No embeddings in remote corpus — fall through to yq pre-filter
+fi
+
+COMMIT_SHA=$(git -C "$TMPDIR" rev-parse HEAD)
+
+# Atomic copy to avoid races
+CACHE_DIR=".hiivmind/corpus/cache/{corpus_id}"
+mkdir -p "$CACHE_DIR"
+rm -rf "$CACHE_DIR/index-embeddings.lance.tmp"
+cp -r "$TMPDIR/index-embeddings.lance" "$CACHE_DIR/index-embeddings.lance.tmp"
+rm -rf "$CACHE_DIR/index-embeddings.lance"
+mv "$CACHE_DIR/index-embeddings.lance.tmp" "$CACHE_DIR/index-embeddings.lance"
+
+cat > "$CACHE_DIR/_cache_meta.json" << EOF
+{
+  "corpus_id": "{corpus_id}",
+  "source_repo": "{owner}/{repo}",
+  "source_ref": "{ref}",
+  "cached_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "cached_commit_sha": "$COMMIT_SHA",
+  "ttl_days": $TTL_DAYS
+}
+EOF
+
+rm -rf "$TMPDIR"
+```
+
+**`_cache_meta.json` format:**
+
+```json
+{
+  "corpus_id": "obsidian",
+  "source_repo": "hiivmind/hiivmind-corpus-obsidian",
+  "source_ref": "main",
+  "cached_at": "2026-03-29T09:00:00Z",
+  "cached_commit_sha": "81cfc93c3e3f92696dec7a40814d8b404f94f3aa",
+  "ttl_days": 7
+}
+```
+
 ### Graceful Degradation
 
 | Condition | Behavior |
@@ -326,6 +417,11 @@ Search the index for relevant entries:
 | No index-embeddings.lance/ for corpus | Skip embedding pre-filter and cross-corpus routing, use yq/keyword approach |
 | No fastembed but index-embeddings.lance/ exists | Skip embedding search, fall back to keywords |
 | Stale embeddings (index newer than embeddings) | Use stale embeddings, note in output |
+| Remote corpus, no cached embeddings | Sparse clone on first query (~5s), then cached |
+| Remote corpus, cache stale but SHA unchanged | Touch cached_at, use cache |
+| Remote corpus, cache stale and SHA changed | Re-clone Lance directory (~5s) |
+| Remote corpus, network unavailable | Use existing cache if present, else yq pre-filter |
+| git not available | Skip sparse clone, fall through to yq pre-filter |
 
 ### Phase 5: Fetch Documentation
 
