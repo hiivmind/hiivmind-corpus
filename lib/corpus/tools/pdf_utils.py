@@ -456,3 +456,250 @@ def sanitize_filename(title: str, max_length: int = 50) -> str:
     safe = re.sub(r"[^\w\s-]", "", title)
     safe = re.sub(r"[\s]+", "_", safe)
     return safe[:max_length].strip("_")
+
+
+# ---------------------------------------------------------------------------
+# Text post-processing
+# ---------------------------------------------------------------------------
+
+def dehyphenate(text: str) -> str:
+    """Fix words split across lines with hyphens.
+
+    Joins "inde- pendent" -> "independent" but preserves intentional hyphens.
+    Only dehyphenates when the fragment before the hyphen is at least 2 chars
+    and the continuation starts lowercase (not a new sentence).
+    """
+    return re.sub(r"(\w{2,})- ([a-z])", lambda m: m.group(1) + m.group(2), text)
+
+
+# ---------------------------------------------------------------------------
+# Table post-processing (for pymupdf4llm table data)
+# ---------------------------------------------------------------------------
+
+def split_subtables(extract: list[list]) -> list[list[list]]:
+    """Split extracted table rows on all-empty rows into sub-tables.
+
+    Complex documents often pack multiple logical tables into one physical
+    table with empty separator rows. This splits them apart so each
+    sub-table can be processed independently.
+
+    Args:
+        extract: Raw table rows from pymupdf4llm (list of rows, each a list
+                 of cell values — strings or None).
+
+    Returns:
+        List of sub-tables, each a list of rows.
+    """
+    subtables: list[list[list]] = []
+    current: list[list] = []
+    for row in extract:
+        if all(c is None or (isinstance(c, str) and not c.strip()) for c in row):
+            if current:
+                subtables.append(current)
+                current = []
+        else:
+            current.append(row)
+    if current:
+        subtables.append(current)
+    return subtables
+
+
+def expand_newline_cells(rows: list[list[str]]) -> list[list[str]]:
+    """Expand cells containing newlines into separate columns.
+
+    pymupdf4llm sometimes crams multiple column values into one cell
+    separated by newlines (e.g., 'DF\\nSquares\\nMean Square').
+    This expands each newline-separated value into its own column
+    and normalizes column count across all rows.
+
+    Args:
+        rows: Cleaned table rows (list of rows, each a list of strings).
+
+    Returns:
+        Rows with newline-packed cells expanded and column count normalized.
+    """
+    if not rows:
+        return rows
+
+    expanded = []
+    for row in rows:
+        new_row = []
+        for cell in row:
+            if cell and "\n" in cell:
+                new_row.extend(part.strip() for part in cell.split("\n"))
+            else:
+                new_row.append(cell or "")
+        expanded.append(new_row)
+
+    # Normalize column count to the max across all rows
+    max_cols = max(len(r) for r in expanded) if expanded else 0
+    for row in expanded:
+        while len(row) < max_cols:
+            row.append("")
+
+    return expanded
+
+
+def merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Merge continuation rows back into their parent row.
+
+    Handles two patterns:
+    1. Backward continuation: a row with empty leading cells continues
+       the previous row (wrapped cell text that spilled into a new row).
+    2. Forward continuation: a sparse partial row (1-2 cells) followed by
+       a fuller row — the sparse row's content merges into empty slots of
+       the next row (common in multi-line table headers).
+
+    Args:
+        rows: Table rows (list of rows, each a list of strings).
+
+    Returns:
+        Rows with continuation rows merged into their parent.
+    """
+    if not rows:
+        return rows
+
+    merged = []
+    for row in rows:
+        if not merged:
+            merged.append(row)
+            continue
+
+        first_nonempty = next((i for i, c in enumerate(row) if c.strip()), None)
+        if first_nonempty is None:
+            # Completely empty row — keep as separator
+            merged.append(row)
+            continue
+
+        if first_nonempty == 0:
+            # First cell has content — check if PREVIOUS row was a sparse partial
+            # header that should merge forward into this row.
+            prev = merged[-1]
+            prev_nonempty = sum(1 for c in prev if c.strip())
+            cur_nonempty = sum(1 for c in row if c.strip())
+
+            if prev_nonempty <= 2 and cur_nonempty > prev_nonempty:
+                # Previous row is sparse — merge into current row.
+                # Only merge where previous has content and current is empty.
+                for i, cell in enumerate(prev):
+                    if i < len(row) and cell.strip() and not row[i].strip():
+                        row[i] = cell.strip()
+                merged[-1] = row
+            else:
+                merged.append(row)
+            continue
+
+        # Backward continuation — merge into previous row
+        prev = merged[-1]
+        for i, cell in enumerate(row):
+            if i < len(prev) and cell.strip():
+                if prev[i].strip():
+                    prev[i] = prev[i].rstrip() + " " + cell.strip()
+                else:
+                    prev[i] = cell.strip()
+
+    return merged
+
+
+def strip_empty_columns(
+    headers: list[str], rows: list[list[str]]
+) -> tuple[list[str], list[list[str]]]:
+    """Remove columns that are empty in every row including the header.
+
+    Args:
+        headers: Header row cells.
+        rows: Data rows.
+
+    Returns:
+        Tuple of (filtered_headers, filtered_rows).
+    """
+    num_cols = len(headers)
+    keep = []
+    for col_idx in range(num_cols):
+        col_vals = [headers[col_idx]] + [row[col_idx] for row in rows if col_idx < len(row)]
+        if any(v.strip() for v in col_vals):
+            keep.append(col_idx)
+    if not keep:
+        return headers, rows
+    headers = [headers[i] for i in keep]
+    rows = [[row[i] for i in keep if i < len(row)] for row in rows]
+    return headers, rows
+
+
+def emit_layout_table(table_data: dict) -> str:
+    """Process and emit a pymupdf4llm table as markdown.
+
+    Orchestrates the full table post-processing pipeline:
+    1. Split on empty rows into sub-tables
+    2. Merge continuation rows (wrapped text)
+    3. Expand newline-packed cells into separate columns
+    4. Merge again (expansion can create new continuations)
+    5. Strip empty columns
+    6. Quality check — fall back to code block if too sparse/wide
+
+    Args:
+        table_data: A table dict from pymupdf4llm's JSON output, expected
+                    to have an "extract" key with list of rows.
+
+    Returns:
+        Markdown string (may contain multiple tables or code blocks).
+        Empty string if the table has no content.
+    """
+    extract = table_data.get("extract", [])
+    if not extract or len(extract) < 1:
+        return ""
+
+    def clean_cell(cell):
+        if cell is None:
+            return ""
+        return cell.strip()
+
+    # Skip completely empty tables
+    all_text = "".join(clean_cell(c) for row in extract for c in row)
+    if not all_text.strip():
+        return ""
+
+    parts: list[str] = []
+    subtables = split_subtables(extract)
+
+    for sub in subtables:
+        if not sub:
+            continue
+
+        cleaned = [[clean_cell(c) for c in row] for row in sub]
+        cleaned = merge_continuation_rows(cleaned)
+        cleaned = expand_newline_cells(cleaned)
+        cleaned = merge_continuation_rows(cleaned)
+
+        headers = cleaned[0]
+        rows = cleaned[1:] if len(cleaned) > 1 else []
+
+        headers, rows = strip_empty_columns(headers, rows)
+
+        all_content = "".join(headers) + "".join("".join(r) for r in rows)
+        if not all_content.strip():
+            continue
+
+        # Quality check — fall back to code block if too sparse or too wide
+        total_cells = len(headers) + sum(len(r) for r in rows)
+        empty_cells = (
+            sum(1 for h in headers if not h.strip())
+            + sum(1 for r in rows for c in r if not c.strip())
+        )
+        too_sparse = total_cells > 0 and empty_cells / total_cells > 0.5
+        too_wide = len(headers) > 8
+
+        if too_sparse or too_wide:
+            lines = []
+            for row in [headers] + rows:
+                cells = [c for c in row if c.strip()]
+                if cells:
+                    lines.append("  ".join(cells))
+            if lines:
+                parts.append(emit_code_block("\n".join(lines), ""))
+                parts.append("")
+        else:
+            parts.append(emit_table(headers, rows))
+            parts.append("")
+
+    return "\n".join(parts)
