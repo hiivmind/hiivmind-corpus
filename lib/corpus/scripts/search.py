@@ -61,7 +61,7 @@ def read_model_from_meta(db, dataset_path):
     """Read model name from _meta table or _meta.json fallback."""
     # Try _meta table first
     try:
-        if META_TABLE in db.table_names():
+        if META_TABLE in db.list_tables():
             meta_table = db.open_table(META_TABLE)
             meta_arrow = meta_table.to_arrow()
             keys = meta_arrow.column("key").to_pylist()
