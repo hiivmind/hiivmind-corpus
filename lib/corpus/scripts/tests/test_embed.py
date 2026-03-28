@@ -203,7 +203,7 @@ class TestEmbeddingPipeline:
 
         # Verify _meta table exists (not _meta.json)
         db = lancedb.connect(str(output))
-        assert "_meta" in db.list_tables()
+        assert "_meta" in db.table_names()
         meta_table = db.open_table("_meta")
         meta_arrow = meta_table.to_arrow()
         keys = meta_arrow.column("key").to_pylist()
@@ -298,7 +298,7 @@ class TestEmbeddingPipeline:
         # _meta.json should be gone, _meta table should exist
         assert not meta_json.exists()
         db2 = lancedb.connect(str(output))
-        assert "_meta" in db2.list_tables()
+        assert "_meta" in db2.table_names()
 
 
 if __name__ == "__main__":

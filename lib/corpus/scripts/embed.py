@@ -83,7 +83,7 @@ def load_entries(input_path):
 def read_meta(db):
     """Read metadata from _meta table. Returns dict or None."""
     try:
-        if META_TABLE not in db.list_tables():
+        if META_TABLE not in db.table_names():
             return None
         meta_table = db.open_table(META_TABLE)
         meta_arrow = meta_table.to_arrow()
@@ -110,7 +110,7 @@ def write_meta(db, metadata, pa):
 def migrate_meta_json(output_path, db, pa):
     """Migrate _meta.json sidecar to _meta table if needed."""
     meta_json_path = output_path / "_meta.json"
-    if meta_json_path.exists() and META_TABLE not in db.list_tables():
+    if meta_json_path.exists() and META_TABLE not in db.table_names():
         try:
             meta = json.loads(meta_json_path.read_text())
             write_meta(db, meta, pa)
@@ -224,7 +224,7 @@ def main():
     if is_new:
         db = lancedb.connect(str(output_path))
 
-    if args.force or is_new or TABLE_NAME not in db.list_tables():
+    if args.force or is_new or TABLE_NAME not in db.table_names():
         tbl = db.create_table(TABLE_NAME, data=arrow_table, mode="overwrite")
     else:
         tbl = db.open_table(TABLE_NAME)
