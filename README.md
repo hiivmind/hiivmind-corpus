@@ -2,6 +2,8 @@
 
 A Claude Code plugin for building persistent, curated documentation indexes with semantic search. One plugin creates, maintains, and queries documentation corpora from any source — git repos, local files, web pages, Obsidian vaults, PDFs, and more.
 
+**Quick links:** [Using a Corpus](#using-a-corpus) | [Building a Corpus](#building-a-corpus) | [Semantic Search](#semantic-search-rag) | [Published Corpora](#published-corpora)
+
 ## The Idea
 
 Without structured indexing, Claude investigates libraries by relying on training data (outdated), web searching (hit-or-miss), or fetching URLs one at a time (no context). Every session rediscovers the same things.
@@ -42,6 +44,84 @@ claude plugin add hiivmind/hiivmind-corpus
 ```
 
 Or use `/plugin` to browse and install interactively.
+
+## Using a Corpus
+
+Most users start here — someone else built the corpus, you just want to query it.
+
+### 1. Register a corpus with your project
+
+```
+/hiivmind-corpus register github:hiivmind/hiivmind-corpus-polars
+```
+
+This adds the corpus to your project's registry (`.hiivmind/corpus/registry.yaml`). Register as many as you need — they're lightweight references, not copies.
+
+### 2. Ask questions
+
+Just ask naturally. Claude routes your question to the right corpus:
+
+```
+"How do I filter rows in Polars?"
+"What's the difference between select and with_columns?"
+"Show me lazy frame optimization techniques"
+```
+
+Or be explicit: `/hiivmind-corpus navigate polars "group by aggregations"`
+
+### How navigation works
+
+When you ask a question, the navigate skill:
+
+1. **Routes to the right corpus** — matches your query against registered corpora using semantic similarity (if embeddings are cached) or keyword matching
+2. **Finds relevant entries** — searches the corpus index using vector search with optional SQL filtering, boosted by concept graph relationships
+3. **Fetches documentation** — retrieves the actual content from the source repo via `gh api`
+4. **Presents the answer** — with source citations and related doc suggestions
+
+For remote GitHub corpora, embeddings are automatically cached locally on first query (~5 seconds, then instant on subsequent queries).
+
+### Check what you have
+
+```
+/hiivmind-corpus discover        # List all available corpora
+/hiivmind-corpus status           # Check freshness and health
+```
+
+### Cross-corpus queries
+
+With 2+ corpora registered, you can create **bridges** — links between related concepts across corpora:
+
+```
+/hiivmind-corpus bridge           # Detect and create cross-corpus links
+```
+
+Navigate then uses bridges and aliases to route queries that span multiple documentation sets. Search for "lazy evaluation" and it finds relevant entries in both Polars and Ibis.
+
+---
+
+## Building a Corpus
+
+If you want to create a new corpus from scratch — for a library, framework, or internal project.
+
+### Quick start
+
+```
+/hiivmind-corpus init             # Scaffold from a GitHub repo
+/hiivmind-corpus add-source       # Add git repos, local files, web pages, PDFs
+/hiivmind-corpus build            # Scan sources, build index collaboratively
+```
+
+The build process is a conversation — Claude scans the docs and you guide what matters: "I care about data modeling and ETL, skip the deployment stuff." That curation persists across sessions.
+
+### After building
+
+```
+/hiivmind-corpus enhance          # Deepen coverage on specific topics
+/hiivmind-corpus refresh          # Sync with upstream changes
+/hiivmind-corpus graph add-concept  # Add zettelkasten concept clusters
+```
+
+---
 
 ## What a Corpus Looks Like
 
