@@ -53,7 +53,7 @@ Most users start here — someone else built the corpus, you just want to query 
 ### 1. Register a corpus with your project
 
 ```
-/hiivmind-corpus register github:hiivmind/hiivmind-corpus-polars
+/hiivmind-corpus register github:hiivmind/hiivmind-corpus-data/hiivmind-corpus-polars
 ```
 
 This adds the corpus to your project's registry (`.hiivmind/corpus/registry.yaml`). Register as many as you need — they're lightweight references, not copies.
@@ -295,7 +295,8 @@ corpora:
   - id: polars
     source:
       type: github
-      repo: hiivmind/hiivmind-corpus-polars
+      repo: hiivmind/hiivmind-corpus-data
+      path: hiivmind-corpus-polars
       ref: main
   - id: flyio
     source:
