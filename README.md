@@ -28,11 +28,16 @@ One command, natural language:
 
 ## Installation
 
-```bash
-# Add the marketplace
-/plugin marketplace add hiivmind/hiivmind-corpus
+**From the command line:**
 
-# Install the plugin
+```bash
+claude plugin add hiivmind/hiivmind-corpus
+```
+
+**From within a Claude Code session:**
+
+```
+/plugin marketplace add hiivmind/hiivmind-corpus
 /plugin install hiivmind-corpus@hiivmind
 ```
 
