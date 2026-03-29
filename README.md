@@ -33,7 +33,8 @@ One command, natural language:
 **From the command line:**
 
 ```bash
-claude plugin add hiivmind/hiivmind-corpus
+claude plugin marketplace add hiivmind/hiivmind-corpus
+claude plugin add hiivmind-corpus@hiivmind
 ```
 
 **From within a Claude Code session:**
