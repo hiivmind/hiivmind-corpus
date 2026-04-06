@@ -96,6 +96,7 @@ def score_line(line: str, strategy: str) -> int:
     elif strategy == "paragraph":
         if line.strip() == "":
             return scores["double_newline"]
+        return scores["single_newline"]
 
     return 0
 
@@ -274,6 +275,9 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(3)

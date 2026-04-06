@@ -133,6 +133,29 @@ class TestParagraphStrategy:
         assert len(chunks) >= 2
 
 
+class TestCodeStrategy:
+    """Code chunking: function/class boundaries (100), blank lines (20)."""
+
+    def test_splits_on_function_definitions(self):
+        from chunk import chunk_text
+
+        text = "\n".join([
+            "def hello():",
+            "    print('hello')",
+            "    print('world')",
+            "",
+            "def goodbye():",
+            "    print('goodbye')",
+            "    print('world')",
+            "",
+            "class MyClass:",
+            "    def method(self):",
+            "        pass",
+        ])
+        chunks = chunk_text(text, strategy="code", target_tokens=10, overlap_tokens=0)
+        assert len(chunks) >= 2
+
+
 class TestLineRanges:
     """Verify line_range accuracy across all strategies."""
 
