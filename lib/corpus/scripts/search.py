@@ -153,7 +153,7 @@ def main():
         try:
             from lancedb.rerank import RRFReranker
             search = (
-                table.search(args.query, query_type="hybrid")
+                table.search(args.query, query_type="hybrid", fts_columns=args.text_column)
                 .rerank(reranker=RRFReranker())
                 .limit(args.top_k)
             )
