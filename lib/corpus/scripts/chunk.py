@@ -211,7 +211,7 @@ def chunk_text(
                     break
             chunk_start = max(chunk_start + 1, split_at - overlap_lines)
         else:
-            chunk_start = split_at
+            chunk_start = max(chunk_start + 1, split_at)
 
     return chunks
 
