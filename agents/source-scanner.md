@@ -128,6 +128,94 @@ For each documentation file discovered during scanning, generate entry metadata:
 
 **Sampling strategy for entries:** For corpora with 50+ files, sample 5-10 representative files to establish tag/category conventions, then apply consistently across all files. For smaller corpora, analyze each file individually.
 
+### Section Entry Generation
+
+When the caller includes `sections_config:` in your input (sourced from the source's `sections:` block in config.yaml), generate section-level entries for qualifying headings.
+
+**When sections are enabled:**
+
+1. For each file, use the already-extracted `headings` list
+2. For each heading at `sections_config.min_level` or deeper:
+   a. Calculate content boundaries: from heading line to next heading of equal/higher level (or EOF)
+   b. Count non-blank content lines in that range
+   c. If content lines < `sections_config.min_content_lines`: skip
+   d. Read the section content (heading to boundary)
+   e. Generate: title (heading text), summary (1-2 sentences), tags, keywords
+   f. Construct section entry with: `parent`, `tier: section`, `anchor`, `heading_level`, `line_range`
+3. Append section entries to the `entries:` list in your output, after the parent file entry
+
+**Section entry output format** (appended to entries list):
+
+```yaml
+entries:
+  # ... file entry ...
+  - path: "expressions.md"
+    parent: "polars:expressions.md"
+    tier: section
+    anchor: "window-functions"
+    title: "Window Functions"
+    summary: "How to use over() for window expressions"
+    tags: [window, aggregation]
+    keywords: [partition_by, over]
+    concepts: []
+    category: reference
+    content_type: markdown
+    heading_level: 2
+    line_range: [145, 210]
+    size: standard
+    stale: false
+```
+
+**Heading consistency assessment:**
+
+During file sampling (step 4), assess heading consistency across the source:
+
+```yaml
+heading_consistency: high    # >80% of files have consistent h2+ structure
+heading_consistency_note: "Consistent h2 sections in 95% of files"
+```
+
+Report this in the top-level scan output so the build skill can make informed recommendations.
+
+### Chunk Generation
+
+When the caller includes `chunking_config:` in your input (sourced from the source's `chunking:` block in config.yaml), generate chunks for each file.
+
+**When chunking is enabled:**
+
+1. For each documentation file in the source:
+   a. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/chunk.py "{file_path}" --strategy {chunking_config.strategy} --target-tokens {chunking_config.target_tokens} --overlap-tokens {chunking_config.overlap_tokens} --json`
+   b. Parse the JSON output
+   c. For each chunk, annotate with corpus-level IDs:
+      - `id`: `{source_id}:{relative_path}#chunk-{chunk_index}`
+      - `parent`: `{source_id}:{relative_path}`
+      - `source`: `{source_id}`
+      - `path`: `{relative_path}`
+2. Append all annotated chunks to a `chunks:` block in your output
+
+**Chunk output format** (separate from entries, appended to scan report):
+
+```yaml
+chunks:
+  - id: "notes:2026-03-15-standup.md#chunk-0"
+    parent: "notes:2026-03-15-standup.md"
+    source: "notes"
+    path: "2026-03-15-standup.md"
+    chunk_index: 0
+    chunk_text: "Discussion about Q3 timeline and resource allocation..."
+    line_range: [1, 25]
+    overlap_prev: false
+  - id: "notes:2026-03-15-standup.md#chunk-1"
+    parent: "notes:2026-03-15-standup.md"
+    source: "notes"
+    path: "2026-03-15-standup.md"
+    chunk_index: 1
+    chunk_text: "Bob raised concerns about infrastructure costs..."
+    line_range: [20, 45]
+    overlap_prev: true
+chunk_count: 2
+```
+
 ## Extraction
 
 When the caller includes `extraction_config:` in your input (sourced from the source's `extraction:` block in config.yaml), run the extraction pipeline after scanning and append an `extraction:` block to your YAML output.
