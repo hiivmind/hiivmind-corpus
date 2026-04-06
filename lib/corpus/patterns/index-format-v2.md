@@ -91,6 +91,84 @@ meta:
 | `stale_since` | datetime | no | When the entry was marked stale. Null if not stale |
 | `last_indexed` | datetime | yes | When this entry was last scanned by the source-scanner agent |
 
+## Section Entries (Tier 2)
+
+When a source has `sections.enabled: true`, the source-scanner generates sub-entries
+for heading-bounded sections within large or structured documents. Section entries
+live in the same `entries` list as file-level entries.
+
+### Additional Fields for Section Entries
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `parent` | string | yes (sections) | ID of the parent file entry |
+| `tier` | enum | yes (sections) | Always `section` for section entries. File entries omit this field or use `file` |
+| `anchor` | string | yes (sections) | Slugified heading text (URL fragment) |
+| `heading_level` | integer | yes (sections) | Heading level (2-6). Level 1 is typically the page title |
+| `line_range` | integer[2] | yes (sections) | `[start_line, end_line]` — 1-indexed, inclusive |
+
+### Section Entry ID Format
+
+`{parent_id}#{anchor}` — e.g., `polars:expressions.md#window-functions`
+
+### Example
+
+```yaml
+entries:
+  # File-level entry (unchanged)
+  - id: "polars:expressions.md"
+    source: polars
+    path: "expressions.md"
+    title: "Expressions"
+    summary: "Overview of Polars expression system"
+    tags: [expressions, core]
+    keywords: [col, lit, when, then]
+    concepts: [expressions]
+    category: reference
+    content_type: markdown
+    size: large
+    grep_hint: "grep -n '^## ' FILE"
+    headings:
+      - anchor: "window-functions"
+        title: "Window Functions"
+      - anchor: "aggregations"
+        title: "Aggregations"
+    links_to: []
+    links_from: []
+    frontmatter: {}
+    stale: false
+    stale_since: null
+    last_indexed: "2026-04-05T10:00:00Z"
+
+  # Section entry (new)
+  - id: "polars:expressions.md#window-functions"
+    parent: "polars:expressions.md"
+    tier: section
+    source: polars
+    path: "expressions.md"
+    anchor: "window-functions"
+    title: "Window Functions"
+    summary: "How to use over() for window expressions in Polars"
+    tags: [window, aggregation, over]
+    keywords: [partition_by, order_by, rolling]
+    concepts: ["window-expressions"]
+    category: reference
+    content_type: markdown
+    heading_level: 2
+    line_range: [145, 210]
+    stale: false
+    stale_since: null
+    last_indexed: "2026-04-05T10:00:00Z"
+```
+
+### Embedding
+
+Section entries use the same metadata-embedding pattern as file entries:
+`"passage: {title} | {summary} | {', '.join(tags)} | {', '.join(concepts)}"`
+
+They are embedded into the existing `index-embeddings.lance/` alongside file entries.
+The `tier` field in index.yaml (not in Lance) lets the navigate skill distinguish them.
+
 ## Meta Section
 
 | Field | Type | Description |
