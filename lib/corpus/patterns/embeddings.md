@@ -95,6 +95,26 @@ Stored alongside index.yaml in the corpus root. **MUST be committed to the repo*
 distributable artifact, not a cache. Consumers get pre-computed embeddings without needing
 fastembed installed. Do NOT add to .gitignore. Treat it the same as index.yaml and index.md.
 
+### Per-corpus: chunks-embeddings.lance/
+
+Generate content embeddings from chunked documents:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
+```
+
+Separate from `index-embeddings.lance/`. Contains actual document content (not metadata
+summaries). Enables LanceDB native hybrid search (FTS + vector + RRF).
+
+**Schema:** See `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/chunking.md`
+
+**Key differences from index-embeddings:**
+- Table name: `chunks` (not `embeddings`)
+- Embeds raw text (no `passage:` prefix)
+- FTS index on `chunk_text` column enables hybrid search
+- Searched with `--table chunks --hybrid --text-column chunk_text`
+- Larger size (10-100MB) since content is stored in table
+
 ### Cross-corpus routing
 
 Cross-corpus routing does not require a separate embedding dataset. Navigate Phase 2
@@ -122,6 +142,14 @@ at `.hiivmind/corpus/cache/{corpus_id}/`.
 
 See navigate skill § Remote Embedding Cache for the full freshness check algorithm
 and sparse clone procedure.
+
+### Remote chunk embedding cache
+
+Same mechanism as index-embeddings cache. Both Lance directories are sparse-cloned
+together. `_cache_meta.json` covers both — a single SHA check validates freshness for
+the entire corpus.
+
+Cache location: `.hiivmind/corpus/cache/{corpus_id}/chunks-embeddings.lance/`
 
 ### Incremental updates
 
@@ -198,6 +226,25 @@ python3 search.py index-embeddings.lance/ "how to speed up queries" --top-k 15 -
 
 This replaces the need for a separate BM25 keyword index. Exact-match needs (API names,
 config keys, version strings) are handled by SQL predicates on text columns.
+
+### Native Hybrid Search (chunks)
+
+For chunk datasets, use LanceDB native hybrid search instead of vector + SQL:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py chunks-embeddings.lance/ "query" \
+  --table chunks --hybrid --text-column chunk_text --top-k 15 --json
+```
+
+This runs vector similarity AND full-text search on `chunk_text` simultaneously,
+then fuses results with Reciprocal Rank Fusion (RRF). Equivalent to BM25 + vector
+search without a separate BM25 index.
+
+**When to use native hybrid vs vector + SQL:**
+- **Native hybrid (`--hybrid`):** For chunk content where both lexical and semantic
+  matching matter. Default for chunk searches.
+- **Vector + SQL (`--where`):** For metadata embeddings where exact tag/keyword matches
+  supplement semantic search. Default for index-embeddings searches.
 
 ## Staleness Detection
 
