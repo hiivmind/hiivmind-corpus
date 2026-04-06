@@ -136,6 +136,23 @@ extraction_config:
 Include extraction output in your YAML report per the extraction output format in
 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/extraction.md § "Source-Scanner Extraction Output Format".
 {end if}
+{if source has sections: block in config}
+sections_config:
+  enabled: true
+  min_level: {min_level}
+  min_content_lines: {min_content_lines}
+Generate section entries for qualifying headings per the Section Entry Generation
+instructions in ${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md.
+Also report heading_consistency in your scan output.
+{end if}
+{if source has chunking: block in config}
+chunking_config:
+  strategy: {strategy}
+  target_tokens: {target_tokens}
+  overlap_tokens: {overlap_tokens}
+Run chunk.py on each file and include chunks in your output per the Chunk Generation
+instructions in ${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md.
+{end if}
 Additionally, for each documentation file, include entry metadata in your output:
 path, title, summary, tags, keywords, category, content_type, size, grep_hint, headings.
 See ${CLAUDE_PLUGIN_ROOT}/agents/source-scanner.md § "Entry Metadata Generation" for field details.
@@ -243,6 +260,61 @@ Ask: "How should the index be organized?"
 Ask: "Are there sections to exclude? (e.g., changelog, internal docs)"
 Allow comma-separated section names or "none".
 
+### Indexing depth (per source)
+
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/section-indexing.md` and `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/chunking.md`
+
+For each source, analyze scan results and recommend an indexing depth. Present
+the recommendation with concrete consequences — estimated counts and sizes.
+
+For each source, present:
+
+```
+Source: {source_id} ({type}, {file_count} files, {large_file_count} large files)
+
+Recommended indexing depth: {recommendation}
+  - File-level: {file_count} entries with metadata embeddings (current default)
+  - Section-level: ~{section_estimate} additional entries from h{min_level}+ headings
+  - Deep chunking: {chunk_estimate_or_"Not recommended"} using {strategy} strategy
+
+Reason: {explanation based on scan results}
+
+Options:
+  a) File only (current behavior)
+  b) File + Sections [recommended if heading_consistency is high]
+  c) File + Chunks [recommended if heading_consistency is low]
+  d) File + Sections + Chunks
+```
+
+**Recommendation logic:**
+
+| Scan Result | Recommendation |
+|------------|---------------|
+| heading_consistency: high, large_files > 0 | File + Sections |
+| heading_consistency: low or mixed | File + Chunks |
+| heading_consistency: high, large_files > 0, file_count > 200 | File + Sections + Chunks |
+| file_count < 50, no large files | File only |
+
+**Estimation heuristics:**
+- Section count: `sum(headings per file at min_level+) * 0.7` (30% filtered by min_content_lines)
+- Chunk count: `sum(file_lines / target_lines_per_chunk)` across chunking-eligible files
+- Embedding size: `entry_count * 2KB` for metadata, `chunk_count * 15KB` for chunks
+
+After all sources are configured, show a confirmation table:
+
+```
+Indexing Depth Summary
+──────────────────────────────────────────────────────────────
+Source            | File | Sections | Chunks | Est. size
+------------------|------|----------|--------|----------
+polars-docs       |  142 |     ~200 |      — | ~4MB
+meeting-notes     |  340 |        — |  ~3000 | ~45MB
+obsidian-vault    |  215 |     ~180 |   ~800 | ~18MB
+──────────────────────────────────────────────────────────────
+```
+
+Store user choices in `computed.indexing_depth` for use in later phases.
+
 ---
 
 ## Phase 5: Generate Index
@@ -296,6 +368,13 @@ For each entry from each source-scanner report:
 6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
 7. Set `concepts` to empty list `[]` (populated later by Phase 6 if graph extraction is enabled, or manually via graph add-concept)
 8. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
+9. For section entries from source-scanner reports (entries with `tier: section`):
+   - Construct `id` as `{source_id}:{path}#{anchor}`
+   - Set `parent` to the file entry ID (`{source_id}:{path}`)
+   - Map scanner output: `title`, `summary`, `tags`, `keywords`, `anchor`, `heading_level`, `line_range`
+   - Set `tier: section`
+   - Set `concepts` to empty list (populated by Phase 6 if applicable)
+   - Section entries do NOT have: `size`, `grep_hint`, `headings`, `links_to`, `links_from`, `frontmatter`
 
 Construct `meta`:
 - `generated_at`: current timestamp
@@ -448,6 +527,38 @@ GUARD_PHASE_7():
 
 ---
 
+## Phase 7b: Generate Chunk Embeddings (optional)
+
+**Inputs:** `computed.scan_results` (with chunks data), `computed.indexing_depth`
+**Outputs:** `chunks-embeddings.lance/` (if any source has chunking enabled)
+
+**Skip condition:** No source in `computed.indexing_depth` has chunks enabled.
+
+### Procedure
+
+1. Aggregate all chunks from source-scanner reports into a single JSON file:
+   - Write `chunks.json` to a temporary location
+   - Each chunk must have: `id`, `parent`, `source`, `path`, `chunk_index`, `chunk_text`, `line_range`, `overlap_prev`
+
+2. Run dependency detection:
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
+   ```
+   If not installed, prompt user (same as Phase 7).
+
+3. Run chunk embedding:
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
+   ```
+
+4. Clean up temporary `chunks.json`
+
+5. Display: "Generated chunk embeddings for {chunk_count} chunks across {source_count} sources"
+
+**Commit guidance:** `chunks-embeddings.lance/` MUST be committed alongside other corpus files. Do NOT add to `.gitignore`.
+
+---
+
 ## Phase 8: Save and Complete
 
 **Inputs:** `computed.index`, `computed.segmentation`
@@ -484,10 +595,11 @@ Display summary:
 ```
 Build complete!
 
-Index: index.yaml ({entry_count} entries)
+Index: index.yaml ({entry_count} entries, {section_count} sections)
 Rendered: index.md
 {if graph: Graph: graph.yaml ({concept_count} concepts, {relationship_count} relationships)}
-{if embeddings: Embeddings: index-embeddings.lance/ ({entry_count} entries)}
+{if embeddings: Embeddings: index-embeddings.lance/ ({entry_count + section_count} entries)}
+{if chunks: Chunks: chunks-embeddings.lance/ ({chunk_count} chunks)}
 {if tiered: Sub-indexes: {count} files}
 Strategy: {segmentation_strategy}
 Sources indexed: {source_count}
@@ -521,6 +633,8 @@ Sources indexed: {source_count}
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Freshness:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+- **Section indexing:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/section-indexing.md`
+- **Deep chunking:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/chunking.md`
 
 ## Agent
 
