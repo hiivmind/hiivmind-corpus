@@ -3,6 +3,7 @@
 
 Usage:
   python3 embed.py [--force] <index.yaml> <output.lance>
+  python3 embed.py --mode chunks [--force] <chunks.json> <output.lance>
 
 Reads entries from index.yaml including their concepts[] field.
 Embedding text: "passage: {title} | {summary} | {tags} | {concepts}"
@@ -27,6 +28,7 @@ from pathlib import Path
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 DIMENSIONS = 384
 TABLE_NAME = "embeddings"
+CHUNKS_TABLE_NAME = "chunks"
 META_TABLE = "_meta"
 PASSAGE_PREFIX = "passage: "  # bge-small asymmetric retrieval prefix for documents
 QUERY_PREFIX = "query: "  # bge-small asymmetric retrieval prefix for queries
@@ -35,12 +37,18 @@ VECTOR_INDEX_THRESHOLD = 500  # Create IVF_PQ index above this entry count
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate embeddings")
-    parser.add_argument("input", help="Path to index.yaml")
+    parser.add_argument("input", help="Path to index.yaml or chunks.json")
     parser.add_argument("output", help="Path to output Lance dataset directory")
     parser.add_argument(
         "--force",
         action="store_true",
         help="Force re-embedding all entries",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["index", "chunks"],
+        default="index",
+        help="Embedding mode: 'index' (default) embeds index.yaml entries, 'chunks' embeds chunk.py JSON output",
     )
     return parser.parse_args()
 
@@ -77,6 +85,25 @@ def load_entries(input_path):
                 "metadata_text": metadata_text.strip(),
             }
         )
+    return items
+
+
+def load_chunks(input_path):
+    """Load chunks from JSON file (output of chunk.py). Return list of dicts."""
+    with open(input_path) as f:
+        chunks = json.load(f)
+    items = []
+    for chunk in chunks:
+        items.append({
+            "id": chunk["id"],
+            "parent": chunk["parent"],
+            "source": chunk["source"],
+            "path": chunk["path"],
+            "chunk_index": chunk["chunk_index"],
+            "chunk_text": chunk["chunk_text"],
+            "line_range": chunk["line_range"],
+            "overlap_prev": chunk.get("overlap_prev", False),
+        })
     return items
 
 
@@ -120,8 +147,140 @@ def migrate_meta_json(output_path, db, pa):
             print(f"Warning: failed to migrate _meta.json: {e}", file=sys.stderr)
 
 
+def main_chunks(args):
+    """Handle the --mode chunks embedding pipeline."""
+    if not Path(args.input).exists():
+        print(f"Error: input file not found: {args.input}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        from fastembed import TextEmbedding
+    except ImportError:
+        print(
+            "Error: fastembed not installed. "
+            "Run: pip install fastembed lancedb",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        import lancedb
+        import pyarrow as pa
+    except ImportError:
+        print(
+            "Error: lancedb not installed. "
+            "Run: pip install fastembed lancedb",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # Load chunks
+    try:
+        items = load_chunks(args.input)
+    except Exception as e:
+        print(f"Error: failed to parse input file: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    if not items:
+        print("Warning: no chunks found in input file", file=sys.stderr)
+        sys.exit(2)
+
+    # Generate embeddings — no passage: prefix for raw content
+    print(f"Embedding {len(items)} chunks with {MODEL_NAME}...", file=sys.stderr)
+    model = TextEmbedding(model_name=MODEL_NAME)
+    texts = [item["chunk_text"] for item in items]
+    embeddings = list(model.embed(texts))
+
+    # Build PyArrow table with explicit schema
+    now = datetime.now(timezone.utc).isoformat()
+
+    schema = pa.schema(
+        [
+            pa.field("id", pa.string()),
+            pa.field("parent", pa.string()),
+            pa.field("source", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("chunk_index", pa.int64()),
+            pa.field("chunk_text", pa.string()),
+            pa.field("vector", pa.list_(pa.float32(), DIMENSIONS)),
+            pa.field("line_range", pa.list_(pa.int64())),
+            pa.field("overlap_prev", pa.bool_()),
+            pa.field("updated_at", pa.string()),
+        ]
+    )
+
+    records = []
+    for item, embedding in zip(items, embeddings):
+        records.append(
+            {
+                "id": item["id"],
+                "parent": item["parent"],
+                "source": item["source"],
+                "path": item["path"],
+                "chunk_index": item["chunk_index"],
+                "chunk_text": item["chunk_text"],
+                "vector": embedding.tolist(),
+                "line_range": item["line_range"],
+                "overlap_prev": item["overlap_prev"],
+                "updated_at": now,
+            }
+        )
+
+    arrow_table = pa.Table.from_pylist(records, schema=schema)
+
+    # Write Lance dataset
+    output_path = Path(args.output)
+    is_new = not output_path.exists()
+    db = lancedb.connect(str(output_path))
+
+    if args.force or is_new or CHUNKS_TABLE_NAME not in db.table_names():
+        tbl = db.create_table(CHUNKS_TABLE_NAME, data=arrow_table, mode="overwrite")
+    else:
+        tbl = db.open_table(CHUNKS_TABLE_NAME)
+        (
+            tbl.merge_insert("id")
+            .when_matched_update_all()
+            .when_not_matched_insert_all()
+            .execute(arrow_table)
+        )
+
+    # Create FTS index on chunk_text for hybrid search
+    try:
+        tbl.create_fts_index("chunk_text", replace=True)
+    except Exception as e:
+        print(f"Warning: FTS index creation failed: {e}", file=sys.stderr)
+
+    # Create vector index for large corpora
+    if len(records) > VECTOR_INDEX_THRESHOLD:
+        try:
+            tbl.create_index(metric="cosine")
+            print(
+                f"Created vector index ({len(records)} chunks "
+                f"> {VECTOR_INDEX_THRESHOLD})",
+                file=sys.stderr,
+            )
+        except Exception as e:
+            print(f"Warning: vector index creation failed: {e}", file=sys.stderr)
+
+    # Write metadata to _meta table
+    metadata = {
+        "model": MODEL_NAME,
+        "dimensions": DIMENSIONS,
+        "generated_at": now,
+        "chunk_count": len(records),
+    }
+    write_meta(db, metadata, pa)
+
+    total = len(records)
+    print(json.dumps({"total": total, "embedded": total, "dataset": str(output_path)}))
+
+
 def main():
     args = parse_args()
+
+    if args.mode == "chunks":
+        main_chunks(args)
+        return
 
     if not Path(args.input).exists():
         print(f"Error: input file not found: {args.input}", file=sys.stderr)
