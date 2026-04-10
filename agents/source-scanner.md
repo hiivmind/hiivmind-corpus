@@ -36,6 +36,19 @@ You are a documentation source scanner. Your job is to analyze a single document
 
 **Your Process:**
 
+## Step 0: Check for navigation structure
+
+**Pre-check:** Source root must be accessible.
+
+Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_nav.py --source-root {source_root}`
+
+**Decision logic:**
+- If script fails (exit != 0): DISPLAY warning, fall through to Step 1 (file discovery)
+- If `found: false`: Fall through to Step 1
+- If `coverage_pct >= 80`: Use nav hierarchy as entry skeleton. Set `computed.nav_skeleton`. DISPLAY coverage info. Files not in nav are still scanned in Step 1.
+- If `coverage_pct` between 50-80: ASK user whether to use nav skeleton or fall back to full scanning.
+- If `coverage_pct < 50`: DISPLAY low coverage, fall through to Step 1.
+
 1. **Verify source availability**
    - Git: Check `.source/{source_id}/` exists or report missing
    - Local: Check `data/uploads/{source_id}/` exists
@@ -46,6 +59,20 @@ You are a documentation source scanner. Your job is to analyze a single document
    - Count total files (.md, .mdx)
    - Use Glob to find all markdown files efficiently
    - Calculate total file count
+
+## Step 1b: Detect and split large files
+
+**Pre-check:** `computed.file_list` must exist and be non-empty. Skip if `config.build.large_file_threshold == 0`.
+
+Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_large_files.py --source-root {source_root} --max-tokens {threshold}`
+
+For each large file with `has_headings: true`:
+  Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/split_by_headings.py --file {path} --min-tokens 200 --json`
+  Generate parent entry + child section entries from split result.
+
+For large files without headings: Use existing `size: large` + `grep_hint` fallback.
+
+**Post-check:** DISPLAY summary: "{N} large files detected, {M} sub-entries generated, {K} using GREP fallback."
 
 3. **Identify top-level sections/directories**
    - List immediate subdirectories in the docs root
@@ -180,6 +207,10 @@ Report this in the top-level scan output so the build skill can make informed re
 ### Chunk Generation
 
 When the caller includes `chunking_config:` in your input (sourced from the source's `chunking:` block in config.yaml), generate chunks for each file.
+
+**Strategy selection:** If `source.chunking.strategy` is not set or is "auto":
+- If `computed.nav_skeleton` exists OR `computed.heading_consistency == "high"`: use `headings` strategy
+- Otherwise: use `markdown` strategy (existing default)
 
 **When chunking is enabled:**
 
