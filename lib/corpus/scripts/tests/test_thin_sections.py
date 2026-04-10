@@ -18,7 +18,7 @@ class TestThinSections:
     def test_merges_small_into_sibling(self):
         index = _make_index([
             {"id": "src:api.md", "title": "API", "summary": "API docs", "tier": "file"},
-            {"id": "src:api.md#methods", "title": "Methods", "summary": "Method docs " * 30,
+            {"id": "src:api.md#methods", "title": "Methods", "summary": "Method documentation content here " * 80,
              "tier": "section", "parent": "src:api.md", "heading_level": 2,
              "line_range": [10, 50], "keywords": ["methods"]},
             {"id": "src:api.md#params", "title": "Parameters", "summary": "Short",
