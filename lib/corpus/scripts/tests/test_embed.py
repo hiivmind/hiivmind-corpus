@@ -171,17 +171,6 @@ class TestErrorHandling:
 # --- Integration Tests (require fastembed + lancedb) ---
 
 
-def deps_available():
-    """Check if fastembed and lancedb are installed."""
-    try:
-        import fastembed  # noqa: F401
-        import lancedb  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
-@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
 class TestEmbeddingPipeline:
     """End-to-end tests requiring fastembed + lancedb."""
 
@@ -336,7 +325,6 @@ class TestChunkMode:
         assert result.returncode == 2
 
 
-@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
 class TestChunkEmbeddingPipeline:
     """End-to-end tests for chunk embedding."""
 
