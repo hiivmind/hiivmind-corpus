@@ -329,6 +329,8 @@ Navigate uses the registry to search across all registered corpora and route que
 
 ## Published Corpora
 
+*Already use Obsidian? Register the Obsidian help corpus to get started: `/hiivmind-corpus register github:hiivmind/hiivmind-corpus-obsidian`*
+
 | Corpus | Source |
 |---|---|
 | [hiivmind-corpus-obsidian](https://github.com/hiivmind/hiivmind-corpus-obsidian) | Obsidian help docs |
