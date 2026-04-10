@@ -101,6 +101,7 @@ def load_chunks(input_path):
             "path": chunk["path"],
             "chunk_index": chunk["chunk_index"],
             "chunk_text": chunk["chunk_text"],
+            "heading_context": chunk.get("heading_context", ""),
             "line_range": chunk["line_range"],
             "overlap_prev": chunk.get("overlap_prev", False),
         })
@@ -185,10 +186,14 @@ def main_chunks(args):
         print("Warning: no chunks found in input file", file=sys.stderr)
         sys.exit(2)
 
-    # Generate embeddings — no passage: prefix for raw content
+    # Generate embeddings — prepend heading_context when available
     print(f"Embedding {len(items)} chunks with {MODEL_NAME}...", file=sys.stderr)
     model = TextEmbedding(model_name=MODEL_NAME)
-    texts = [item["chunk_text"] for item in items]
+    texts = []
+    for item in items:
+        heading_ctx = item.get("heading_context", "")
+        raw_text = item["chunk_text"]
+        texts.append(f"{heading_ctx} | {raw_text}" if heading_ctx else raw_text)
     embeddings = list(model.embed(texts))
 
     # Build PyArrow table with explicit schema
