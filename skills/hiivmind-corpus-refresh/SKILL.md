@@ -323,6 +323,31 @@ Index entries: {added} added, {modified} modified, {removed} removed
 
 ---
 
+## Post-Refresh Verification (optional)
+
+```pseudocode
+GUARD_REFRESH_VERIFICATION():
+  IF computed.changes_applied IS null OR len(computed.changes_applied) == 0:
+    SKIP "No changes applied. Skipping verification."
+
+  modified_ids = [c.entry_id for c in computed.changes_applied if c.action in ("modified", "added")]
+  IF len(modified_ids) == 0:
+    SKIP "Only deletions applied. Skipping verification."
+
+  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --entries {modified_ids}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Post-refresh verification failed. Proceeding."
+
+  inaccurate = LLM_VERIFY(result)
+
+  IF len(inaccurate) > 0:
+    DISPLAY "Post-refresh verification found {N} entries with summary drift."
+    ASK user: "Regenerate? [Y/n]"
+```
+
+---
+
 ## Error Handling
 
 | Error | Message | Recovery |
