@@ -297,6 +297,11 @@ These features span multiple skills and must stay synchronized:
 | Concept membership | build, graph, enhance, refresh, navigate | `concepts[]` field in index.yaml entries, bidirectional with graph.yaml concept definitions, enriches embedding text |
 | Section indexing | build, source-scanner, navigate, enhance, refresh | `sections:` config, `tier: section` entries, heading consistency detection, line_range in index.yaml |
 | Deep chunking | build, source-scanner, navigate, enhance, refresh | `chunking:` config, chunk.py invocation, `chunks-embeddings.lance/` generation/query, hybrid search, query expansion |
+| Nav detection | source-scanner, build, add-source | `detect_nav.py` called before glob scan, coverage threshold logic |
+| Verification loop | build, refresh | `verify_entries.py` + LLM verification, config flag |
+| Tree thinning | build, enhance, refresh | `thin_sections.py` post-processing, `min_section_tokens` config |
+| Large-node splitting | source-scanner, build | `detect_large_files.py` + `split_by_headings.py`, interaction with section indexing |
+| Structure-aware chunking | build, source-scanner, navigate | `headings` strategy in `chunk.py`, `heading_context` in embeddings |
 
 ### When Adding New Features
 
@@ -336,6 +341,10 @@ navigate ◄── index-embeddings.lance/ (retrieval + cross-corpus routing)
 graph ◄── index-embeddings.lance/ (relationship candidate detection)
 build ──► chunks-embeddings.lance/ (optional, Phase 7b)
 navigate ◄── chunks-embeddings.lance/ (hybrid search + fusion)
+build ──► detect_nav.py, detect_large_files.py, split_by_headings.py (via source-scanner, Phase 2)
+build ──► thin_sections.py (post Phase 2c)
+build ──► verify_entries.py (Phase 7c)
+refresh ──► verify_entries.py (post Phase 6)
 ```
 
 ### Reference Sections
