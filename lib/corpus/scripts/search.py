@@ -54,6 +54,21 @@ def parse_args():
         dest="json_output",
         help="Output as JSON",
     )
+    parser.add_argument(
+        "--table",
+        default=TABLE_NAME,
+        help="Table name to search within the Lance database (default: embeddings)",
+    )
+    parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="Use hybrid search (FTS + vector + RRF) instead of vector-only",
+    )
+    parser.add_argument(
+        "--text-column",
+        default="metadata_text",
+        help="Text column for hybrid FTS search (default: metadata_text)",
+    )
     return parser.parse_args()
 
 
@@ -115,9 +130,9 @@ def main():
     db = lancedb.connect(str(dataset_path))
 
     try:
-        table = db.open_table(TABLE_NAME)
+        table = db.open_table(args.table)
     except Exception as e:
-        print(f"Error: could not open dataset: {e}", file=sys.stderr)
+        print(f"Error: could not open table '{args.table}': {e}", file=sys.stderr)
         sys.exit(2)
 
     # Check model match
@@ -134,29 +149,37 @@ def main():
     model = TextEmbedding(model_name=MODEL_NAME)
     query_embedding = list(model.embed([f"{QUERY_PREFIX}{args.query}"]))[0]
 
-    # Build search query with cosine metric
-    search = (
-        table.search(query_embedding.tolist(), vector_column_name="vector")
-        .metric("cosine")
-        .limit(args.top_k)
-    )
+    if args.hybrid:
+        try:
+            from lancedb.rerank import RRFReranker
+            search = (
+                table.search(args.query, query_type="hybrid", fts_columns=args.text_column)
+                .rerank(reranker=RRFReranker())
+                .limit(args.top_k)
+            )
+        except ImportError:
+            print("Warning: RRFReranker not available, falling back to vector search", file=sys.stderr)
+            search = (
+                table.search(query_embedding.tolist(), vector_column_name="vector")
+                .metric("cosine")
+                .limit(args.top_k)
+            )
+    else:
+        search = (
+            table.search(query_embedding.tolist(), vector_column_name="vector")
+            .metric("cosine")
+            .limit(args.top_k)
+        )
 
-    # Add SQL predicate if provided
     if args.where:
         search = search.where(args.where)
 
-    # Apply reranking if requested
     if args.rerank:
         try:
             from lancedb.rerank import CrossEncoderReranker
-
             search = search.rerank(reranker=CrossEncoderReranker())
         except ImportError:
-            print(
-                "Warning: reranking not available "
-                "(lancedb rerank module missing)",
-                file=sys.stderr,
-            )
+            print("Warning: reranking not available", file=sys.stderr)
         except Exception as e:
             print(f"Warning: reranking failed: {e}", file=sys.stderr)
 
@@ -170,7 +193,14 @@ def main():
 
     # Format results
     ids = arrow_result.column("id").to_pylist()
-    distances = arrow_result.column("_distance").to_pylist()
+
+    # Hybrid search returns _relevance_score, vector search returns _distance
+    if "_relevance_score" in arrow_result.schema.names:
+        raw_scores = arrow_result.column("_relevance_score").to_pylist()
+        scores = [max(0.0, float(s)) for s in raw_scores]
+    else:
+        distances = arrow_result.column("_distance").to_pylist()
+        scores = [max(0.0, 1.0 - float(d)) for d in distances]
 
     # Determine extra columns to include (--select requires --json)
     select_cols = []
@@ -178,8 +208,7 @@ def main():
         select_cols = [c.strip() for c in args.select.split(",")]
 
     results = []
-    for i, (entry_id, distance) in enumerate(zip(ids, distances)):
-        score = max(0.0, 1.0 - float(distance))
+    for i, (entry_id, score) in enumerate(zip(ids, scores)):
         result = {"id": entry_id, "score": round(score, 4)}
 
         # Add selected columns

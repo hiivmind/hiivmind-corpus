@@ -251,6 +251,109 @@ class TestSearchPipeline:
         parts = lines[0].split("\t")
         assert len(parts) == 2  # score + id only
 
+    def test_table_parameter_uses_named_table(self, embedded_dataset):
+        """--table selects a specific table within the Lance database."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(embedded_dataset),
+             "database performance", "--table", "embeddings", "--json"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        results = json.loads(result.stdout)
+        assert len(results) > 0
+
+    def test_table_parameter_missing_table_exits_2(self, embedded_dataset):
+        """--table with nonexistent table name exits 2."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(embedded_dataset),
+             "query", "--table", "nonexistent"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 2
+        assert "could not open" in result.stderr.lower()
+
+
+class TestHybridSearch:
+    """Tests for --hybrid mode (FTS + vector + RRF)."""
+
+    @pytest.fixture
+    def chunk_dataset(self, tmp_path):
+        """Build a Lance dataset with chunk_text column for hybrid search testing."""
+        import lancedb
+        import pyarrow as pa
+        from fastembed import TextEmbedding
+
+        db = lancedb.connect(str(tmp_path / "chunks.lance"))
+        model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+
+        records = [
+            {"id": "src:file.md#chunk-0", "parent": "src:file.md", "source": "src",
+             "chunk_text": "Python is a great programming language for data science and machine learning.",
+             "chunk_index": 0},
+            {"id": "src:file.md#chunk-1", "parent": "src:file.md", "source": "src",
+             "chunk_text": "Italian cooking involves pasta, pizza, olive oil and fresh tomatoes.",
+             "chunk_index": 1},
+            {"id": "src:other.md#chunk-0", "parent": "src:other.md", "source": "src",
+             "chunk_text": "Cloud deployment on AWS requires configuring EC2 instances and load balancers.",
+             "chunk_index": 0},
+        ]
+
+        texts = [r["chunk_text"] for r in records]
+        embeddings = list(model.embed(texts))
+
+        schema = pa.schema([
+            pa.field("id", pa.string()),
+            pa.field("parent", pa.string()),
+            pa.field("source", pa.string()),
+            pa.field("chunk_text", pa.string()),
+            pa.field("chunk_index", pa.int64()),
+            pa.field("vector", pa.list_(pa.float32(), 384)),
+        ])
+
+        for rec, emb in zip(records, embeddings):
+            rec["vector"] = emb.tolist()
+
+        tbl = db.create_table("chunks", data=pa.Table.from_pylist(records, schema=schema))
+        tbl.create_fts_index("chunk_text", replace=True)
+
+        meta_schema = pa.schema([pa.field("key", pa.string()), pa.field("value", pa.string())])
+        meta_records = [
+            {"key": "model", "value": "BAAI/bge-small-en-v1.5"},
+            {"key": "dimensions", "value": "384"},
+        ]
+        db.create_table("_meta", data=pa.Table.from_pylist(meta_records, schema=meta_schema))
+
+        return tmp_path / "chunks.lance"
+
+    @pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
+    def test_hybrid_search_returns_results(self, chunk_dataset):
+        """--hybrid with --table chunks returns results using FTS+vector."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(chunk_dataset),
+             "python data science", "--table", "chunks",
+             "--hybrid", "--text-column", "chunk_text", "--json"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        results = json.loads(result.stdout)
+        assert len(results) > 0
+        assert results[0]["id"] == "src:file.md#chunk-0"
+
+    @pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
+    def test_hybrid_returns_extra_columns(self, chunk_dataset):
+        """--hybrid with --select returns requested columns."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, str(chunk_dataset),
+             "deploy cloud AWS", "--table", "chunks",
+             "--hybrid", "--text-column", "chunk_text",
+             "--select", "parent,chunk_text", "--json"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        results = json.loads(result.stdout)
+        assert "parent" in results[0]
+        assert "chunk_text" in results[0]
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

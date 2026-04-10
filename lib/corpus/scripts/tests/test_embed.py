@@ -301,5 +301,103 @@ class TestEmbeddingPipeline:
         assert "_meta" in db2.table_names()
 
 
+@pytest.fixture
+def sample_chunks_json(tmp_path):
+    """Create a chunks JSON file matching chunk.py output format."""
+    chunks = [
+        {"id": "test:doc1.md#chunk-0", "parent": "test:doc1.md", "source": "test",
+         "path": "doc1.md", "chunk_index": 0,
+         "chunk_text": "Getting started with the project requires installing dependencies first.",
+         "line_range": [1, 10], "overlap_prev": False},
+        {"id": "test:doc1.md#chunk-1", "parent": "test:doc1.md", "source": "test",
+         "path": "doc1.md", "chunk_index": 1,
+         "chunk_text": "The API provides endpoints for creating, reading, and deleting resources.",
+         "line_range": [8, 20], "overlap_prev": True},
+        {"id": "test:doc2.md#chunk-0", "parent": "test:doc2.md", "source": "test",
+         "path": "doc2.md", "chunk_index": 0,
+         "chunk_text": "Performance tuning involves optimizing database queries and caching strategies.",
+         "line_range": [1, 15], "overlap_prev": False},
+    ]
+    path = tmp_path / "chunks.json"
+    path.write_text(json.dumps(chunks))
+    return path
+
+
+class TestChunkMode:
+    """Test --mode chunks for chunk embedding pipeline."""
+
+    def test_missing_mode_chunks_input(self, tmp_path):
+        """Exit code 2 when chunks input file doesn't exist."""
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--mode", "chunks",
+             "/nonexistent/chunks.json", str(tmp_path / "out.lance")],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 2
+
+
+@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
+class TestChunkEmbeddingPipeline:
+    """End-to-end tests for chunk embedding."""
+
+    def test_chunk_mode_creates_chunks_table(self, sample_chunks_json, tmp_path):
+        import lancedb
+        output = tmp_path / "chunks-embeddings.lance"
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--mode", "chunks",
+             str(sample_chunks_json), str(output)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"Failed: {result.stderr}"
+        db = lancedb.connect(str(output))
+        assert "chunks" in db.table_names()
+        table = db.open_table("chunks")
+        assert "chunk_text" in table.schema.names
+        assert "vector" in table.schema.names
+        assert "parent" in table.schema.names
+        assert "chunk_index" in table.schema.names
+        assert table.count_rows() == 3
+
+    def test_chunk_mode_creates_fts_index(self, sample_chunks_json, tmp_path):
+        output = tmp_path / "chunks-embeddings.lance"
+        subprocess.run(
+            [sys.executable, SCRIPT, "--mode", "chunks",
+             str(sample_chunks_json), str(output)],
+            capture_output=True,
+        )
+        import lancedb
+        db = lancedb.connect(str(output))
+        table = db.open_table("chunks")
+        assert "chunk_text" in table.schema.names
+
+    def test_chunk_mode_meta_table(self, sample_chunks_json, tmp_path):
+        import lancedb
+        output = tmp_path / "chunks-embeddings.lance"
+        subprocess.run(
+            [sys.executable, SCRIPT, "--mode", "chunks",
+             str(sample_chunks_json), str(output)],
+            capture_output=True,
+        )
+        db = lancedb.connect(str(output))
+        meta_table = db.open_table("_meta")
+        meta_arrow = meta_table.to_arrow()
+        keys = meta_arrow.column("key").to_pylist()
+        values = meta_arrow.column("value").to_pylist()
+        meta = dict(zip(keys, values))
+        assert meta["model"] == "BAAI/bge-small-en-v1.5"
+        assert meta["chunk_count"] == "3"
+
+    def test_chunk_mode_json_output(self, sample_chunks_json, tmp_path):
+        output = tmp_path / "chunks-embeddings.lance"
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--mode", "chunks",
+             str(sample_chunks_json), str(output)],
+            capture_output=True, text=True,
+        )
+        output_json = json.loads(result.stdout)
+        assert output_json["total"] == 3
+        assert output_json["embedded"] == 3
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

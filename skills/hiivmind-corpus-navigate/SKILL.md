@@ -167,6 +167,28 @@ Read: {source.path}/index.md
 
 ### Phase 4: Search Index
 
+#### Step 4-pre: Query Expansion (if chunks-embeddings exists)
+
+Check if `chunks-embeddings.lance/` exists for the selected corpus:
+- **Local/embedded:** `{corpus_path}/chunks-embeddings.lance/`
+- **Remote:** `.hiivmind/corpus/cache/{corpus_id}/chunks-embeddings.lance/`
+
+If it exists:
+
+1. Generate 2 query variants:
+   - **Lexical variant:** Reformulate the query using specific keywords, function names, identifiers
+   - **Conceptual variant:** Reformulate using synonyms, broader concepts, related terminology
+2. Store all 3 queries: `[original, lexical_variant, conceptual_variant]`
+
+Example:
+- Original: "how do I filter by date"
+- Lexical: "date filter timestamp column"
+- Conceptual: "temporal predicates datetime expressions"
+
+If `chunks-embeddings.lance/` does not exist: skip, use only the original query.
+
+Can be disabled with `query_expansion: false` in the corpus config.yaml.
+
 #### If index.yaml was fetched (v2 flow):
 
 **Step 4a: Embedding pre-filter** (if index-embeddings.lance/ exists)
@@ -198,6 +220,46 @@ Use `lance_path` in all subsequent search.py invocations in this phase.
    - Feed top 15 entries to Step 4b (LLM semantic judgment)
    - Skip the yq pre-filter below
 5. If search.py exits non-zero or no results: fall through to yq pre-filter
+
+**Step 4a-chunks: Chunk search** (if chunks-embeddings.lance/ exists)
+
+Resolve chunk lance path:
+- **Local/embedded:** `chunks_lance_path = {corpus_path}/chunks-embeddings.lance/`
+- **Remote:** `chunks_lance_path = .hiivmind/corpus/cache/{corpus_id}/chunks-embeddings.lance/`
+
+If path exists:
+
+For each query (original + variants from Step 4-pre):
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {chunks_lance_path} "{query}" \
+  --table chunks --hybrid --text-column chunk_text --top-k 15 \
+  --select "parent,chunk_text,line_range" --json
+```
+
+Merge results across queries: deduplicate by `id`, keep highest score per chunk,
+weight original query results 2x.
+
+**Step 4a-fusion: Fuse results across tiers**
+
+If both index-embeddings and chunks-embeddings returned results:
+
+1. **Normalize scores per tier:** Divide each score by the max score in its tier
+   (so both tiers have scores in 0-1 range).
+
+2. **Parent-child deduplication:** For each chunk hit, check if its `parent` field
+   matches any file/section hit's `id`:
+   - If match: boost the parent's normalized score by +0.1, attach the chunk's
+     `line_range` to the parent entry (so the LLM knows which section is relevant).
+     Remove the chunk from the results.
+   - If no match: keep the chunk as a standalone result with its `parent` and
+     `line_range` for context.
+
+3. **Merge:** Combine remaining results from both tiers, sort by normalized score,
+   take top 15.
+
+4. Feed merged results to Step 4b (LLM semantic judgment).
+
+If only one tier returned results: skip fusion, use that tier's results directly.
 
 **See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md` § Graph-Boost, Reranking
 
@@ -360,7 +422,7 @@ TTL_DAYS=${TTL_DAYS:-7}
 TMPDIR=$(mktemp -d)
 git clone --depth 1 --filter=blob:none --sparse \
   "https://github.com/{owner}/{repo}.git" "$TMPDIR" 2>/dev/null
-cd "$TMPDIR" && git sparse-checkout set index-embeddings.lance
+cd "$TMPDIR" && git sparse-checkout set index-embeddings.lance chunks-embeddings.lance
 
 if [ ! -d "$TMPDIR/index-embeddings.lance" ]; then
   rm -rf "$TMPDIR"
@@ -376,6 +438,14 @@ rm -rf "$CACHE_DIR/index-embeddings.lance.tmp"
 cp -r "$TMPDIR/index-embeddings.lance" "$CACHE_DIR/index-embeddings.lance.tmp"
 rm -rf "$CACHE_DIR/index-embeddings.lance"
 mv "$CACHE_DIR/index-embeddings.lance.tmp" "$CACHE_DIR/index-embeddings.lance"
+
+# Copy chunks-embeddings.lance (new)
+if [ -d "$TMPDIR/chunks-embeddings.lance" ]; then
+  rm -rf "$CACHE_DIR/chunks-embeddings.lance.tmp"
+  cp -r "$TMPDIR/chunks-embeddings.lance" "$CACHE_DIR/chunks-embeddings.lance.tmp"
+  rm -rf "$CACHE_DIR/chunks-embeddings.lance"
+  mv "$CACHE_DIR/chunks-embeddings.lance.tmp" "$CACHE_DIR/chunks-embeddings.lance"
+fi
 
 cat > "$CACHE_DIR/_cache_meta.json" << EOF
 {
@@ -422,6 +492,10 @@ rm -rf "$TMPDIR"
 | Remote corpus, cache stale and SHA changed | Re-clone Lance directory (~5s) |
 | Remote corpus, network unavailable | Use existing cache if present, else yq pre-filter |
 | git not available | Skip sparse clone, fall through to yq pre-filter |
+| No chunks-embeddings.lance/ | Skip chunk search, use metadata embeddings only |
+| chunks-embeddings.lance/ but no fastembed | Skip chunk search, fall back to metadata-only |
+| Stale chunk embeddings | Use them, note in output |
+| query_expansion: false in config | Skip query expansion, search with original query only |
 
 ### Phase 5: Fetch Documentation
 
