@@ -1,6 +1,6 @@
 # hiivmind-corpus
 
-A Claude Code plugin for building persistent, curated documentation indexes with semantic search. One plugin creates, maintains, and queries documentation corpora from any source — git repos, local files, web pages, Obsidian vaults, PDFs, and more.
+A Claude Code plugin for shareable, linkable LLM knowledge bases. If you have been following Andrej Karpathy's LLM wiki idea or building Obsidian-based PKM setups, hiivmind-corpus is the productised version of that pattern — raw sources compiled into a curated, interlinked index — but any corpus can be published as a plain git repo and registered by anyone else with a single command, queryable remotely via `gh api` with sparse-cloned embeddings and cross-corpus bridges that link concepts across independently maintained knowledge bases. Every other tool in this space (ObsidianRAG, Neural Composer, obsidian-notes-rag, Karpathy's LLM wiki) is single-user, single-vault, local-only; this one is a library, not a personal notebook.
 
 **Quick links:** [Using a Corpus](#using-a-corpus) | [Building a Corpus](#building-a-corpus) | [Semantic Search](#semantic-search-rag) | [Published Corpora](#published-corpora)
 
@@ -329,14 +329,16 @@ Navigate uses the registry to search across all registered corpora and route que
 
 ## Published Corpora
 
+*Already use Obsidian? Register the Obsidian help corpus to get started: `/hiivmind-corpus register github:hiivmind/hiivmind-corpus-obsidian`*
+
 | Corpus | Source |
 |---|---|
+| [hiivmind-corpus-obsidian](https://github.com/hiivmind/hiivmind-corpus-obsidian) | Obsidian help docs |
 | [hiivmind-corpus-polars](https://github.com/hiivmind/hiivmind-corpus-data) | Polars documentation |
 | [hiivmind-corpus-ibis](https://github.com/hiivmind/hiivmind-corpus-data) | Ibis documentation |
 | [hiivmind-corpus-narwhals](https://github.com/hiivmind/hiivmind-corpus-data) | Narwhals documentation |
 | [hiivmind-corpus-substrait](https://github.com/hiivmind/hiivmind-corpus-data) | Substrait specification |
 | [hiivmind-corpus-flyio](https://github.com/hiivmind/hiivmind-corpus-flyio) | Fly.io platform docs |
-| [hiivmind-corpus-obsidian](https://github.com/hiivmind/hiivmind-corpus-obsidian) | Obsidian help docs |
 | [hiivmind-corpus-lancedb](https://github.com/hiivmind/hiivmind-corpus-lancedb) | LanceDB documentation |
 | [hiivmind-corpus-claude-agent-sdk](https://github.com/hiivmind/hiivmind-corpus-claude) | Claude Agent SDK |
 
