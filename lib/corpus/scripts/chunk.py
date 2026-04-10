@@ -44,6 +44,7 @@ BOUNDARY_SCORES = {
         "double_newline": 50,
         "single_newline": 10,
     },
+    "headings": {"heading": 100, "blank_line": 20},
 }
 
 STRATEGY_DEFAULTS = {
@@ -51,6 +52,7 @@ STRATEGY_DEFAULTS = {
     "transcript": {"target_tokens": 900, "overlap_tokens": 100},
     "code": {"target_tokens": 600, "overlap_tokens": 50},
     "paragraph": {"target_tokens": 900, "overlap_tokens": 100},
+    "headings": {"target_tokens": 900, "overlap_tokens": 100},
 }
 
 HEADING_RE = re.compile(r"^#{1,6}\s+")
@@ -101,6 +103,92 @@ def score_line(line: str, strategy: str) -> int:
     return 0
 
 
+def _chunk_paragraphs(lines, target_tokens, overlap_tokens, heading_context, start_line=1):
+    """Split lines into chunks at paragraph boundaries with overlap."""
+    chunks = []
+    current_lines = []
+    current_tokens = 0
+    chunk_start = start_line
+
+    for i, line in enumerate(lines):
+        line_tokens = max(1, int(len(line.split()) * TOKENS_PER_WORD)) if line.strip() else 1
+        if current_tokens + line_tokens > target_tokens and current_lines:
+            chunk_text_str = "\n".join(current_lines)
+            chunks.append({
+                "text": chunk_text_str,
+                "line_range": [chunk_start, start_line + i - 1],
+                "chunk_index": len(chunks),
+                "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
+                "heading_context": heading_context,
+            })
+            if overlap_tokens > 0:
+                overlap_lines = []
+                overlap_count = 0
+                for prev_line in reversed(current_lines):
+                    prev_tokens = max(1, int(len(prev_line.split()) * TOKENS_PER_WORD)) if prev_line.strip() else 1
+                    overlap_count += prev_tokens
+                    overlap_lines.insert(0, prev_line)
+                    if overlap_count >= overlap_tokens:
+                        break
+                current_lines = overlap_lines
+                current_tokens = overlap_count
+                chunk_start = start_line + i - len(overlap_lines)
+            else:
+                current_lines = []
+                current_tokens = 0
+                chunk_start = start_line + i
+        current_lines.append(line)
+        current_tokens += line_tokens
+
+    if current_lines:
+        chunks.append({
+            "text": "\n".join(current_lines),
+            "line_range": [chunk_start, start_line + len(lines) - 1],
+            "chunk_index": len(chunks),
+            "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
+            "heading_context": heading_context,
+        })
+    return chunks
+
+
+def _chunk_by_headings(text, target_tokens, overlap_tokens):
+    """Chunk by heading sections, splitting large sections at paragraphs."""
+    from split_by_headings import split_by_headings as _split
+
+    sections = _split(text, min_level=1, max_level=6, min_tokens=0)
+    lines = text.split("\n")
+
+    if not sections:
+        # No headings — fall back to paragraph-based splitting
+        return _chunk_paragraphs(lines, target_tokens, overlap_tokens, "", start_line=1)
+
+    chunks = []
+    for section in sections:
+        start = section["line_start"] - 1  # 0-indexed
+        end = section["line_end"]
+        section_lines = lines[start:end]
+        section_tokens = estimate_tokens("\n".join(section_lines))
+        heading_context = f"{'#' * section['level']} {section['title']}"
+
+        if section_tokens <= target_tokens:
+            chunks.append({
+                "text": "\n".join(section_lines),
+                "line_range": [section["line_start"], section["line_end"]],
+                "chunk_index": len(chunks),
+                "overlap_prev": False,
+                "heading_context": heading_context,
+            })
+        else:
+            sub_chunks = _chunk_paragraphs(
+                section_lines, target_tokens, overlap_tokens,
+                heading_context, start_line=section["line_start"],
+            )
+            for sc in sub_chunks:
+                sc["chunk_index"] = len(chunks)
+                chunks.append(sc)
+    return chunks
+
+
 def chunk_text(
     text: str,
     strategy: str = "markdown",
@@ -123,6 +211,9 @@ def chunk_text(
         target_tokens = defaults["target_tokens"]
     if overlap_tokens is None:
         overlap_tokens = defaults["overlap_tokens"]
+
+    if strategy == "headings":
+        return _chunk_by_headings(text, target_tokens, overlap_tokens)
 
     lines = text.split("\n")
     total_lines = len(lines)
@@ -221,7 +312,7 @@ def parse_args():
     parser.add_argument("file", help="Path to document file")
     parser.add_argument(
         "--strategy",
-        choices=["markdown", "transcript", "code", "paragraph"],
+        choices=["markdown", "transcript", "code", "paragraph", "headings"],
         default="markdown",
         help="Chunking strategy (default: markdown)",
     )
