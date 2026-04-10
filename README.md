@@ -331,12 +331,12 @@ Navigate uses the registry to search across all registered corpora and route que
 
 | Corpus | Source |
 |---|---|
+| [hiivmind-corpus-obsidian](https://github.com/hiivmind/hiivmind-corpus-obsidian) | Obsidian help docs |
 | [hiivmind-corpus-polars](https://github.com/hiivmind/hiivmind-corpus-data) | Polars documentation |
 | [hiivmind-corpus-ibis](https://github.com/hiivmind/hiivmind-corpus-data) | Ibis documentation |
 | [hiivmind-corpus-narwhals](https://github.com/hiivmind/hiivmind-corpus-data) | Narwhals documentation |
 | [hiivmind-corpus-substrait](https://github.com/hiivmind/hiivmind-corpus-data) | Substrait specification |
 | [hiivmind-corpus-flyio](https://github.com/hiivmind/hiivmind-corpus-flyio) | Fly.io platform docs |
-| [hiivmind-corpus-obsidian](https://github.com/hiivmind/hiivmind-corpus-obsidian) | Obsidian help docs |
 | [hiivmind-corpus-lancedb](https://github.com/hiivmind/hiivmind-corpus-lancedb) | LanceDB documentation |
 | [hiivmind-corpus-claude-agent-sdk](https://github.com/hiivmind/hiivmind-corpus-claude) | Claude Agent SDK |
 
