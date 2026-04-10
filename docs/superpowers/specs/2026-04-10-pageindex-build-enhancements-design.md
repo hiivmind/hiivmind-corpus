@@ -559,6 +559,247 @@ This means a chunk from "## Data Modeling > ### Primary Keys" gets embedded with
 
 ---
 
+## Skill and Agent Integration: Guards, Skips, and Post-Checks
+
+Each algorithm integration follows the existing patterns: GUARD blocks at phase entry, skip conditions for optional features, and post-step verification with user-facing summaries.
+
+### Source-Scanner Agent Updates
+
+The source-scanner agent (`agents/source-scanner.md`) gains three new steps. Each follows the existing step format with inline verification.
+
+**New Step 0: Check for navigation structure** (before existing Step 1: File Discovery)
+
+```pseudocode
+STEP_0_NAV_DETECTION():
+  # Pre-check: source root must be resolved
+  IF source_root IS NOT accessible:
+    SKIP "Cannot check nav structure: source root not resolved"
+    PROCEED to Step 1 (existing file discovery)
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_nav.py --source-root {source_root}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Nav detection failed: {stderr}. Falling back to file scanning."
+    PROCEED to Step 1
+
+  IF result.found == false:
+    PROCEED to Step 1
+
+  # Post-check: evaluate coverage
+  IF result.coverage.coverage_pct >= 80:
+    computed.nav_skeleton = result.hierarchy
+    computed.nav_source = result.nav_file
+    DISPLAY "Found {result.nav_file} with {result.coverage.coverage_pct}% coverage ({result.coverage.files_resolved}/{result.coverage.nav_entries} files resolved). Using nav skeleton."
+    # Step 1 file discovery will use nav_skeleton as entry list, scan remaining files normally
+  ELIF result.coverage.coverage_pct >= 50:
+    DISPLAY "Found {result.nav_file} with {result.coverage.coverage_pct}% coverage. {result.coverage.files_missing} files referenced but not found."
+    ASK user: "Use this nav structure as the index skeleton? Files outside the nav will still be scanned. [Y/n]"
+    IF user approves:
+      computed.nav_skeleton = result.hierarchy
+  ELSE:
+    DISPLAY "Found {result.nav_file} but only {result.coverage.coverage_pct}% coverage. Falling back to file scanning."
+    PROCEED to Step 1
+```
+
+**New Step 1b: Detect and split large files** (after existing Step 1: File Discovery, before Step 2: Sample Files)
+
+```pseudocode
+STEP_1B_LARGE_FILE_SPLITTING():
+  # Pre-check: file discovery must have completed
+  IF computed.file_list IS null OR len(computed.file_list) == 0:
+    SKIP "No files discovered. Skipping large file detection."
+    PROCEED to Step 2
+
+  # Skip condition: check if feature is disabled
+  large_threshold = config.build.large_file_threshold OR 15000
+  IF large_threshold == 0:
+    SKIP "Large file splitting disabled (threshold = 0)."
+    PROCEED to Step 2
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_large_files.py --source-root {source_root} --max-tokens {large_threshold}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Large file detection failed: {stderr}. Continuing without splitting."
+    PROCEED to Step 2
+
+  IF len(result) == 0:
+    DISPLAY "No files exceed {large_threshold} token threshold."
+    PROCEED to Step 2
+
+  # Post-check: split each large file that has headings
+  computed.large_files = result
+  computed.split_entries = []
+  FOR file IN result:
+    IF file.has_headings:
+      split = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/split_by_headings.py --file {source_root}/{file.path} --min-tokens 200")
+      IF split.exit_code == 0 AND len(split) > 1:
+        computed.split_entries.append({file: file.path, sections: split})
+        DISPLAY "Split {file.path} ({file.token_count} tokens) into {len(split)} sections."
+      ELSE:
+        DISPLAY "Could not split {file.path} by headings. Will use GREP marker fallback."
+    ELSE:
+      DISPLAY "{file.path} ({file.token_count} tokens) has no heading structure. Using size: large + grep_hint."
+
+  # Summary
+  split_count = sum(len(s.sections) for s in computed.split_entries)
+  fallback_count = len(result) - len(computed.split_entries)
+  DISPLAY "Large files: {len(result)} detected, {split_count} sub-entries generated, {fallback_count} using GREP fallback."
+```
+
+**Modified Step (chunking):** When chunking is enabled, select strategy based on heading analysis.
+
+```pseudocode
+STEP_CHUNKING_STRATEGY_SELECTION():
+  # Pre-check: chunking must be enabled for this source
+  IF source.chunking.enabled != true:
+    SKIP chunking entirely
+
+  strategy = source.chunking.strategy OR "auto"
+
+  IF strategy == "auto":
+    # Use heading analysis from Step 0 or Step 1b
+    IF computed.nav_skeleton IS NOT null:
+      strategy = "headings"
+    ELIF computed.heading_consistency == "high":
+      strategy = "headings"
+    ELSE:
+      strategy = "markdown"  # existing default
+
+  DISPLAY "Chunking strategy for {source.id}: {strategy}"
+  # Proceed with selected strategy
+```
+
+### Build Skill Updates
+
+**New GUARD for verification (after Phase 7b, before Phase 8):**
+
+```pseudocode
+GUARD_PHASE_7C_VERIFICATION():
+  IF computed.index IS null:
+    DISPLAY "Cannot verify: index has not been generated."
+    EXIT
+
+  # Skip condition
+  verify_enabled = config.build.verify_on_build
+  IF verify_enabled IS null:
+    # Default: true for <200 entries, false otherwise
+    verify_enabled = (computed.index.meta.entry_count < 200)
+
+  IF verify_enabled == false:
+    SKIP "Verification skipped (verify_on_build: false or entry_count >= 200)."
+    PROCEED to Phase 8
+
+  sample_size = config.build.verify_sample_size OR 20
+  IF sample_size > computed.index.meta.entry_count:
+    sample_size = 0  # 0 means all
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --sample {sample_size}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Verification script failed: {stderr}. Proceeding without verification."
+    PROCEED to Phase 8
+
+  IF len(result) == 0:
+    DISPLAY "No entries to verify (all entries may be remote-only)."
+    PROCEED to Phase 8
+
+  # LLM verification of extracted previews (batched)
+  inaccurate = []
+  FOR batch IN chunk(result, size=10):
+    verification = LLM_CALL("For each entry, check if summary matches content_preview.
+                              Return [{entry_id, accurate: true/false, issue: '...'}]", batch)
+    inaccurate.extend([v for v in verification if v.accurate == false])
+
+  # Post-check: present results
+  IF len(inaccurate) == 0:
+    DISPLAY "Verification passed: {len(result)} entries checked, all accurate."
+  ELSE:
+    DISPLAY "Verification found {len(inaccurate)} entries with summary drift:"
+    FOR entry IN inaccurate:
+      DISPLAY "  - {entry.entry_id}: {entry.issue}"
+    ASK user: "Regenerate summaries for these entries? [Y/n]"
+    IF user approves:
+      regenerate_summaries(inaccurate)
+      IF index-embeddings.lance/ exists:
+        re_embed(inaccurate)
+```
+
+**New GUARD for tree thinning (after Phase 2c section indexing, before Phase 5):**
+
+```pseudocode
+GUARD_TREE_THINNING():
+  # Pre-check: section entries must exist
+  section_count = count(entry for entry in computed.scan_results if entry.tier == "section")
+  IF section_count == 0:
+    SKIP "No section entries to thin."
+    PROCEED to next phase
+
+  # Skip condition: min_section_tokens must be configured
+  has_token_config = ANY(source.sections.min_section_tokens IS NOT null for source in config.sources)
+  IF NOT has_token_config:
+    SKIP "Tree thinning not configured (no min_section_tokens in any source)."
+    PROCEED to next phase
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens} --dry-run")
+
+  IF result.exit_code != 0:
+    DISPLAY "Tree thinning failed: {stderr}. Proceeding with unthinned sections."
+    PROCEED to next phase
+
+  IF result.sections_before == result.sections_after:
+    DISPLAY "Tree thinning: all {result.sections_before} sections above token threshold. No merges needed."
+    PROCEED to next phase
+
+  # Post-check: present merge plan and confirm
+  DISPLAY "Tree thinning would merge {result.sections_before - result.sections_after} sections:"
+  FOR merge IN result.merged[:10]:  # show first 10
+    DISPLAY "  - {merge.removed_id} → {merge.merged_into} ({merge.reason})"
+  IF len(result.merged) > 10:
+    DISPLAY "  ... and {len(result.merged) - 10} more."
+
+  ASK user: "Apply these merges? [Y/n]"
+  IF user approves:
+    Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens}")
+    DISPLAY "Thinned: {result.sections_before} → {result.sections_after} sections."
+```
+
+### Refresh Skill Updates
+
+**New optional step after Phase 6 (Apply Changes):**
+
+```pseudocode
+GUARD_REFRESH_VERIFICATION():
+  # Pre-check: changes must have been applied
+  IF computed.changes_applied IS null OR len(computed.changes_applied) == 0:
+    SKIP "No changes applied. Skipping verification."
+    PROCEED to Phase 7
+
+  # Skip condition: only verify if entries were actually modified
+  modified_ids = [c.entry_id for c in computed.changes_applied if c.action in ("modified", "added")]
+  IF len(modified_ids) == 0:
+    SKIP "Only deletions applied. Skipping verification."
+    PROCEED to Phase 7
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --entries {','.join(modified_ids)}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Post-refresh verification failed: {stderr}. Proceeding without verification."
+    PROCEED to Phase 7
+
+  # LLM verification (same pattern as build)
+  inaccurate = []
+  FOR batch IN chunk(result, size=10):
+    verification = LLM_CALL(...)
+    inaccurate.extend(...)
+
+  IF len(inaccurate) > 0:
+    DISPLAY "Post-refresh verification found {len(inaccurate)} entries with summary drift."
+    ASK user: "Regenerate? [Y/n]"
+    ...
+```
+
+---
+
 ## Cross-Cutting Concerns
 
 ### Script dependencies
@@ -627,6 +868,16 @@ New rows for CLAUDE.md cross-cutting concerns:
 - [ ] Each chunk carries `heading_context` (ancestor heading chain).
 - [ ] `embed.py` prepends `heading_context` to chunk embedding text.
 - [ ] Existing chunking strategies (`markdown`, `transcript`, `code`, `paragraph`) are unchanged.
+
+### Guards, Skips, and Post-Checks
+- [ ] Source-scanner Step 0 (nav detection) has pre-check for source root accessibility, graceful fallback on script failure, and coverage-threshold decision logic with user prompt at 50–80%.
+- [ ] Source-scanner Step 1b (large files) has pre-check for `computed.file_list`, skip when `large_file_threshold == 0`, graceful fallback on script failure, and post-step summary of split vs fallback counts.
+- [ ] Source-scanner chunking step has pre-check for `chunking.enabled`, auto-strategy selection based on heading analysis, and strategy display.
+- [ ] Build Phase 7c (verification) has GUARD for `computed.index`, skip condition based on `verify_on_build` config with default heuristic, graceful fallback on script failure, and post-check presenting inaccurate entries with regeneration prompt.
+- [ ] Build tree-thinning step has pre-check for section entry existence, skip when `min_section_tokens` not configured, dry-run preview before applying, and user confirmation gate.
+- [ ] Refresh verification step has pre-check for `computed.changes_applied`, skip when only deletions applied, and targets only modified/added entries.
+- [ ] All new steps degrade gracefully: script failure → DISPLAY warning → PROCEED to next phase (never EXIT on script failure).
+- [ ] All new steps with user interaction offer `[Y/n]` confirmation before modifying index.yaml.
 
 ### Integration
 - [ ] All scripts exit 0 with JSON stdout on success, exit 1 with stderr on error.
