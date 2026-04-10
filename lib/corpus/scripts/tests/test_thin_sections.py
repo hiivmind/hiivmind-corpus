@@ -1,6 +1,9 @@
 """Tests for thin_sections.py — bottom-up section merging."""
 import copy
+import json
+import subprocess
 import sys
+import yaml
 from pathlib import Path
 
 import pytest
@@ -98,3 +101,63 @@ class TestThinSections:
         result = thin_sections(index, min_tokens=100, dry_run=True)
         assert index == original
         assert result["sections_before"] >= 1
+
+
+class TestThinSectionsCLI:
+    """CLI integration tests."""
+
+    def test_cli_dry_run(self, tmp_path):
+        index = _make_index([
+            {"id": "src:a.md", "title": "A", "summary": "A docs", "tier": "file", "keywords": []},
+            {"id": "src:a.md#tiny", "title": "Tiny", "summary": "Short",
+             "tier": "section", "parent": "src:a.md", "heading_level": 2,
+             "line_range": [1, 3], "keywords": []},
+        ])
+        index_path = tmp_path / "index.yaml"
+        with open(index_path, "w") as f:
+            yaml.dump(index, f)
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "thin_sections.py"),
+             "--index", str(index_path), "--min-tokens", "100", "--dry-run"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert "sections_before" in data
+
+    def test_cli_missing_index(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "thin_sections.py"),
+             "--index", "/nonexistent/index.yaml"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 1
+
+
+class TestThinSectionsEdgeCases:
+    def test_no_sections_in_index(self):
+        index = _make_index([
+            {"id": "src:a.md", "title": "A", "summary": "A docs", "tier": "file"},
+        ])
+        result = thin_sections(index, min_tokens=100)
+        assert len(result["entries"]) == 1
+
+    def test_chain_merge(self):
+        """When A is small and merges into B, and B was also small, the merge should still work."""
+        index = _make_index([
+            {"id": "src:a.md", "title": "A", "summary": "A docs " * 80, "tier": "file", "keywords": []},
+            {"id": "src:a.md#s1", "title": "S1", "summary": "Big " * 80,
+             "tier": "section", "parent": "src:a.md", "heading_level": 2,
+             "line_range": [1, 50], "keywords": ["s1"]},
+            {"id": "src:a.md#s2", "title": "S2", "summary": "Tiny",
+             "tier": "section", "parent": "src:a.md", "heading_level": 2,
+             "line_range": [51, 53], "keywords": ["s2"]},
+            {"id": "src:a.md#s3", "title": "S3", "summary": "Also tiny",
+             "tier": "section", "parent": "src:a.md", "heading_level": 2,
+             "line_range": [54, 56], "keywords": ["s3"]},
+        ])
+        result = thin_sections(index, min_tokens=100)
+        section_ids = [e["id"] for e in result["entries"] if e.get("tier") == "section"]
+        # s2 and s3 should both be merged (into s1 or cascaded)
+        assert "src:a.md#s2" not in section_ids
+        assert "src:a.md#s3" not in section_ids

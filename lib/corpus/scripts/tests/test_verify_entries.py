@@ -1,5 +1,6 @@
 """Tests for verify_entries.py — entry content verification data prep."""
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -75,3 +76,34 @@ class TestExtractPreviews:
         )
         assert len(result) == 1
         assert result[0]["entry_id"] == "src:docs/guide.md"
+
+
+class TestVerifyEntriesCLI:
+    """CLI integration tests."""
+
+    def test_cli_json_output(self, sample_index):
+        index_yaml, source_root = sample_index
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "verify_entries.py"),
+             "--index", str(index_yaml), "--source-root", str(source_root)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert len(data) == 3
+
+    def test_cli_missing_index(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "verify_entries.py"),
+             "--index", "/nonexistent/index.yaml", "--source-root", "/tmp"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode != 0
+
+
+class TestVerifyEntriesEdgeCases:
+    def test_empty_index(self, tmp_path):
+        index_yaml = tmp_path / "index.yaml"
+        index_yaml.write_text("meta:\n  entry_count: 0\nentries: []\n")
+        result = extract_previews(str(index_yaml), str(tmp_path), token_limit=500)
+        assert result == []

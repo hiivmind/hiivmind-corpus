@@ -1,4 +1,6 @@
 """Tests for detect_large_files.py — large file detection."""
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -53,3 +55,25 @@ class TestDetectLargeFiles:
     def test_high_threshold_finds_nothing(self, docs_dir):
         result = detect_large_files(str(docs_dir), max_tokens=999999)
         assert result == []
+
+
+class TestDetectLargeFilesCLI:
+    def test_cli_json_output(self, docs_dir):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "detect_large_files.py"),
+             "--source-root", str(docs_dir), "--max-tokens", "50"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert len(data) >= 1
+
+    def test_cli_nonexistent_dir(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "detect_large_files.py"),
+             "--source-root", "/nonexistent"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert data == []

@@ -10,6 +10,7 @@ Unit tests (no external deps):
 """
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -169,3 +170,37 @@ class TestDetectNav:
         result = detect_nav(str(tmp_path))
         assert result["found"] is True
         assert result["framework"] in ("mdbook", "gitbook")
+
+
+class TestDetectNavCLI:
+    """CLI integration tests."""
+
+    def test_cli_valid_source(self, tmp_path):
+        mkdocs = tmp_path / "mkdocs.yml"
+        mkdocs.write_text("nav:\n  - Home: index.md\n")
+        (tmp_path / "index.md").write_text("# Home")
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py"),
+             "--source-root", str(tmp_path)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert data["found"] is True
+
+    def test_cli_nonexistent_dir(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py"),
+             "--source-root", "/nonexistent/path"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0  # not found is not an error
+        data = json.loads(result.stdout)
+        assert data["found"] is False
+
+    def test_cli_missing_arg(self):
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py")],
+            capture_output=True, text=True,
+        )
+        assert result.returncode != 0
