@@ -53,15 +53,6 @@ meta:
     return path
 
 
-def deps_available():
-    try:
-        import fastembed  # noqa: F401
-        import lancedb  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
 @pytest.fixture
 def embedded_dataset(sample_index_yaml, tmp_path):
     """Build a Lance dataset from sample data. Requires fastembed + lancedb."""
@@ -104,7 +95,6 @@ class TestErrorHandling:
 # --- Integration Tests (require fastembed + lancedb) ---
 
 
-@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
 class TestSearchPipeline:
 
     def test_basic_search_returns_results(self, embedded_dataset):
@@ -325,7 +315,6 @@ class TestHybridSearch:
 
         return tmp_path / "chunks.lance"
 
-    @pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
     def test_hybrid_search_returns_results(self, chunk_dataset):
         """--hybrid with --table chunks returns results using FTS+vector."""
         result = subprocess.run(
@@ -339,7 +328,6 @@ class TestHybridSearch:
         assert len(results) > 0
         assert results[0]["id"] == "src:file.md#chunk-0"
 
-    @pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
     def test_hybrid_returns_extra_columns(self, chunk_dataset):
         """--hybrid with --select returns requested columns."""
         result = subprocess.run(

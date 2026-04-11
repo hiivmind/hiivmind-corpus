@@ -171,17 +171,6 @@ class TestErrorHandling:
 # --- Integration Tests (require fastembed + lancedb) ---
 
 
-def deps_available():
-    """Check if fastembed and lancedb are installed."""
-    try:
-        import fastembed  # noqa: F401
-        import lancedb  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
-@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
 class TestEmbeddingPipeline:
     """End-to-end tests requiring fastembed + lancedb."""
 
@@ -336,7 +325,6 @@ class TestChunkMode:
         assert result.returncode == 2
 
 
-@pytest.mark.skipif(not deps_available(), reason="fastembed/lancedb not installed")
 class TestChunkEmbeddingPipeline:
     """End-to-end tests for chunk embedding."""
 
@@ -397,6 +385,125 @@ class TestChunkEmbeddingPipeline:
         output_json = json.loads(result.stdout)
         assert output_json["total"] == 3
         assert output_json["embedded"] == 3
+
+
+class TestHeadingContextEmbedding:
+    """Tests for heading_context prepend in chunk embeddings."""
+
+    @pytest.fixture
+    def chunks_with_context(self, tmp_path):
+        """Create chunks JSON with heading_context fields."""
+        chunks = [
+            {
+                "id": "src:file.md#chunk-0",
+                "parent": "src:file.md",
+                "source": "src",
+                "path": "file.md",
+                "chunk_index": 0,
+                "chunk_text": "Install the package using pip.",
+                "heading_context": "## Getting Started > ### Installation",
+                "line_range": [1, 5],
+                "overlap_prev": False,
+            },
+            {
+                "id": "src:file.md#chunk-1",
+                "parent": "src:file.md",
+                "source": "src",
+                "path": "file.md",
+                "chunk_index": 1,
+                "chunk_text": "Configure the settings file.",
+                "heading_context": "",
+                "line_range": [6, 10],
+                "overlap_prev": False,
+            },
+        ]
+        path = tmp_path / "chunks_ctx.json"
+        path.write_text(json.dumps(chunks))
+        return path
+
+    @pytest.fixture
+    def chunks_without_context(self, tmp_path):
+        """Create chunks JSON without heading_context fields."""
+        chunks = [
+            {
+                "id": "src:file.md#chunk-0",
+                "parent": "src:file.md",
+                "source": "src",
+                "path": "file.md",
+                "chunk_index": 0,
+                "chunk_text": "Install the package using pip.",
+                "line_range": [1, 5],
+                "overlap_prev": False,
+            },
+        ]
+        path = tmp_path / "chunks_no_ctx.json"
+        path.write_text(json.dumps(chunks))
+        return path
+
+    def test_heading_context_produces_different_embeddings(self, chunks_with_context, chunks_without_context, tmp_path):
+        """Chunks with heading_context should embed differently than without."""
+        script = str(Path(__file__).parent.parent / "embed.py")
+
+        # Embed with context
+        out_ctx = tmp_path / "with_ctx.lance"
+        r1 = subprocess.run(
+            [sys.executable, script, "--mode", "chunks", str(chunks_with_context), str(out_ctx)],
+            capture_output=True, text=True,
+        )
+        assert r1.returncode == 0, f"Failed: {r1.stderr}"
+
+        # Embed without context
+        out_no_ctx = tmp_path / "no_ctx.lance"
+        r2 = subprocess.run(
+            [sys.executable, script, "--mode", "chunks", str(chunks_without_context), str(out_no_ctx)],
+            capture_output=True, text=True,
+        )
+        assert r2.returncode == 0, f"Failed: {r2.stderr}"
+
+        # Compare vectors — they should differ since heading_context was prepended
+        import lancedb
+        db_ctx = lancedb.connect(str(out_ctx))
+        db_no_ctx = lancedb.connect(str(out_no_ctx))
+        tbl_ctx = db_ctx.open_table("chunks")
+        tbl_no_ctx = db_no_ctx.open_table("chunks")
+
+        vec_ctx = tbl_ctx.to_pandas().iloc[0]["vector"]
+        vec_no_ctx = tbl_no_ctx.to_pandas().iloc[0]["vector"]
+
+        # Same chunk_text but different heading_context should produce different vectors
+        assert list(vec_ctx) != list(vec_no_ctx)
+
+    def test_empty_heading_context_backward_compatible(self, chunks_without_context, tmp_path):
+        """Chunks without heading_context field should embed normally."""
+        script = str(Path(__file__).parent.parent / "embed.py")
+        output = tmp_path / "compat.lance"
+        result = subprocess.run(
+            [sys.executable, script, "--mode", "chunks", str(chunks_without_context), str(output)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"Failed: {result.stderr}"
+
+        import lancedb
+        db = lancedb.connect(str(output))
+        tbl = db.open_table("chunks")
+        df = tbl.to_pandas()
+        assert len(df) == 1
+        assert df.iloc[0]["id"] == "src:file.md#chunk-0"
+
+    def test_load_chunks_preserves_heading_context(self, chunks_with_context):
+        """load_chunks should include heading_context in items."""
+        sys.path.insert(0, str(Path(SCRIPT).parent))
+        from embed import load_chunks
+        items = load_chunks(str(chunks_with_context))
+        assert items[0]["heading_context"] == "## Getting Started > ### Installation"
+        assert items[1]["heading_context"] == ""
+
+    def test_load_chunks_defaults_missing_context(self, chunks_without_context):
+        """load_chunks should default heading_context to empty string when missing."""
+        sys.path.insert(0, str(Path(SCRIPT).parent))
+        from embed import load_chunks
+        items = load_chunks(str(chunks_without_context))
+        assert items[0]["heading_context"] == ""
 
 
 if __name__ == "__main__":

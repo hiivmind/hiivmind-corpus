@@ -179,6 +179,37 @@ Scan Results
 Total: {total_files} files across {source_count} sources
 ```
 
+### Tree Thinning (post Phase 2c)
+
+```pseudocode
+GUARD_TREE_THINNING():
+  section_count = count(entry for entry in computed.scan_results if entry.tier == "section")
+  IF section_count == 0:
+    SKIP "No section entries to thin."
+    PROCEED to next phase
+
+  has_token_config = ANY(source.sections.min_section_tokens IS NOT null for source in config.sources)
+  IF NOT has_token_config:
+    SKIP "Tree thinning not configured (no min_section_tokens in any source)."
+    PROCEED to next phase
+
+  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens} --dry-run")
+
+  IF result.exit_code != 0:
+    DISPLAY "Tree thinning failed: {stderr}. Proceeding with unthinned sections."
+    PROCEED to next phase
+
+  IF result.sections_before == result.sections_after:
+    DISPLAY "Tree thinning: all sections above threshold. No merges needed."
+    PROCEED to next phase
+
+  DISPLAY "Tree thinning would merge {sections_before - sections_after} sections."
+  ASK user: "Apply these merges? [Y/n]"
+  IF user approves:
+    Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens}")
+    DISPLAY "Thinned: {sections_before} → {sections_after} sections."
+```
+
 ---
 
 ## Phase 3: Determine Segmentation Strategy
@@ -556,6 +587,43 @@ GUARD_PHASE_7():
 5. Display: "Generated chunk embeddings for {chunk_count} chunks across {source_count} sources"
 
 **Commit guidance:** `chunks-embeddings.lance/` MUST be committed alongside other corpus files. Do NOT add to `.gitignore`.
+
+---
+
+## Phase 7c: Verification
+
+```pseudocode
+GUARD_PHASE_7C_VERIFICATION():
+  IF computed.index IS null:
+    DISPLAY "Cannot verify: index has not been generated."
+    EXIT
+
+  verify_enabled = config.build.verify_on_build
+  IF verify_enabled IS null:
+    verify_enabled = (computed.index.meta.entry_count < 200)
+
+  IF verify_enabled == false:
+    SKIP "Verification skipped."
+    PROCEED to Phase 8
+
+  sample_size = config.build.verify_sample_size OR 20
+  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --sample {sample_size}")
+
+  IF result.exit_code != 0:
+    DISPLAY "Verification script failed. Proceeding without verification."
+    PROCEED to Phase 8
+
+  # LLM verification of previews in batches of 10
+  inaccurate = LLM_VERIFY(result)
+
+  IF len(inaccurate) == 0:
+    DISPLAY "Verification passed: all entries accurate."
+  ELSE:
+    DISPLAY "Verification found {N} entries with summary drift."
+    ASK user: "Regenerate summaries for these entries? [Y/n]"
+    IF user approves:
+      regenerate and re-embed if needed
+```
 
 ---
 
