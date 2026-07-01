@@ -1,10 +1,9 @@
 {
   "name": "hiivmind-corpus",
   "owner": {
-    "name": "hiivmind",
+    "name": "Nathaniel Ramm",
     "email": "nathaniel.ramm@discretedatascience.com"
   },
-  "repository": "https://github.com/hiivmind/hiivmind-corpus",
   "metadata": {
     "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
     "version": "1.4.0"
@@ -14,15 +13,7 @@
       "name": "hiivmind-corpus",
       "source": "./",
       "description": "Create, build, and maintain documentation corpus skills for any project",
-      "version": "1.4.0",
-      "keywords": [
-        "documentation",
-        "corpus",
-        "meta-plugin",
-        "skills",
-        "navigation",
-        "indexing"
-      ]
+      "version": "1.4.0"
     }
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "name": "hiivmind-corpus",
+  "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
+  "version": "1.4.0",
+  "contextFileName": "GEMINI.md",
+  "author": "Nathaniel Ramm",
+  "homepage": "https://github.com/hiivmind/hiivmind-corpus#readme"
+}
