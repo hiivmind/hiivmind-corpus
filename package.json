@@ -1,0 +1,34 @@
+{
+  "name": "hiivmind-corpus",
+  "displayName": "hiivmind-corpus",
+  "version": "1.4.0",
+  "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
+  "publisher": "hiivmind",
+  "author": "Nathaniel Ramm",
+  "license": "MIT",
+  "homepage": "https://github.com/hiivmind/hiivmind-corpus#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hiivmind/hiivmind-corpus.git"
+  },
+  "keywords": [
+    "documentation",
+    "corpus",
+    "meta-plugin",
+    "skills",
+    "navigation",
+    "indexing"
+  ],
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./openclaw.plugin.json"
+    ],
+    "compat": {
+      "openclaw": ">=0.1.0"
+    }
+  }
+}

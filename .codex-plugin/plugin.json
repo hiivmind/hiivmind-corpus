@@ -1,0 +1,9 @@
+{
+  "name": "hiivmind-corpus",
+  "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
+  "version": "1.4.0",
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "agents": "./agents/",
+  "lib": "./lib/"
+}

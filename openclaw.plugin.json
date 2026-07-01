@@ -1,0 +1,30 @@
+{
+  "id": "hiivmind-corpus",
+  "name": "hiivmind-corpus",
+  "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
+  "version": "1.4.0",
+  "skills": [
+    "skills/hiivmind-corpus-add-source",
+    "skills/hiivmind-corpus-bridge",
+    "skills/hiivmind-corpus-build",
+    "skills/hiivmind-corpus-discover",
+    "skills/hiivmind-corpus-enhance",
+    "skills/hiivmind-corpus-graph",
+    "skills/hiivmind-corpus-init",
+    "skills/hiivmind-corpus-navigate",
+    "skills/hiivmind-corpus-refresh",
+    "skills/hiivmind-corpus-register",
+    "skills/hiivmind-corpus-status"
+  ],
+  "agents": [
+    "agents/source-scanner.md"
+  ],
+  "commands": [
+    "commands/hiivmind-corpus.md"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}
