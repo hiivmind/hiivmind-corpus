@@ -14,3 +14,15 @@ corpora:
       path: null           # local cache path (for clone strategy)
       ttl: 7d
     registered_at: "2026-01-29T00:00:00Z"
+
+  - id: github-docs
+    source:
+      type: github
+      repo: hiivmind/hiivmind-corpus-github
+      ref: main
+      path: null
+    cache:
+      strategy: fetch      # clone | fetch | none
+      path: null           # local cache path (for clone strategy)
+      ttl: 7d
+    registered_at: "2026-07-01T05:15:43Z"
