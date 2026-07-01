@@ -15,7 +15,7 @@ inputs:
   - name: mode
     type: string
     required: false
-    description: "status" for check-only, "update" to pull changes (prompted if not provided)
+    description: "'status' for check-only, 'update' to pull changes (prompted if not provided)"
   - name: auto_approve
     type: boolean
     required: false
