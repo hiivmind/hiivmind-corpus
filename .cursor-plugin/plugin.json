@@ -2,7 +2,7 @@
   "name": "hiivmind-corpus",
   "displayName": "hiivmind-corpus",
   "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "author": {
     "name": "Nathaniel Ramm",
     "email": "nathaniel.ramm@discretedatascience.com"
