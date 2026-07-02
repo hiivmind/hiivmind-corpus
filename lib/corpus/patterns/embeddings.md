@@ -12,7 +12,7 @@ and stores them in Lance format for hybrid vector + SQL search.
 - `pyarrow` — Columnar data (transitive dependency of lancedb)
 - Model: `BAAI/bge-small-en-v1.5` (~45MB, auto-downloaded on first use)
 
-Install: `pip install fastembed lancedb pyyaml` (~260MB total)
+Install: `uv pip install fastembed lancedb pyyaml` (~260MB total, or `pip install` if not using uv)
 
 ## Dependency Detection
 
@@ -29,7 +29,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
 | `not-installed` | 1 | fastembed or lancedb not available |
 
 **Install prompt** (when heuristic recommends embeddings):
-> "Enable semantic search? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
+> "Enable semantic search? Requires: `uv pip install fastembed lancedb pyyaml` (~260MB)"
 
 **Model download note** (when detect.py reports "no-model"):
 > "Downloading embedding model (~45MB, one-time)..."

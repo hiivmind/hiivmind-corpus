@@ -13,9 +13,20 @@ Exit codes:
   1 - dependencies not installed
   2 - python error
 """
+
 import sys
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
+
+
+def _install_hint() -> str:
+    """Return the install command, preferring uv if available."""
+    import shutil
+
+    pkg = "fastembed lancedb pyyaml"
+    if shutil.which("uv"):
+        return f"uv pip install {pkg}"
+    return f"pip install {pkg}"
 
 
 def main():
@@ -23,12 +34,14 @@ def main():
         import fastembed  # noqa: F401
     except ImportError:
         print("not-installed")
+        print(f"Install with: {_install_hint()}", file=sys.stderr)
         sys.exit(1)
 
     try:
         import lancedb  # noqa: F401
     except ImportError:
         print("not-installed")
+        print(f"Install with: {_install_hint()}", file=sys.stderr)
         sys.exit(1)
 
     # Check if model is already downloaded.
@@ -39,9 +52,7 @@ def main():
         from pathlib import Path
 
         cache_path = Path.home() / ".cache" / "fastembed"
-        model_dirs = (
-            list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
-        )
+        model_dirs = list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
         if model_dirs:
             print("ready")
         else:
