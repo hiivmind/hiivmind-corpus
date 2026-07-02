@@ -261,12 +261,36 @@ requires running the graph skill's add-concept with updated entry selection.
 
 ### v1 format (index.md only)
 
+Per-change rules (apply to both single and tiered):
+
+- **D (deleted):** Remove the entry line from the relevant section file.
+- **M (modified):** Path is unchanged — the entry reference remains valid. No section edit needed.
+- **A (added):** Read the file from `.source/{id}/` and extract a real title and intro **before** writing the entry. Never write a directory summary or placeholder stub — v1 has no re-scan phase, so entries need real content from the start.
+
+  ```pseudocode
+  FOR EACH added_path IN source.files_changed WHERE status == "A":
+    content = git_show(".source/{source.id}", "HEAD:{docs_root}/{relative_path}")
+    title   = frontmatter.title OR frontmatter.shortTitle OR first_h1(content) OR filename_humanized
+    intro   = frontmatter.intro (clean template vars, truncate to ~120 chars)
+    entry   = "- **{title}** `{source.id}:{relative_path}`"
+    IF intro: entry += " — {intro}"
+    append entry to relevant section in index file
+  ```
+
+  Template variables (e.g. Liquid `{% data variables.X.Y %}`) must be resolved or stripped
+  **before** truncating — truncating mid-tag leaves broken markup in the index.
+
+  Place each entry in the appropriate existing `##` section based on path structure
+  (e.g. `copilot/concepts/...` → `## Concepts`, `copilot/how-tos/...` → `## How-Tos`).
+  Never stage entries under a temporary heading like "New in This Refresh" — the index
+  is a durable source of truth, not a changelog.
+
 #### Single index
 
 If `computed.index_structure.is_tiered` is false:
 
 1. Read `index.md`
-2. Apply changes: update existing entries, add new entries, mark removed entries
+2. Apply changes per rules above
 3. Show preview of changes to user
 4. If `auto_approve` or user confirms → save index.md
 
@@ -278,7 +302,7 @@ If `computed.index_structure.is_tiered` is true:
 2. Present affected sections to user
 3. For each affected sub-index:
    - Read `index-{section}.md`
-   - Apply relevant changes
+   - Apply relevant changes per rules above
    - Save
 4. Update main `index.md` summary section
 5. If `auto_approve` or user confirms → save all files
