@@ -280,8 +280,10 @@ Per-change rules (apply to both single and tiered):
   Template variables (e.g. Liquid `{% data variables.X.Y %}`) must be resolved or stripped
   **before** truncating — truncating mid-tag leaves broken markup in the index.
 
-  Group added entries by subdirectory under an `## New in This Refresh` section when there
-  are more than ~15 additions in a section file.
+  Place each entry in the appropriate existing `##` section based on path structure
+  (e.g. `copilot/concepts/...` → `## Concepts`, `copilot/how-tos/...` → `## How-Tos`).
+  Never stage entries under a temporary heading like "New in This Refresh" — the index
+  is a durable source of truth, not a changelog.
 
 #### Single index
 
