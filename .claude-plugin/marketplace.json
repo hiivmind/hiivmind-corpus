@@ -7,14 +7,14 @@
   "repository": "https://github.com/hiivmind/hiivmind-corpus",
   "metadata": {
     "description": "Meta-plugin for creating documentation corpus skills - index and navigate any open source project docs",
-    "version": "1.5.1"
+    "version": "1.5.2"
   },
   "plugins": [
     {
       "name": "hiivmind-corpus",
       "source": "./",
       "description": "Create, build, and maintain documentation corpus skills for any project",
-      "version": "1.5.1",
+      "version": "1.5.2",
       "keywords": [
         "documentation",
         "corpus",
