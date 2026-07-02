@@ -172,6 +172,28 @@ or the graph skill respectively.
 Apply changes directly to `index.md`. If tiered (glob `index-*.md`), map changes to
 affected sub-indexes and update each. See `patterns/sources/shared.md`.
 
+Per-change rules:
+
+- **D (deleted):** Remove the entry line from the relevant section file.
+- **M (modified):** Path is unchanged — the entry reference remains valid. No section edit needed.
+- **A (added):** Read the file from `.source/{id}/` and extract a real title and intro **before** writing the entry. Never write a directory summary or placeholder stub — v1 has no re-scan phase, so entries need real content from the start.
+
+  ```pseudocode
+  FOR EACH added_path IN source.files_changed WHERE status == "A":
+    content = git_show(".source/{source.id}", "HEAD:{docs_root}/{relative_path}")
+    title   = frontmatter.title OR frontmatter.shortTitle OR first_h1(content) OR filename_humanized
+    intro   = frontmatter.intro (clean template vars, truncate to ~120 chars)
+    entry   = "- **{title}** `{source.id}:{relative_path}`"
+    IF intro: entry += " — {intro}"
+    append entry to relevant section in index file
+  ```
+
+  Template variables (e.g. Liquid `{% data variables.X.Y %}`) must be resolved or stripped
+  **before** truncating — truncating mid-tag leaves broken markup in the index.
+
+  Group added entries by subdirectory under an `## New in This Refresh` section when there
+  are more than ~15 additions in a section file.
+
 ### Update config.yaml (both formats)
 
 For each updated source: advance `last_indexed_at`, and `last_commit_sha` (git/self/generated-docs)
