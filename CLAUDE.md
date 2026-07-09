@@ -72,6 +72,7 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   ├── hiivmind-corpus-refresh/      # Refresh index from upstream changes
 │   ├── hiivmind-corpus-refresh-headless/ # Non-interactive refresh for pipelines
 │   ├── hiivmind-corpus-enrich-headless/  # Non-interactive stale-entry enrichment
+│   ├── hiivmind-corpus-migrate/      # One-shot v1→v2 index migration (headless)
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
 │   ├── hiivmind-corpus-navigate/     # Global navigation across all corpora
 │   ├── hiivmind-corpus-register/     # Register corpus with project
@@ -129,6 +130,8 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 
 Headless pipeline:  refresh-headless → enrich-headless
                     (detect changes)   (regenerate stale entries, automated)
+
+Migration (one-shot): hiivmind-corpus-migrate  (v1 index.md → v2 index.yaml + tiered render)
 ```
 
 **Creation & Maintenance Skills:**
@@ -139,6 +142,7 @@ Headless pipeline:  refresh-headless → enrich-headless
 5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
 6. **hiivmind-corpus-refresh-headless**: Non-interactive refresh for automated pipelines; writes `refresh-result.yaml`
 7. **hiivmind-corpus-enrich-headless**: Non-interactive enrichment of stale entries (re-scan, concept assignment, verification, re-embed); writes `enrich-result.yaml`
+8. **hiivmind-corpus-migrate**: One-shot headless v1→v2 migration (parse index.md/index-*.md → index.yaml + `render:` block, deterministic render, ID-parity diff-check); writes `migrate-result.yaml`
 
 **Discovery & Navigation Skills:**
 6. **hiivmind-corpus-discover**: Scans for installed corpora
@@ -183,7 +187,7 @@ hiivmind-corpus-{project}/
 
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
-- Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-refresh-headless`, `hiivmind-corpus-enrich-headless`
+- Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-refresh-headless`, `hiivmind-corpus-enrich-headless`, `hiivmind-corpus-migrate`
 - Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`, `hiivmind-corpus-graph`, `hiivmind-corpus-bridge`
 - Gateway command: `/hiivmind-corpus`
 - Generated corpora: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-flyio`, `hiivmind-corpus-polars`)
@@ -204,8 +208,9 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `sources/` | Git/local/web/llms-txt/self operations | Per-type patterns (git, local, web, generated-docs, llms-txt, self) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
 | `freshness.md` | SHA-gated freshness | Read-time checks, CI refresh, stale flagging |
-| `index-updating.md` | Applying A/M/D changes to v1/v2 indexes | Stale marking, entry rules, config metadata |
-| `headless-contract.md` | Headless result-file contract | refresh/enrich schemas, versioning, validation |
+| `index-updating.md` | Applying A/M/D changes to v1/v2 indexes | Stale marking, entry rules, config metadata (v1 is read-only) |
+| `headless-contract.md` | Headless result-file contract | refresh/enrich/migrate schemas, versioning, validation |
+| `derivation-dag.md` | What skills write vs what is derived | config/index/graph.yaml are sources of truth; index.md and *.lance/ are rendered |
 
 **How skills use patterns:**
 
@@ -246,6 +251,8 @@ Using bash with yq:
 - **Optional embeddings**: Entry-level semantic embeddings (`index-embeddings.lance/`) via fastembed enhance retrieval for large/tiered corpora. Entries include `concepts[]` field for zettelkasten-enriched embedding text. Cross-corpus routing searches per-corpus embeddings directly. Opt-in during build with heuristic-based advice. Graceful fallback to keyword/LLM approach when fastembed unavailable — see specs at `docs/superpowers/specs/2026-03-27-rag-embeddings-design.md`, `docs/superpowers/specs/2026-03-27-lancedb-revision-design.md`, and `docs/superpowers/specs/2026-03-27-corpus-consolidation-design.md`
 - **Section-level indexing**: Sources with `sections.enabled: true` generate sub-entries for heading-bounded sections with their own metadata embeddings. Extends the existing metadata-embedding pattern to finer granularity — see spec at `docs/superpowers/specs/2026-04-05-section-indexing-and-deep-chunking-design.md`
 - **Deep chunking**: Sources with `chunking.enabled: true` split content into ~900-token chunks embedded into a separate `chunks-embeddings.lance/` file. Enables LanceDB native hybrid search (FTS + vector + RRF) for precise retrieval in unstructured content. Navigate skill fuses results across tiers with deduplication and query expansion.
+- **Tiering is render-time**: there is exactly one `index.yaml`; the `render:` block in config.yaml (`strategy: single | tiered`, section defs, optional quick-reference) drives `render-index.sh` to emit `index.md` (+ `index-{section}.md` per section). Entries opt into a section via a per-entry `section` field. Removing a section re-homes its entries to the main index (no data loss). See `patterns/index-rendering.md` and `patterns/derivation-dag.md`.
+- **v1 is read-only legacy**: the v1 format (`index.md` as source of truth) is no longer written by any skill. refresh/refresh-headless/enhance detect v1 and route to the one-shot headless `hiivmind-corpus-migrate` skill (index.md → index.yaml + render block, ID-parity diff-check). v1 write paths in `patterns/index-updating.md` are deprecated for one release, then deleted.
 
 ## Index Format
 
@@ -287,8 +294,8 @@ These features span multiple skills and must stay synchronized:
 
 | Feature | Relevant Skills | What to Check |
 |---------|-----------------|---------------|
-| Tiered indexes | build, enhance, refresh | Detection logic, update handling |
-| Source types (git/local/web/generated-docs/llms-txt/self) | add-source, build, enhance, refresh | Path formats, fetch methods |
+| Tiered rendering | build, migrate, refresh (re-render only) | `render:` block + entry `section` field — patterns/index-rendering.md; one index.yaml, N rendered files |
+| Source types (git/local/web/generated-docs/llms-txt/obsidian/self) | add-source, build, enhance, refresh, refresh-headless | Path formats, fetch methods |
 | `⚡ GREP` markers | add-source, build, enhance | Large file detection, index format |
 | Project awareness | init, navigate command (template) | Template exists, command help mentions it |
 | Config schema | all skills | Schema fields, validation |
@@ -311,7 +318,8 @@ These features span multiple skills and must stay synchronized:
 | Tree thinning | build, enhance, refresh | `thin_sections.py` post-processing, `min_section_tokens` config |
 | Large-node splitting | source-scanner, build | `detect_large_files.py` + `split_by_headings.py`, interaction with section indexing |
 | Structure-aware chunking | build, source-scanner, navigate | `headings` strategy in `chunk.py`, `heading_context` in embeddings |
-| Index updating | refresh, refresh-headless, enrich-headless | Single algorithm in `patterns/index-updating.md` — never duplicate into skills |
+| Index updating | refresh, refresh-headless, enrich-headless | Single algorithm in `patterns/index-updating.md` — never duplicate into skills; v1 write paths are read-only (migrate to v2) |
+| v1→v2 migration | migrate, refresh, refresh-headless, enhance | v1 read-only gating routes to `hiivmind-corpus-migrate`; render: block + section field; migrate-result contract |
 | Headless result contract | refresh-headless, enrich-headless, scheduler tasks | `contract_version`, result files, `validate_result.py` |
 | Headless enrichment | refresh-headless, enrich-headless, graph, build | Stale-entry resolution, concept assignment from existing graph only, result contract |
 
@@ -360,6 +368,8 @@ refresh ──► verify_entries.py (post Phase 6)
 refresh-headless ──► refresh-result.yaml (patterns/headless-contract.md)
 refresh-headless ──► enrich-headless (pipelines, when stale entries exist)
 enrich-headless ──► source-scanner agent, verify_entries.py, index-embeddings.lance/, enrich-result.yaml
+migrate ──► index.yaml + config.yaml render: block + render-index.sh (one-shot v1→v2), migrate-result.yaml
+build/refresh/migrate ──► render-index.sh ──► index.md (+ index-{section}.md when tiered)
 ```
 
 ### Reference Sections

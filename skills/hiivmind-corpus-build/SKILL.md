@@ -237,6 +237,13 @@ Present segmentation options:
 
 If tiered or by-source selected, collect section definitions from user.
 
+Record the decision as the `render:` block in config.yaml (see
+`patterns/config-parsing.md`): `strategy: tiered` with the collected
+`sections` (id, title, description), or `strategy: single`. "By source"
+is tiered with one section per source id. Section membership is written
+per-entry (`section:` field) during Phase 5 index generation, using the
+section definitions as assignment targets.
+
 ### Moderate corpus (200-500 files)
 
 Suggest segmentation but don't require it: "This corpus has {n} files. A tiered index
@@ -380,8 +387,10 @@ per user preferences. Each entry should include:
 - **Brief summary** (1-2 sentences describing the content)
 - **Key topics** covered
 
-For tiered indexes, generate the main `index.md` with section summaries and separate
-`index-{section}.md` files with detailed entries.
+For tiered corpora, do NOT hand-write sub-index files. Tiering is a render-time
+concern: assign each entry a `section:` field (below) and let `render-index.sh`
+emit the main `index.md` and every `index-{section}.md` from one `index.yaml`
+(see `patterns/index-rendering.md`).
 
 **See:** `lib/corpus/patterns/index-generation.md`
 
@@ -398,8 +407,9 @@ For each entry from each source-scanner report:
 5. Compute `links_from` by cross-referencing all entries' `links_to` lists
 6. Set `frontmatter` from extraction frontmatter data (if available, else `{}`)
 7. Set `concepts` to empty list `[]` (populated later by Phase 6 if graph extraction is enabled, or manually via graph add-concept)
-8. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
-9. For section entries from source-scanner reports (entries with `tier: section`):
+8. If Phase 3 chose `strategy: tiered`, set each entry's `section` field to the id of the matching `render.sections[]` (by source for "by source", or by topical fit for tiered/by-section); omit `section` for entries that belong in the main index. Leave unset entirely for `strategy: single`.
+9. Set `stale: false`, `stale_since: null`, `last_indexed` to current timestamp
+10. For section entries from source-scanner reports (entries with `tier: section`):
    - Construct `id` as `{source_id}:{path}#{anchor}`
    - Set `parent` to the file entry ID (`{source_id}:{path}`)
    - Map scanner output: `title`, `summary`, `tags`, `keywords`, `anchor`, `heading_level`, `line_range`
@@ -644,10 +654,10 @@ GUARD_PHASE_8():
 
 ### Save index files
 
-1. Write `index.yaml` with the structured index
-2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/render-index.sh` to corpus root (if not already present)
-3. Run `bash render-index.sh index.yaml` to generate `index.md`
-4. If tiered: write each `index-{section}.md` sub-index file (v1 format only — tiered v2 is deferred)
+1. Write `index.yaml` with the structured index (entries carry their `section:`
+   field from Phase 5; the `render:` block was written to config.yaml in Phase 3)
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/render-index.sh` to corpus root (overwrite if present — always use the current tiered-capable version)
+3. Run `bash render-index.sh index.yaml` — with `render.strategy: tiered` this also emits every `index-{section}.md` sub-index (see `patterns/index-rendering.md`); no hand-written sub-indexes, ever
 
 ### Update config metadata
 
@@ -710,6 +720,7 @@ Sources indexed: {source_count}
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`

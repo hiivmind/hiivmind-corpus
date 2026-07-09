@@ -230,6 +230,7 @@ Write the file even on abort or zero-work runs.
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless refresh (runs before this): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh-headless/SKILL.md`
 - Interactive refresh: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`

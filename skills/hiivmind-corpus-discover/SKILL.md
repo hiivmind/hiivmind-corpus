@@ -380,6 +380,7 @@ Skip and note in output:
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - **Navigate:** `skills/hiivmind-corpus-navigate/SKILL.md` - Query corpus documentation
 - **Register:** `skills/hiivmind-corpus-register/SKILL.md` - Add corpus to registry
 - **Status:** `skills/hiivmind-corpus-status/SKILL.md` - Check corpus health

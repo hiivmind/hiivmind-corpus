@@ -29,6 +29,10 @@ Manage documentation sources: git repositories, local uploads, web content, and 
 | `obsidian` | `.source/{id}/` (git) or direct path (local) | SHA / timestamp | Local files | Obsidian vaults | wikilinks, frontmatter, tags |
 | `self` | repo root (via `docs_root`) | Scoped SHA | Local files | Embedded corpus in own repo | frontmatter, tags |
 
+> **PDF is not a source type.** Large PDFs are a pre-processing concern of the
+> `local` source (split into chapters via `pdf.md`, then added as `local`) — see
+> "Pre-Processing" below.
+
 ## When to Use Each Type
 
 ```

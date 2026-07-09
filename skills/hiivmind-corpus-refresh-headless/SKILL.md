@@ -88,6 +88,7 @@ Per-source logic by type:
 | web | Cache age > 7 days → stale | `patterns/sources/web.md` |
 | llms-txt | SHA-256 of fetched manifest vs `manifest.last_hash` | `patterns/sources/llms-txt.md` |
 | generated-docs | Same as git, using `source_repo` | `patterns/sources/generated-docs.md` |
+| obsidian | Same as git when the vault is a clone (`.source/{id}/`); timestamp scan for a direct local path | `patterns/sources/obsidian.md` |
 | self | `git log -1 --format=%H -- {docs_root}` vs `last_commit_sha` | `patterns/sources/self.md` |
 
 If all sources are current: emit result with no changes and exit.
@@ -130,6 +131,7 @@ with their status (A/M/D).
 - **Web:** re-fetch all URLs to `.cache/web/{id}/` — see `patterns/sources/web.md`
 - **llms-txt:** re-fetch manifest, diff pages, re-cache changes — see `patterns/sources/llms-txt.md`
 - **Generated-docs:** same shallow-clone strategy as git, using `source_repo`
+- **Obsidian:** same as git when the vault is a clone (`.source/{id}/`), or a timestamp scan for a direct local path — see `patterns/sources/obsidian.md`
 - **Self:** `git diff --name-status {old_sha}..{new_sha} -- {docs_root}`, filtered by `include_patterns`
 
 ---
@@ -254,6 +256,7 @@ until enrich-headless or a rebuild runs.
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Enrichment (run after refresh): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enrich-headless/SKILL.md`
 - Interactive refresh: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
