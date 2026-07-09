@@ -14,7 +14,7 @@ Statuses: `Proposed` → `Accepted` → `In progress` → `Done` (or `Rejected` 
 | 04 | [Python packaging (PEP 723 + uv), cache-path bug, CI](04-python-packaging-and-ci.md) | **P2** | Done (PR #47) | S | — | Self-contained `uv run` scripts, fix `FASTEMBED_CACHE_PATH` bug in detect.py, dedupe constants, add CI to the plugin repo. |
 | 03 | [Tiered v2 rendering → v1 migration → retire v1](03-retire-v1-tiered-v2-rendering.md) | **P3** | In progress (wave 2) | L | internal sequencing | Make tiering a render-time concern of index.yaml, ship a migrate skill, move flyio off v1, delete v1 write paths. |
 | 05 | [Scheduler consolidation](05-scheduler-consolidation.md) | **P3** | Done (PR #48 + scheduler #1) | S | 01, 02, 04 | Replace 7 copy-pasted tasks with template+constants or a registry-driven task; upstream the sparse-checkout lesson into git.md; branch/PR hygiene. |
-| 06 | [Decision capture + more headless surfaces](06-decision-capture-and-headless-surfaces.md) | P4 | Proposed | M | 02, 03 | Persist build decisions in config.yaml for replay; headless status/graph-validate; `embeddings_lag` observability. |
+| 06 | [Decision capture + more headless surfaces](06-decision-capture-and-headless-surfaces.md) | P4 | In progress (wave 4) | M | 02, 03 | Persist build decisions in config.yaml for replay; headless status/graph-validate; `embeddings_lag` observability. |
 
 ## Suggested sequencing
 
