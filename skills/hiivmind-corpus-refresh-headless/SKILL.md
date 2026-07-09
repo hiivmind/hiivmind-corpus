@@ -99,8 +99,11 @@ run continues for other sources.
 
 `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/git.md`:
 
-Clone to `.source/{id}` if not present (depth 50). Then ensure the tracked SHA is
-reachable for diffing:
+Clone to `.source/{id}` if not present (depth 50; for large repos prefer the
+sparse blob-filtered clone — see "Sparse Checkout for Large Repositories" in
+`patterns/sources/git.md`). Never use the GitHub compare API to list changed
+files: it caps at 300 files and silently truncates. Then ensure the tracked
+SHA is reachable for diffing:
 
 ```pseudocode
 DEEPEN_IF_NEEDED(clone_dir, source):
