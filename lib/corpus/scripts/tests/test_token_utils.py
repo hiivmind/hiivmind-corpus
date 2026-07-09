@@ -15,10 +15,12 @@ class TestEstimateTokens:
     def test_empty_string_returns_zero(self):
         assert estimate_tokens("") == 0
 
+    @pytest.mark.model
     def test_single_word(self):
         result = estimate_tokens("hello")
         assert result >= 1
 
+    @pytest.mark.model
     def test_approximation_scales_with_length(self):
         short = estimate_tokens("one two three")
         long = estimate_tokens("one two three four five six seven eight nine ten")
@@ -30,6 +32,7 @@ class TestEstimateTokens:
     def test_whitespace_only_returns_zero(self):
         assert estimate_tokens("   \n\t  ") == 0
 
+    @pytest.mark.model
     def test_returns_integer(self):
         result = estimate_tokens("some words here for testing purposes")
         assert isinstance(result, int)

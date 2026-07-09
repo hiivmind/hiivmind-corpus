@@ -171,6 +171,7 @@ class TestErrorHandling:
 # --- Integration Tests (require fastembed + lancedb) ---
 
 
+@pytest.mark.model
 class TestEmbeddingPipeline:
     """End-to-end tests requiring fastembed + lancedb."""
 
@@ -325,6 +326,7 @@ class TestChunkMode:
         assert result.returncode == 2
 
 
+@pytest.mark.model
 class TestChunkEmbeddingPipeline:
     """End-to-end tests for chunk embedding."""
 
@@ -387,6 +389,7 @@ class TestChunkEmbeddingPipeline:
         assert output_json["embedded"] == 3
 
 
+@pytest.mark.model
 class TestHeadingContextEmbedding:
     """Tests for heading_context prepend in chunk embeddings."""
 

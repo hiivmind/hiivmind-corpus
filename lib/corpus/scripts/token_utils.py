@@ -7,7 +7,12 @@ word-count approximation (len(text.split()) * 1.3).
 Usage as module:
   from token_utils import estimate_tokens
   count = estimate_tokens("some text here")
+
+Set HIIVMIND_CORPUS_NO_MODEL=1 to force the word-count approximation and
+skip loading fastembed entirely (avoids a ~90MB model download when only a
+rough token estimate is needed, e.g. in CI).
 """
+import os
 
 TOKENS_PER_WORD = 1.3
 
@@ -21,6 +26,9 @@ def _get_tokenizer():
     if _tokenizer_checked:
         return _tokenizer
     _tokenizer_checked = True
+    if os.environ.get("HIIVMIND_CORPUS_NO_MODEL"):
+        _tokenizer = None
+        return _tokenizer
     try:
         from fastembed import TextEmbedding
 

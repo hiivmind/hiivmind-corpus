@@ -19,3 +19,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["lib/corpus/scripts/tests", "lib/corpus/tools"]
 pythonpath = ["."]
+markers = [
+    "model: test downloads/loads the fastembed embedding model (deselect in CI with -m 'not model')",
+]

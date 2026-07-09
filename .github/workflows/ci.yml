@@ -3,11 +3,27 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
   pull_request:
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Skip the fastembed model entirely in CI: no ~90MB download and no
+      # onnxruntime execution (which intermittently segfaults on the runner).
+      # Model-dependent tests are marked `model` and deselected below; token
+      # counting falls back to a word-count approximation.
+      HIIVMIND_CORPUS_NO_MODEL: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -16,14 +32,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Cache fastembed model
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/fastembed
-          key: fastembed-bge-small-en-v1.5
-
       - name: Run tests
-        run: uv run --group dev pytest -q
+        run: uv run --group dev pytest -q -m "not model"
 
       - name: Smoke-test PEP 723 scripts
         run: |
