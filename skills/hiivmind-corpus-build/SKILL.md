@@ -607,7 +607,7 @@ GUARD_PHASE_7C_VERIFICATION():
     PROCEED to Phase 8
 
   sample_size = config.build.verify_sample_size OR 20
-  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --sample {sample_size}")
+  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --sample {sample_size}")
 
   IF result.exit_code != 0:
     DISPLAY "Verification script failed. Proceeding without verification."
