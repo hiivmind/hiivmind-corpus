@@ -10,6 +10,7 @@ retained for human-readable logs only — orchestrators MUST read the file.
 |-------|------|--------------|
 | hiivmind-corpus-refresh-headless | refresh-result.yaml | `{corpus_root}/refresh-result.yaml` |
 | hiivmind-corpus-enrich-headless | enrich-result.yaml | `{corpus_root}/enrich-result.yaml` |
+| hiivmind-corpus-migrate | migrate-result.yaml | `{corpus_root}/migrate-result.yaml` |
 
 Result files are transient run artifacts: the skill ensures both filenames are
 listed in the corpus `.gitignore` (appending if missing) before writing.
@@ -21,11 +22,14 @@ run overwrites it.
 `contract_version` is a required integer. Current version: **1**. Consumers
 MUST reject files with versions they don't support (validate_result.py does).
 Additive optional fields do not bump the version; renamed/removed/retyped
-fields do.
+fields do. Adding a new `kind` (e.g. `migrate`) is backward-compatible;
+consumers reject only unknown `contract_version`, not unknown kinds they were
+not asked to validate.
 
 ## Validation
 
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py refresh-result.yaml --kind refresh
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py migrate-result.yaml --kind migrate
 
 Orchestrators should validate before consuming and treat exit 1/2 as a failed
 run (report, do not commit). Exit codes: 0 valid, 1 invalid (errors on
@@ -74,6 +78,24 @@ verification:                         # required
   failed: <int>
   drift_entries: [<entry id>, ...]
 embeddings: updated | skipped | no-model | not-installed   # required
+errors: [<str>, ...]                  # required
+```
+
+### migrate-result.yaml (written by hiivmind-corpus-migrate)
+
+```yaml
+contract_version: 1
+kind: migrate
+corpus: <name>                        # str, required
+run_at: <ISO 8601>                    # str, required
+entries_migrated: <int>               # required — entries written to index.yaml
+entries_skipped:                      # required list (may be empty) — human review items
+  - id: <entry id>                    # str, required
+    reason: file-missing | clone-failed   # str, required
+sections: [<str>, ...]                # required — section ids written to render.sections
+strategy: tiered | single             # required enum
+id_parity: <bool>                     # required — true only if the render preserved every non-skipped v1 ID
+embeddings: skipped                   # required — migrate never generates embeddings
 errors: [<str>, ...]                  # required
 ```
 
