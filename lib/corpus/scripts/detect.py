@@ -23,7 +23,8 @@ import shutil
 import sys
 from pathlib import Path
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import MODEL_NAME  # noqa: E402, F401
 
 
 def _install_hint() -> str:

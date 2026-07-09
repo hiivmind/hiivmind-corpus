@@ -16,10 +16,8 @@ import json
 import sys
 from pathlib import Path
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
-TABLE_NAME = "embeddings"
-META_TABLE = "_meta"
-QUERY_PREFIX = "query: "
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import MODEL_NAME, TABLE_NAME, META_TABLE, QUERY_PREFIX  # noqa: E402
 
 
 def parse_args():
