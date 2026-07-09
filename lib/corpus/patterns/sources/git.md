@@ -262,6 +262,32 @@ compare_clone_to_indexed() {
 
 ---
 
+### Sparse Checkout for Large Repositories (and the compare-API prohibition)
+
+For large upstream repos — or whenever only `docs_root` matters — use a sparse,
+blob-filtered clone instead of a full one. The clone lives in `.source/{id}/`
+(gitignored) and persists between runs, so the clone cost is paid once;
+subsequent runs just fetch and diff locally.
+
+**Using bash:**
+```bash
+# First run — sparse clone of docs_root only
+git clone --filter=blob:none --sparse --depth=50 <repo_url> .source/<id>
+git -C .source/<id> sparse-checkout set <docs_root>
+git -C .source/<id> checkout <branch>
+
+# Subsequent runs — fetch and diff locally
+git -C .source/<id> fetch --depth=50 origin <branch>
+git -C .source/<id> diff --name-status <last_commit_sha>..FETCH_HEAD -- <docs_root>
+```
+
+**Never use the GitHub compare API**
+(`gh api repos/{owner}/{repo}/compare/{base}...{head}`) **for change
+detection.** It caps the returned file list at 300 entries and silently drops
+the rest — a large documentation refresh will miss changed files with no error
+or warning. This is an operational lesson learned in production (scheduled
+corpus refreshes): always diff locally inside the clone.
+
 ---
 
 ### Extraction Support
