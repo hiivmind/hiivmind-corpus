@@ -77,6 +77,33 @@ Check graph.yaml for issues.
 3. Report: errors (must fix), warnings (should review)
 4. If clean: "Graph validates OK — N concepts, M relationships, no issues."
 
+**Headless mode** (`validate --headless`, or `headless: true` input): run the
+same validation rules non-interactively and write
+`{corpus_path}/graph-validate-result.yaml` (headless contract — see
+`${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/headless-contract.md`):
+
+```yaml
+contract_version: 1
+kind: graph-validate
+corpus: {name}
+run_at: {ISO 8601}
+concepts: {int}
+relationships: {int}
+issues:
+  - severity: error | warning
+    rule: {rule id from patterns/graph.md § Validation Rules}
+    detail: "{human-readable description with the offending id}"
+valid: {bool}                    # true when zero error-severity issues
+errors: []                       # runtime failures, not validation findings
+```
+
+Exit semantics for pipelines: emit the file always; `valid: false` when any
+error-severity issue exists. Validate with
+`uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py graph-validate-result.yaml --kind graph-validate`.
+Ensure `graph-validate-result.yaml` is gitignored in the corpus (append if
+missing). Note: interactive rule 2 loads `index.md`; headless mode loads
+`index.yaml` when present (v2), since entry IDs are the join key being checked.
+
 ### add-concept
 
 Add a new concept to graph.yaml with semi-automated entry suggestion.

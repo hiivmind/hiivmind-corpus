@@ -121,6 +121,23 @@ refresh_needed: <bool>                # required — any source behind OR stale_
 errors: [<str>, ...]                  # required
 ```
 
+### graph-validate-result.yaml (written by hiivmind-corpus-graph --headless)
+
+```yaml
+contract_version: 1
+kind: graph-validate
+corpus: <name>                        # str, required
+run_at: <ISO 8601>                    # str, required
+concepts: <int>                       # required — concept count
+relationships: <int>                  # required — relationship count
+issues:                               # required list (may be empty)
+  - severity: error | warning         # required enum
+    rule: <str>                       # required — rule id from patterns/graph.md
+    detail: <str>                     # required — human-readable, includes offending id
+valid: <bool>                         # required — true when zero error-severity issues
+errors: [<str>, ...]                  # required — runtime failures, not findings
+```
+
 ## Source status semantics
 
 - `current` — upstream unchanged, nothing done
