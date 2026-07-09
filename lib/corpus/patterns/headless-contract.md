@@ -11,6 +11,8 @@ retained for human-readable logs only — orchestrators MUST read the file.
 | hiivmind-corpus-refresh-headless | refresh-result.yaml | `{corpus_root}/refresh-result.yaml` |
 | hiivmind-corpus-enrich-headless | enrich-result.yaml | `{corpus_root}/enrich-result.yaml` |
 | hiivmind-corpus-migrate | migrate-result.yaml | `{corpus_root}/migrate-result.yaml` |
+| hiivmind-corpus-status-headless | status-result.yaml | `{corpus_root}/status-result.yaml` |
+| hiivmind-corpus-graph (--headless) | graph-validate-result.yaml | `{corpus_root}/graph-validate-result.yaml` |
 
 Result files are transient run artifacts: the skill ensures both filenames are
 listed in the corpus `.gitignore` (appending if missing) before writing.
@@ -30,6 +32,8 @@ not asked to validate.
 
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py refresh-result.yaml --kind refresh
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py migrate-result.yaml --kind migrate
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py status-result.yaml --kind status
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py graph-validate-result.yaml --kind graph-validate
 
 Orchestrators should validate before consuming and treat exit 1/2 as a failed
 run (report, do not commit). Exit codes: 0 valid, 1 invalid (errors on
@@ -96,6 +100,24 @@ sections: [<str>, ...]                # required — section ids written to rend
 strategy: tiered | single             # required enum
 id_parity: <bool>                     # required — true only if the render preserved every non-skipped v1 ID
 embeddings: skipped                   # required — migrate never generates embeddings
+errors: [<str>, ...]                  # required
+```
+
+### status-result.yaml (written by hiivmind-corpus-status-headless)
+
+```yaml
+contract_version: 1
+kind: status
+corpus: <name>                        # str, required
+run_at: <ISO 8601>                    # str, required
+index_format: v2 | v1 | none          # required enum
+sources:                              # required list (may be empty)
+  - id: <source id>                   # str, required
+    type: <source type>              # str, required
+    freshness: current | behind | unknown   # required enum
+stale_entries: <int>                  # required — entries flagged stale in the index
+embeddings_lag: <int or null>         # required key; null = no embeddings present
+refresh_needed: <bool>                # required — any source behind OR stale_entries > 0
 errors: [<str>, ...]                  # required
 ```
 
