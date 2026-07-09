@@ -34,10 +34,21 @@ UPDATE_INDEX_V2():
             computed.index_changes.stale_entries.append(entry_id)
 
         CASE "A":
+          # Consult config.build (decision capture) before placing the entry.
+          # See patterns/config-parsing.md § The build: Block.
+          IF config.build.skip_sections AND change matches a skipped section:
+            # Intentionally excluded — do NOT create an entry.
+            computed.index_changes.excluded.append(relative_path)
+            CONTINUE   # log as "excluded-by-config: {path}", not a failure
+          section = null
+          IF config.build.organization == "by-source" AND render.strategy == tiered:
+            section = source.id           # group new entries under their source
+          # by-topic → leave section null; enrich/build assigns by subject later
           append_entry(index, {
             id: entry_id, source: source.id, path: relative_path,
             stale: true, stale_since: now(),
             category: "unknown", summary: "Pending re-scan",
+            section: section,
             tags: [], keywords: [], concepts: []
           })
           computed.index_changes.added += 1
@@ -53,6 +64,12 @@ UPDATE_INDEX_V2():
 ```
 
 Notes:
+- **New-entry placement honors `config.build`** (decision capture): before
+  creating a placeholder for an added file, consult the block. `skip_sections`
+  matches → do not create an entry, log it as intentionally excluded instead.
+  `organization: by-source` on a tiered corpus → assign `section = source.id`;
+  `by-topic` → leave `section` null (subject assigned by enrich/build later).
+  **Absent block → current behavior** (best-effort category, main index).
 - `links_from` is NOT updated during refresh — recomputing cross-references
   requires a full build.
 - `concepts` is preserved as-is — full concept remapping requires the graph

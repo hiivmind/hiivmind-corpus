@@ -377,6 +377,14 @@ GUARD_STEP_5():
 
 Update `index.md` (or target sub-index file) collaboratively:
 
+**Replay recorded build decisions first.** Before deciding where deepened
+entries go, read `config.build` (see `patterns/config-parsing.md` § The `build:`
+Block): use `config.build.organization` to place entries (by-topic vs by-source)
+and honor `config.build.skip_sections` (never re-add an intentionally excluded
+section). Only fall back to inferring organization from the existing index when
+the block is absent. Never ask the user a question the block already answers —
+display the replayed value instead, e.g. `Using recorded organization: by-topic`.
+
 ### Enhancement Patterns
 
 All paths use the format: `{source_id}:{relative_path}`

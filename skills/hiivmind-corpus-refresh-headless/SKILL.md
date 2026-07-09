@@ -145,6 +145,11 @@ v2 → stale-marking rules (M/A/D); v1 → direct entry edits with real titles
 extracted from `.source/` (single or tiered). Then update config metadata per
 the same pattern. Track counts into `computed.index_changes`.
 
+Placement of added entries follows `config.build` (see
+`patterns/index-updating.md`) — `skip_sections` exclusions are logged in the
+result file's `errors[]` as `"excluded-by-config: {path}"` (informational, not
+a failure).
+
 ---
 
 ## Phase 5: Embeddings

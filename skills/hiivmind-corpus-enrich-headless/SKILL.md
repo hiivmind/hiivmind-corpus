@@ -160,6 +160,11 @@ If the script fails, log to errors and continue — verification is best-effort.
 
 ## Phase 5: Save, Render, Embed
 
+Enriched entries keep their existing `category`/`section`; any new placement
+decisions follow `config.build.organization` as documented in
+`patterns/index-updating.md` (§ New-entry placement) — never re-ask, never
+re-home already-placed entries.
+
 1. Update `index.yaml`: `meta.generated_at = now()`, recount `meta.entry_count`. Save.
 2. Re-render: `bash ./render-index.sh index.yaml` (if present).
 3. Embeddings — only if `index-embeddings.lance/` exists:
