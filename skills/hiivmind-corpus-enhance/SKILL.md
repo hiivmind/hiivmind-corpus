@@ -522,7 +522,7 @@ as `[]`. Concept assignment is handled separately via the graph skill.
 After saving updated index.yaml:
 
 1. If `index-embeddings.lance/` exists in corpus root:
-   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+   - Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
    - (Incremental — only re-embeds changed/new entries)
    - Display: "Updated embeddings for {n} modified entries"
 
@@ -685,6 +685,7 @@ User: "The detailed actions sub-index"
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`
 - Refresh from upstream: `skills/hiivmind-corpus-refresh/SKILL.md`
+- Headless enrichment (pipelines): `skills/hiivmind-corpus-enrich-headless/SKILL.md`
 - Discover corpora: `skills/hiivmind-corpus-discover/SKILL.md`
 - Global navigation: `skills/hiivmind-corpus-navigate/SKILL.md`
 - Gateway command: `commands/hiivmind-corpus.md`

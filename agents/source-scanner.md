@@ -40,7 +40,7 @@ You are a documentation source scanner. Your job is to analyze a single document
 
 **Pre-check:** Source root must be accessible.
 
-Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_nav.py --source-root {source_root}`
+Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect_nav.py --source-root {source_root}`
 
 **Decision logic:**
 - If script fails (exit != 0): DISPLAY warning, fall through to Step 1 (file discovery)
@@ -64,10 +64,10 @@ Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_nav.py --source-root {sou
 
 **Pre-check:** `computed.file_list` must exist and be non-empty. Skip if `config.build.large_file_threshold == 0`.
 
-Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/detect_large_files.py --source-root {source_root} --max-tokens {threshold}`
+Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect_large_files.py --source-root {source_root} --max-tokens {threshold}`
 
 For each large file with `has_headings: true`:
-  Run: `python3 ${PLUGIN_ROOT}/lib/corpus/scripts/split_by_headings.py --file {path} --min-tokens 200 --json`
+  Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/split_by_headings.py --file {path} --min-tokens 200 --json`
   Generate parent entry + child section entries from split result.
 
 For large files without headings: Use existing `size: large` + `grep_hint` fallback.
@@ -215,7 +215,7 @@ When the caller includes `chunking_config:` in your input (sourced from the sour
 **When chunking is enabled:**
 
 1. For each documentation file in the source:
-   a. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/chunk.py "{file_path}" --strategy {chunking_config.strategy} --target-tokens {chunking_config.target_tokens} --overlap-tokens {chunking_config.overlap_tokens} --json`
+   a. Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/chunk.py "{file_path}" --strategy {chunking_config.strategy} --target-tokens {chunking_config.target_tokens} --overlap-tokens {chunking_config.overlap_tokens} --json`
    b. Parse the JSON output
    c. For each chunk, annotate with corpus-level IDs:
       - `id`: `{source_id}:{relative_path}#chunk-{chunk_index}`

@@ -38,6 +38,31 @@ Establish available tool capabilities at the start of corpus operations, enablin
 - **jq** - JSON parsing, rarely needed in corpus operations
 - **fastembed + lancedb** (Python) - ONNX-based embedding generation and Lance vector storage for semantic search. Required for generating and querying `index-embeddings.lance/`. Without it, corpus retrieval falls back to keyword/LLM approach. Install: `pip install fastembed lancedb pyyaml` (~260MB). Detection: `python3 -c "import fastembed; import lancedb; print('available')" 2>/dev/null`. See `embeddings.md` for full detection flow via `detect.py`.
 
+## Python Script Invocation (uv-first)
+
+All Python scripts under `lib/corpus/scripts/` and `lib/corpus/tools/` carry
+PEP 723 inline metadata (`# /// script` blocks) declaring their dependencies.
+
+**Preferred (uv available):**
+
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/
+
+uv creates/reuses a cached ephemeral environment with the script's declared
+dependencies — no venv setup, no pip install step, works identically on
+macOS/Linux/Windows.
+
+**Fallback (no uv):**
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py ...
+
+requires the dependencies to be installed in the ambient interpreter:
+`pip install fastembed lancedb pyarrow pyyaml` (embedding scripts) /
+`pip install pymupdf` (PDF tools). detect.py reports `not-installed` on
+this path when imports fail.
+
+Detect once per session: `command -v uv` → use `uv run` for every script
+invocation in this session; otherwise use `python3` and respect detect.py.
+
 ## Detection Commands
 
 ### Detect YAML Parsing Capability

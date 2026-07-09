@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["fastembed>=0.4.0", "lancedb>=0.20.0", "pyarrow>=15.0.0", "pyyaml>=6.0"]
+# ///
 """Generate embeddings from index.yaml into a Lance dataset.
 
 Usage:
@@ -25,14 +29,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
-DIMENSIONS = 384
-TABLE_NAME = "embeddings"
-CHUNKS_TABLE_NAME = "chunks"
-META_TABLE = "_meta"
-PASSAGE_PREFIX = "passage: "  # bge-small asymmetric retrieval prefix for documents
-QUERY_PREFIX = "query: "  # bge-small asymmetric retrieval prefix for queries
-VECTOR_INDEX_THRESHOLD = 500  # Create IVF_PQ index above this entry count
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import (  # noqa: E402
+    MODEL_NAME, DIMENSIONS, TABLE_NAME, CHUNKS_TABLE_NAME,
+    META_TABLE, PASSAGE_PREFIX, QUERY_PREFIX, VECTOR_INDEX_THRESHOLD,
+)
 
 
 def parse_args():

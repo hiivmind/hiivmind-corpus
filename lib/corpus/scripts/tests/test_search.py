@@ -95,6 +95,7 @@ class TestErrorHandling:
 # --- Integration Tests (require fastembed + lancedb) ---
 
 
+@pytest.mark.model
 class TestSearchPipeline:
 
     def test_basic_search_returns_results(self, embedded_dataset):
@@ -263,6 +264,7 @@ class TestSearchPipeline:
         assert "could not open" in result.stderr.lower()
 
 
+@pytest.mark.model
 class TestHybridSearch:
     """Tests for --hybrid mode (FTS + vector + RRF)."""
 

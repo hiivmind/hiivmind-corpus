@@ -19,7 +19,7 @@ Install: `uv pip install fastembed lancedb pyyaml` (~260MB total, or `pip instal
 Detection via `detect.py`:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
 ```
 
 | Output | Exit | Meaning |
@@ -88,7 +88,7 @@ to distinguish between document text and query text:
 Generate entry embeddings from index.yaml:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/
 ```
 
 Stored alongside index.yaml in the corpus root. **MUST be committed to the repo** — this is a
@@ -100,7 +100,7 @@ fastembed installed. Do NOT add to .gitignore. Treat it the same as index.yaml a
 Generate content embeddings from chunked documents:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
 ```
 
 Separate from `index-embeddings.lance/`. Contains actual document content (not metadata
@@ -169,7 +169,7 @@ Both indexes are created inside the Lance dataset directory. No extra files.
 ## Querying Embeddings
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py index-embeddings.lance/ "user query" --top-k 15 --json
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py index-embeddings.lance/ "user query" --top-k 15 --json
 ```
 
 Output: `[{"id": "polars:expressions.md", "score": 0.8432}, ...]`
@@ -232,7 +232,7 @@ config keys, version strings) are handled by SQL predicates on text columns.
 For chunk datasets, use LanceDB native hybrid search instead of vector + SQL:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py chunks-embeddings.lance/ "query" \
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py chunks-embeddings.lance/ "query" \
   --table chunks --hybrid --text-column chunk_text --top-k 15 --json
 ```
 

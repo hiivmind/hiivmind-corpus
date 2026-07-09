@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["fastembed>=0.4.0", "lancedb>=0.20.0", "pyarrow>=15.0.0"]
+# ///
 """Query a Lance embedding dataset by cosine similarity with optional filtering and reranking.
 
 Usage:
@@ -16,10 +20,8 @@ import json
 import sys
 from pathlib import Path
 
-MODEL_NAME = "BAAI/bge-small-en-v1.5"
-TABLE_NAME = "embeddings"
-META_TABLE = "_meta"
-QUERY_PREFIX = "query: "
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import MODEL_NAME, TABLE_NAME, META_TABLE, QUERY_PREFIX  # noqa: E402
 
 
 def parse_args():

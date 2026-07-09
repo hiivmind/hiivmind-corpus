@@ -241,97 +241,19 @@ For each selected source, execute the type-specific update:
 
 **Inputs:** `computed.all_changes`, `computed.index_structure`, `computed.index_format`, `computed.updated_sources`
 
-### v2 format (index.yaml exists)
+Apply every change per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-updating.md`:
+v2 → stale-marking rules (M/A/D); v1 → direct entry edits with real titles
+extracted from `.source/` (single or tiered). Then update config metadata and
+run the embedding update per the same pattern.
 
-If `computed.index_format == "v2"`:
+Interactive additions on top of the pattern:
 
-1. **For modified entries**: Set `stale: true` and `stale_since` to current timestamp. Preserve existing summary, tags, keywords, and `concepts`.
-2. **For added entries**: Add placeholder entries with `stale: true`, `category: "unknown"`, `summary: "Pending re-scan"`. Full metadata populated on next build or LLM re-scan.
-3. **For deleted entries**: Remove entry from index.yaml. Remove from graph.yaml concept entries if referenced.
-4. Update `meta.generated_at` and `meta.entry_count` in index.yaml.
-5. Re-render index.md: `bash ./render-index.sh index.yaml` (render-index.sh is at corpus root, copied from templates/ during build)
-6. Show preview of changes (entries added/modified/removed, stale count).
-
-**Note:** `links_from` is NOT updated during refresh — requires a full build to recompute cross-references.
-
-**Note:** `concepts` is preserved as-is during differential refresh. Full concept remapping
-requires running the graph skill's add-concept with updated entry selection.
-
-**Pattern reference:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
-
-### v1 format (index.md only)
-
-Per-change rules (apply to both single and tiered):
-
-- **D (deleted):** Remove the entry line from the relevant section file.
-- **M (modified):** Path is unchanged — the entry reference remains valid. No section edit needed.
-- **A (added):** Read the file from `.source/{id}/` and extract a real title and intro **before** writing the entry. Never write a directory summary or placeholder stub — v1 has no re-scan phase, so entries need real content from the start.
-
-  ```pseudocode
-  FOR EACH added_path IN source.files_changed WHERE status == "A":
-    content = git_show(".source/{source.id}", "HEAD:{docs_root}/{relative_path}")
-    title   = frontmatter.title OR frontmatter.shortTitle OR first_h1(content) OR filename_humanized
-    intro   = frontmatter.intro (clean template vars, truncate to ~120 chars)
-    entry   = "- **{title}** `{source.id}:{relative_path}`"
-    IF intro: entry += " — {intro}"
-    append entry to relevant section in index file
-  ```
-
-  Template variables (e.g. Liquid `{% data variables.X.Y %}`) must be resolved or stripped
-  **before** truncating — truncating mid-tag leaves broken markup in the index.
-
-  Place each entry in the appropriate existing `##` section based on path structure
-  (e.g. `copilot/concepts/...` → `## Concepts`, `copilot/how-tos/...` → `## How-Tos`).
-  Never stage entries under a temporary heading like "New in This Refresh" — the index
-  is a durable source of truth, not a changelog.
-
-#### Single index
-
-If `computed.index_structure.is_tiered` is false:
-
-1. Read `index.md`
-2. Apply changes per rules above
-3. Show preview of changes to user
-4. If `auto_approve` or user confirms → save index.md
-
-#### Tiered index
-
-If `computed.index_structure.is_tiered` is true:
-
-1. Map changes to affected sub-indexes (match source sections to `index-*.md` files)
-2. Present affected sections to user
-3. For each affected sub-index:
-   - Read `index-{section}.md`
-   - Apply relevant changes per rules above
-   - Save
-4. Update main `index.md` summary section
-5. If `auto_approve` or user confirms → save all files
-
-### Update config metadata (both formats)
-
-After index changes are saved (applies to both v1 and v2):
-
-1. Update `index.last_updated_at` in config.yaml
-2. For each updated source:
-   - Set `last_commit_sha` (git/generated-docs)
-   - Set `last_indexed_at` to current timestamp
-   - Update `manifest.last_hash` (llms-txt)
-3. Save config.yaml
-
-### Embedding Update (if applicable)
-
-After updating index.yaml and config metadata:
-
-1. If `index-embeddings.lance/` exists in corpus root:
-   - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
-   - If output is "ready" (model already downloaded):
-     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
-     - (Incremental — only re-embeds entries with changed summaries)
-   - If output is "no-model": skip (do not trigger 80MB download during automated refresh)
-   - If exit 1: skip (fastembed not installed)
-2. If `index-embeddings.lance/` does not exist: no action (refresh does not prompt for opt-in)
-
-**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+1. **Preview before saving:** show the user the changes (entries
+   added/modified/removed, stale count; for tiered v1, the affected
+   sub-indexes). If `auto_approve` or the user confirms → save; otherwise
+   discard and stop.
+2. For v2, remind: stale entries are refreshed by the next build or LLM
+   re-scan (headless pipelines use `hiivmind-corpus-enrich-headless`).
 
 ### Completion
 
@@ -358,7 +280,7 @@ GUARD_REFRESH_VERIFICATION():
   IF len(modified_ids) == 0:
     SKIP "Only deletions applied. Skipping verification."
 
-  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --entries {modified_ids}")
+  result = Bash("uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --entries {modified_ids}")
 
   IF result.exit_code != 0:
     DISPLAY "Post-refresh verification failed. Proceeding."
@@ -395,6 +317,7 @@ GUARD_REFRESH_VERIFICATION():
 - **Self sources:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/self.md`
 - **Shared patterns:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/sources/shared.md`
 - **Index v2 schema:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-format-v2.md`
+- **Index updating:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-updating.md`
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
@@ -409,5 +332,6 @@ GUARD_REFRESH_VERIFICATION():
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
 - Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`
+- Headless enrichment (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enrich-headless/SKILL.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases

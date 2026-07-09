@@ -21,3 +21,6 @@ Thumbs.db
 *.pyc
 *.pyo
 .worktrees/
+
+# Python dev env (uv)
+.venv/

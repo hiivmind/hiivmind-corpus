@@ -70,6 +70,8 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   ├── hiivmind-corpus-build/        # Analyze docs, build index with user
 │   ├── hiivmind-corpus-enhance/      # Deepen coverage on specific topics
 │   ├── hiivmind-corpus-refresh/      # Refresh index from upstream changes
+│   ├── hiivmind-corpus-refresh-headless/ # Non-interactive refresh for pipelines
+│   ├── hiivmind-corpus-enrich-headless/  # Non-interactive stale-entry enrichment
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
 │   ├── hiivmind-corpus-navigate/     # Global navigation across all corpora
 │   ├── hiivmind-corpus-register/     # Register corpus with project
@@ -124,6 +126,9 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
                                  ↓
                         hiivmind-corpus-enhance
                             (as needed)
+
+Headless pipeline:  refresh-headless → enrich-headless
+                    (detect changes)   (regenerate stale entries, automated)
 ```
 
 **Creation & Maintenance Skills:**
@@ -132,6 +137,8 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
 3. **hiivmind-corpus-build**: Analyzes docs, builds `index.md` collaboratively with user
 4. **hiivmind-corpus-enhance**: Deepens coverage on specific topics (runs on existing index)
 5. **hiivmind-corpus-refresh**: Compares against upstream commits, refreshes index based on diff
+6. **hiivmind-corpus-refresh-headless**: Non-interactive refresh for automated pipelines; writes `refresh-result.yaml`
+7. **hiivmind-corpus-enrich-headless**: Non-interactive enrichment of stale entries (re-scan, concept assignment, verification, re-embed); writes `enrich-result.yaml`
 
 **Discovery & Navigation Skills:**
 6. **hiivmind-corpus-discover**: Scans for installed corpora
@@ -176,7 +183,7 @@ hiivmind-corpus-{project}/
 
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
-- Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`
+- Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-refresh-headless`, `hiivmind-corpus-enrich-headless`
 - Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`, `hiivmind-corpus-graph`, `hiivmind-corpus-bridge`
 - Gateway command: `/hiivmind-corpus`
 - Generated corpora: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-flyio`, `hiivmind-corpus-polars`)
@@ -197,6 +204,8 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `sources/` | Git/local/web/llms-txt/self operations | Per-type patterns (git, local, web, generated-docs, llms-txt, self) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
 | `freshness.md` | SHA-gated freshness | Read-time checks, CI refresh, stale flagging |
+| `index-updating.md` | Applying A/M/D changes to v1/v2 indexes | Stale marking, entry rules, config metadata |
+| `headless-contract.md` | Headless result-file contract | refresh/enrich schemas, versioning, validation |
 
 **How skills use patterns:**
 
@@ -302,6 +311,9 @@ These features span multiple skills and must stay synchronized:
 | Tree thinning | build, enhance, refresh | `thin_sections.py` post-processing, `min_section_tokens` config |
 | Large-node splitting | source-scanner, build | `detect_large_files.py` + `split_by_headings.py`, interaction with section indexing |
 | Structure-aware chunking | build, source-scanner, navigate | `headings` strategy in `chunk.py`, `heading_context` in embeddings |
+| Index updating | refresh, refresh-headless, enrich-headless | Single algorithm in `patterns/index-updating.md` — never duplicate into skills |
+| Headless result contract | refresh-headless, enrich-headless, scheduler tasks | `contract_version`, result files, `validate_result.py` |
+| Headless enrichment | refresh-headless, enrich-headless, graph, build | Stale-entry resolution, concept assignment from existing graph only, result contract |
 
 ### When Adding New Features
 
@@ -345,6 +357,9 @@ build ──► detect_nav.py, detect_large_files.py, split_by_headings.py (via 
 build ──► thin_sections.py (post Phase 2c)
 build ──► verify_entries.py (Phase 7c)
 refresh ──► verify_entries.py (post Phase 6)
+refresh-headless ──► refresh-result.yaml (patterns/headless-contract.md)
+refresh-headless ──► enrich-headless (pipelines, when stale entries exist)
+enrich-headless ──► source-scanner agent, verify_entries.py, index-embeddings.lance/, enrich-result.yaml
 ```
 
 ### Reference Sections

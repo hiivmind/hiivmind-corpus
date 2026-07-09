@@ -2,6 +2,8 @@
 import subprocess
 import sys
 
+import pytest
+
 SCRIPT = "lib/corpus/scripts/detect.py"
 
 
@@ -51,7 +53,47 @@ def test_no_stderr_on_success():
         assert result.stderr == "", f"Unexpected stderr: {result.stderr}"
 
 
-if __name__ == "__main__":
-    import pytest
+class TestCachePathAndUv:
+    """FASTEMBED_CACHE_PATH override and uv-aware availability."""
 
+    def _run(self, env_overrides, tmp_path):
+        import os
+        env = os.environ.copy()
+        env.update(env_overrides)
+        return subprocess.run(
+            [sys.executable, "lib/corpus/scripts/detect.py"],
+            capture_output=True, text=True, env=env,
+        )
+
+    def test_custom_cache_path_with_model_reports_ready(self, tmp_path):
+        """A bge-small model dir under FASTEMBED_CACHE_PATH must be found."""
+        cache = tmp_path / "custom-cache"
+        (cache / "models--qdrant--bge-small-en-v1.5").mkdir(parents=True)
+        result = self._run({"FASTEMBED_CACHE_PATH": str(cache)}, tmp_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() == "ready"
+
+    def test_custom_cache_path_empty_reports_no_model(self, tmp_path):
+        cache = tmp_path / "empty-cache"
+        cache.mkdir()
+        result = self._run({"FASTEMBED_CACHE_PATH": str(cache)}, tmp_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() == "no-model"
+
+    def test_uv_present_never_reports_not_installed(self, tmp_path, monkeypatch):
+        """With uv on PATH, availability is guaranteed by `uv run`, so the
+        import probe must be skipped even in an env without fastembed."""
+        import shutil
+        if shutil.which("uv") is None:
+            pytest.skip("uv not installed on this host")
+        cache = tmp_path / "empty-cache"
+        cache.mkdir()
+        # Run under the system python even if fastembed IS importable here;
+        # the assertion is only that exit code is 0 and output is a model status.
+        result = self._run({"FASTEMBED_CACHE_PATH": str(cache)}, tmp_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() in ("ready", "no-model")
+
+
+if __name__ == "__main__":
     pytest.main([__file__, "-v"])

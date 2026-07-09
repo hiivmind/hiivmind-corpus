@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pymupdf>=1.24.0"]
+# ///
 """Split a PDF into chapters based on its Table of Contents.
 
 This tool helps import large PDFs into hiivmind-corpus by splitting them
