@@ -1,0 +1,94 @@
+# Pattern: Headless Result Contract
+
+Headless skills communicate with orchestrators through **result files written
+to disk**, not by prose parsing. The printed `---headless-result` block is
+retained for human-readable logs only — orchestrators MUST read the file.
+
+## File locations
+
+| Skill | File | Default path |
+|-------|------|--------------|
+| hiivmind-corpus-refresh-headless | refresh-result.yaml | `{corpus_root}/refresh-result.yaml` |
+| hiivmind-corpus-enrich-headless | enrich-result.yaml | `{corpus_root}/enrich-result.yaml` |
+
+Result files are transient run artifacts: the skill ensures both filenames are
+listed in the corpus `.gitignore` (appending if missing) before writing.
+Orchestrators should treat the file as consumed after parsing; a subsequent
+run overwrites it.
+
+## Versioning
+
+`contract_version` is a required integer. Current version: **1**. Consumers
+MUST reject files with versions they don't support (validate_result.py does).
+Additive optional fields do not bump the version; renamed/removed/retyped
+fields do.
+
+## Validation
+
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py refresh-result.yaml --kind refresh
+
+Orchestrators should validate before consuming and treat exit 1/2 as a failed
+run (report, do not commit). Exit codes: 0 valid, 1 invalid (errors on
+stderr), 2 file missing/unparseable.
+
+## Schemas
+
+### refresh-result.yaml (written by hiivmind-corpus-refresh-headless)
+
+```yaml
+contract_version: 1
+kind: refresh
+corpus: <name from config>            # str, required
+run_at: <ISO 8601 timestamp>          # str, required
+sources:                              # list, required (may be empty)
+  - id: <source id>                   # str, required
+    type: <source type>               # str, required
+    status: current | updated | failed | skipped-manual   # required
+    old_sha: <str or null>
+    new_sha: <str or null>
+    files_changed: <int>
+index_changes:                        # required
+  added: <int>
+  modified: <int>
+  removed: <int>
+  stale_entries: [<entry id>, ...]    # list of str
+embeddings: updated | skipped | no-model | not-installed | deferred   # required
+errors: [<str>, ...]                  # list, required (may be empty)
+```
+
+### enrich-result.yaml (written by hiivmind-corpus-enrich-headless)
+
+```yaml
+contract_version: 1
+kind: enrich
+corpus: <name>                        # str, required
+run_at: <ISO 8601>                    # str, required
+enriched: <int>                       # entries re-scanned and un-staled, required
+skipped: <int>                        # stale entries not enrichable (e.g. source file unreadable)
+concepts_assigned: <int>              # entries that received concept membership
+new_concept_candidates:               # list (may be empty) — needs human review
+  - label: <str>
+    evidence: [<entry id>, ...]
+verification:                         # required
+  sampled: <int>
+  failed: <int>
+  drift_entries: [<entry id>, ...]
+embeddings: updated | skipped | no-model | not-installed   # required
+errors: [<str>, ...]                  # required
+```
+
+## Source status semantics
+
+- `current` — upstream unchanged, nothing done
+- `updated` — upstream changes pulled and applied to the index
+- `failed` — this source errored; details in `errors[]`; other sources proceed
+- `skipped-manual` — source type has no automatic change detection (e.g. `local`);
+  requires an interactive refresh. Surfaced so automation cannot silently
+  never-refresh a corpus.
+
+## embeddings: deferred
+
+`deferred` means stale/placeholder entries exist and embedding was
+intentionally left to the enrichment stage — embedding placeholder summaries
+("Pending re-scan") would poison semantic search. Orchestrators seeing
+`deferred` MUST run enrich-headless before merging.
