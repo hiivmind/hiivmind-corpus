@@ -197,6 +197,8 @@ The `lib/corpus/patterns/` directory contains tool-agnostic algorithm documentat
 | `sources/` | Git/local/web/llms-txt/self operations | Per-type patterns (git, local, web, generated-docs, llms-txt, self) |
 | `scanning.md` | Documentation analysis | File discovery, framework detection, large files |
 | `freshness.md` | SHA-gated freshness | Read-time checks, CI refresh, stale flagging |
+| `index-updating.md` | Applying A/M/D changes to v1/v2 indexes | Stale marking, entry rules, config metadata |
+| `headless-contract.md` | Headless result-file contract | refresh/enrich schemas, versioning, validation |
 
 **How skills use patterns:**
 
@@ -302,6 +304,8 @@ These features span multiple skills and must stay synchronized:
 | Tree thinning | build, enhance, refresh | `thin_sections.py` post-processing, `min_section_tokens` config |
 | Large-node splitting | source-scanner, build | `detect_large_files.py` + `split_by_headings.py`, interaction with section indexing |
 | Structure-aware chunking | build, source-scanner, navigate | `headings` strategy in `chunk.py`, `heading_context` in embeddings |
+| Index updating | refresh, refresh-headless, enrich-headless | Single algorithm in `patterns/index-updating.md` — never duplicate into skills |
+| Headless result contract | refresh-headless, enrich-headless, scheduler tasks | `contract_version`, result files, `validate_result.py` |
 
 ### When Adding New Features
 
