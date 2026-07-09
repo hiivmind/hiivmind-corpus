@@ -193,7 +193,7 @@ GUARD_TREE_THINNING():
     SKIP "Tree thinning not configured (no min_section_tokens in any source)."
     PROCEED to next phase
 
-  result = Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens} --dry-run")
+  result = Bash("uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens} --dry-run")
 
   IF result.exit_code != 0:
     DISPLAY "Tree thinning failed: {stderr}. Proceeding with unthinned sections."
@@ -206,7 +206,7 @@ GUARD_TREE_THINNING():
   DISPLAY "Tree thinning would merge {sections_before - sections_after} sections."
   ASK user: "Apply these merges? [Y/n]"
   IF user approves:
-    Bash("python3 ${PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens}")
+    Bash("uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/thin_sections.py --index index.yaml --min-tokens {min_section_tokens}")
     DISPLAY "Thinned: {sections_before} → {sections_after} sections."
 ```
 
@@ -540,18 +540,18 @@ GUARD_PHASE_7():
 
 ### Procedure
 
-1. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
+1. Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py`
 2. Check heuristic: `entry_count > 150` OR corpus has tiered indexes (index-*.md files exist)
 3. If heuristic not met: skip silently, proceed to Phase 8
 4. If heuristic met:
    a. If detect.py reports "ready" or "no-model":
       Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it?"
    b. If detect.py exits 1 (not installed):
-      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires: `pip install fastembed lancedb pyyaml` (~260MB)"
+      Ask: "This corpus has {entry_count} entries. Semantic search improves retrieval for corpora this size. Enable it? Requires uv (recommended, zero-setup) or `pip install fastembed lancedb pyyaml` (~260MB)"
    c. If user declines: skip, proceed to Phase 8
    d. If user accepts and fastembed not installed: run `pip install fastembed lancedb pyyaml`
    e. If detect.py reports "no-model": inform user "Downloading embedding model (~80MB, one-time)..."
-5. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+5. Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
 6. Display: "Generated embeddings for {entry_count} entries"
 
 **Commit guidance:** `index-embeddings.lance/` MUST be committed alongside `index.yaml` and `index.md`. It is a distributable artifact, not a cache. Do NOT add to `.gitignore`.
@@ -573,13 +573,13 @@ GUARD_PHASE_7():
 
 2. Run dependency detection:
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
+   uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/detect.py
    ```
    If not installed, prompt user (same as Phase 7).
 
 3. Run chunk embedding:
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
+   uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py --mode chunks chunks.json chunks-embeddings.lance/
    ```
 
 4. Clean up temporary `chunks.json`
@@ -607,7 +607,7 @@ GUARD_PHASE_7C_VERIFICATION():
     PROCEED to Phase 8
 
   sample_size = config.build.verify_sample_size OR 20
-  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --sample {sample_size}")
+  result = Bash("uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --sample {sample_size}")
 
   IF result.exit_code != 0:
     DISPLAY "Verification script failed. Proceeding without verification."

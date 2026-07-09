@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["fastembed>=0.4.0", "lancedb>=0.20.0", "pyarrow>=15.0.0"]
+# ///
 """Query a Lance embedding dataset by cosine similarity with optional filtering and reranking.
 
 Usage:

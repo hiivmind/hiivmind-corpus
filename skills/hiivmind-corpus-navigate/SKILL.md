@@ -71,7 +71,7 @@ Arguments: "flyio how to deploy"
      - **Remote (GitHub) corpus:** `lance_path = .hiivmind/corpus/cache/{corpus_id}/index-embeddings.lance/`
        Run cache freshness check (see § Remote Embedding Cache below). If no cache available, skip this corpus.
    - For each corpus with a valid lance_path:
-     - Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 3 --json`
+     - Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 3 --json`
      - Corpus score = max score across returned entries
    - If top corpus score > 0.6 and > second corpus score + 0.15: use that corpus
    - If top score > 0.6 but within 0.15 of second: present top 2-3 corpora to user
@@ -208,7 +208,7 @@ Use `lance_path` in all subsequent search.py invocations in this phase.
    - Tag matches: `"array_has_any(tags, ['term1', 'term2'])"`
    - Title matches: `"title LIKE '%term%'"`
    - Or no predicate (pure semantic search)
-2. Run: `python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 15 --where "{predicate}" --select "concepts" --json`
+2. Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {lance_path} "{query}" --top-k 15 --where "{predicate}" --select "concepts" --json`
 3. **Reranking decision:** If top 3 scores are within 0.05 of each other OR query is ambiguous, re-run with `--rerank` for better precision. Do NOT rerank if top score > 0.8 or during Phase 2 cross-corpus routing.
 4. If search.py exits 0 with results:
    - Parse ranked entry IDs with cosine scores
@@ -231,7 +231,7 @@ If path exists:
 
 For each query (original + variants from Step 4-pre):
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {chunks_lance_path} "{query}" \
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py {chunks_lance_path} "{query}" \
   --table chunks --hybrid --text-column chunk_text --top-k 15 \
   --select "parent,chunk_text,line_range" --json
 ```

@@ -48,7 +48,7 @@ sources:
 ### CLI
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/chunk.py <file> \
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/chunk.py <file> \
   --strategy <strategy> \
   --target-tokens <n> \
   --overlap-tokens <n> \
@@ -102,7 +102,7 @@ Table name: `chunks` (in `chunks-embeddings.lance/`)
 ## Hybrid Search
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py chunks-embeddings.lance/ "query" \
+uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/search.py chunks-embeddings.lance/ "query" \
   --table chunks --hybrid --text-column chunk_text --top-k 15 --json
 ```
 

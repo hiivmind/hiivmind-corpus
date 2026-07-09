@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """Check fastembed and lancedb availability and model status.
 
 Usage: python3 detect.py

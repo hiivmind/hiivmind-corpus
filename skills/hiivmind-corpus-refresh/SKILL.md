@@ -280,7 +280,7 @@ GUARD_REFRESH_VERIFICATION():
   IF len(modified_ids) == 0:
     SKIP "Only deletions applied. Skipping verification."
 
-  result = Bash("python3 ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --entries {modified_ids}")
+  result = Bash("uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/verify_entries.py --index index.yaml --source-root .source/ --config config.yaml --entries {modified_ids}")
 
   IF result.exit_code != 0:
     DISPLAY "Post-refresh verification failed. Proceeding."

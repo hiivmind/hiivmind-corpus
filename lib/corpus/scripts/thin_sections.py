@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml>=6.0"]
+# ///
 """Bottom-up merge of small section entries in index.yaml.
 
 Usage:
