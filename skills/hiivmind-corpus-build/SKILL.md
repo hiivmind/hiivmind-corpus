@@ -244,6 +244,9 @@ is tiered with one section per source id. Section membership is written
 per-entry (`section:` field) during Phase 5 index generation, using the
 section definitions as assignment targets.
 
+(This segmentation choice is also recorded in `config.build.segmentation` at
+Phase 8 — see `patterns/config-parsing.md` § The `build:` Block.)
+
 ### Moderate corpus (200-500 files)
 
 Suggest segmentation but don't require it: "This corpus has {n} files. A tiered index
@@ -297,6 +300,10 @@ Ask: "How should the index be organized?"
 
 Ask: "Are there sections to exclude? (e.g., changelog, internal docs)"
 Allow comma-separated section names or "none".
+
+(All Phase 4 answers — use_case, source_priorities, organization, skip_sections
+— are recorded in `config.build` at Phase 8 so headless skills can replay them.
+See `patterns/config-parsing.md` § The `build:` Block.)
 
 ### Indexing depth (per source)
 
@@ -564,6 +571,9 @@ GUARD_PHASE_7():
 5. Run: `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
 6. Display: "Generated embeddings for {entry_count} entries"
 
+The opt-in outcome (enabled or declined) is recorded as `config.build.embeddings`
+at Phase 8 — see `patterns/config-parsing.md` § The `build:` Block.
+
 **Commit guidance:** `index-embeddings.lance/` MUST be committed alongside `index.yaml` and `index.md`. It is a distributable artifact, not a cache. Do NOT add to `.gitignore`.
 
 ---
@@ -665,6 +675,13 @@ GUARD_PHASE_8():
 2. For each source, update `last_indexed_at` to current timestamp
 3. If git source: update `last_commit_sha` to current clone HEAD
 4. Save `config.yaml`
+5. Write the `build:` block (see `patterns/config-parsing.md` § The `build:`
+   Block): `use_case`, `organization`, `segmentation`, `source_priorities`
+   (multi-source only), `skip_sections` (Phase 4 answers); `embeddings` (Phase 7
+   opt-in outcome — true if the user enabled embeddings, else false);
+   `verify_on_build` / `verify_sample_size` (Phase 7c settings);
+   `decided_at = now()`. Preserve any keys the user set by hand. This block lets
+   enhance/refresh/enrich-headless replay these decisions instead of re-asking.
 
 ### Completion
 

@@ -215,6 +215,42 @@ does not lose data — its entries just fall back to the main index on next rend
 
 ---
 
+## The `build:` Block (decision capture)
+
+**Principle: interactive skills capture decisions; headless skills replay
+them.** The build skill records every Phase 3/4 answer here at save time.
+Enhance, refresh, and enrich-headless read these instead of guessing (or
+re-asking). A future `build-headless` re-build becomes possible because this
+block is a complete replay script of the interactive session.
+
+```yaml
+build:
+  use_case: reference            # reference | learning | troubleshooting | mixed
+  organization: by-topic         # by-topic | by-source | mixed
+  segmentation: tiered           # single | tiered | by-source | by-section
+                                 # (section definitions live in render.sections)
+  source_priorities: [polars, polars-blog]   # ordered, multi-source only; omit if single
+  skip_sections: [changelog, internal]       # [] if none
+  embeddings: true               # user opted in during Phase 7
+  verify_on_build: true          # Phase 7c preference (pre-existing key, now documented)
+  verify_sample_size: 20         # pre-existing key, now documented
+  decided_at: "2026-07-09T00:00:00Z"
+```
+
+Notes: `sections:`, `chunking:`, and `extraction:` remain per-source config
+(indexing-depth answers already persist there). `render:` holds the section
+definitions (see the `render:` block above). Absent block = legacy corpus:
+skills fall back to current heuristics and SHOULD write the block when the user
+next answers the questions interactively.
+
+**Reading fields** (yq):
+```bash
+yq '.build.organization // "mixed"' config.yaml
+yq -r '.build.skip_sections // [] | .[]?' config.yaml
+```
+
+---
+
 ## Extraction Patterns
 
 ### Get Corpus Name
