@@ -1,0 +1,21 @@
+[project]
+name = "hiivmind-corpus-dev"
+version = "0.0.0"
+description = "Dev/test environment for hiivmind-corpus plugin scripts (the scripts themselves are PEP 723 self-contained)"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pyyaml>=6.0",
+    "fastembed>=0.4.0",
+    "lancedb>=0.20.0",
+    "pyarrow>=15.0.0",
+    "pandas>=2.0",
+    "pymupdf>=1.24.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["lib/corpus/scripts/tests", "lib/corpus/tools"]
+pythonpath = ["."]
