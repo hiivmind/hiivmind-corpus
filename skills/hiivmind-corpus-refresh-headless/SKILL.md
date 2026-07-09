@@ -11,10 +11,14 @@ inputs:
     type: string
     required: false
     description: Absolute path to the corpus root (uses current working directory if not provided)
+  - name: result_path
+    type: string
+    required: false
+    description: Where to write refresh-result.yaml (defaults to {corpus_root}/refresh-result.yaml)
 outputs:
   - name: result
     type: yaml
-    description: Structured result block — see Output Contract section
+    description: Structured result written to result_path and echoed as a log block — see patterns/headless-contract.md
 ---
 
 # Corpus Refresh (Headless)
@@ -36,13 +40,14 @@ computed:
   sources: []
   index_format: null           # "v1" | "v2"
   status_report: []            # per-source { id, type, status, old_sha, new_sha }
+                               # status: current | updated | failed | skipped-manual
   updated_sources: []
   index_changes:
     added: 0
     modified: 0
     removed: 0
     stale_entries: []
-  embedding_status: null       # "updated" | "skipped" | "no-model" | "not-installed"
+  embedding_status: null       # "updated" | "skipped" | "no-model" | "not-installed" | "deferred"
   errors: []
 ```
 
@@ -72,7 +77,7 @@ Per-source logic by type:
 | Type | Check | Pattern doc |
 |------|-------|-------------|
 | git | `git ls-remote` SHA vs `last_commit_sha` | `patterns/sources/git.md` |
-| local | Always "current" (no auto-detection) | `patterns/sources/local.md` |
+| local | Always "skipped-manual" (no auto-detection — needs interactive refresh) | `patterns/sources/local.md` |
 | web | Cache age > 7 days → stale | `patterns/sources/web.md` |
 | llms-txt | SHA-256 of fetched manifest vs `manifest.last_hash` | `patterns/sources/llms-txt.md` |
 | generated-docs | Same as git, using `source_repo` | `patterns/sources/generated-docs.md` |
@@ -211,27 +216,39 @@ or `manifest.last_hash` (llms-txt). Set `config.index.last_updated_at`. Save.
 
 Skip if `index-embeddings.lance/` doesn't exist, or if no entries were added/modified.
 
-Otherwise run `detect.py`: if "ready", run `embed.py index.yaml index-embeddings.lance/`
-(incremental upsert). If "no-model", skip — never trigger a download during automated
-refresh. If not installed, skip.
+If `computed.index_changes.stale_entries` is non-empty, set
+`computed.embedding_status = "deferred"` and skip embedding entirely —
+stale entries have placeholder or outdated summaries, and embedding them
+would poison semantic search. The enrichment stage
+(`hiivmind-corpus-enrich-headless`) re-embeds after regenerating summaries.
+
+Otherwise run `detect.py`: if "ready", run
+`uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/embed.py index.yaml index-embeddings.lance/`
+(incremental upsert). If "no-model", skip — never trigger a download during
+automated refresh. If not installed, skip.
 
 ---
 
 ## Output Contract
 
-Emit this YAML block as the final output. The calling pipeline extracts between
-`---headless-result` and `---` and parses as YAML.
+**See:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/headless-contract.md`
+
+1. Resolve `result_path` (input, default `{corpus_root}/refresh-result.yaml`).
+2. Ensure the corpus `.gitignore` contains lines `refresh-result.yaml` and
+   `enrich-result.yaml` — append them if missing (create `.gitignore` if absent).
+3. Write the result file with the Write tool:
 
 ```yaml
----headless-result
+contract_version: 1
+kind: refresh
 corpus: {name from config}
 run_at: {ISO timestamp}
 sources:
   - id: {source id}
     type: {source type}
-    status: current | updated | failed
-    old_sha: {short sha, if applicable}
-    new_sha: {short sha, if updated}
+    status: current | updated | failed | skipped-manual
+    old_sha: {short sha or null}
+    new_sha: {short sha or null}
     files_changed: {count}
 index_changes:
   added: {n}
@@ -239,14 +256,19 @@ index_changes:
   removed: {n}
   stale_entries:
     - {entry id}
-embeddings: updated | skipped | no-model | not-installed
+embeddings: updated | skipped | no-model | not-installed | deferred
 errors:
   - {description}
----
 ```
 
-Emit even on partial failure. A source that fails is `status: failed` with the error
-in `errors[]`; other sources proceed normally.
+4. Echo the same YAML between `---headless-result` and `---` markers as the
+   final output — this is a human-readable log convenience only; pipelines
+   MUST read the file, not parse prose.
+
+Write the file even on partial failure or early exit (all-current, validation
+abort): a missing result file is indistinguishable from a crashed run. A source
+that fails is `status: failed` with the error in `errors[]`; other sources
+proceed normally.
 
 ---
 
@@ -254,7 +276,7 @@ in `errors[]`; other sources proceed normally.
 
 | Error | Behaviour |
 |-------|-----------|
-| No config.yaml / no sources / index not built | Abort: emit result with error, exit |
+| No config.yaml / no sources / index not built | Abort: write result file with error, emit log block, exit |
 | Clone/fetch failed | Source marked `failed`, logged in `errors[]`, continue |
 | Shallow deepen failed | Fallback: `--shallow-since` → full unshallow → fail source |
 | Index update failed | Logged in `errors[]`, partial changes saved |
@@ -274,6 +296,7 @@ in `errors[]`; other sources proceed normally.
 - **Freshness checks:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/freshness.md`
 - **Index rendering:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/index-rendering.md`
 - **Embeddings:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+- **Result contract:** `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/headless-contract.md`
 
 ## Related Skills
 
