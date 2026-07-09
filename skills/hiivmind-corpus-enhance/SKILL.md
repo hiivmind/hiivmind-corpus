@@ -105,6 +105,13 @@ VALIDATE_PREREQUISITES():
     DISPLAY "Index is a placeholder. Run hiivmind-corpus-build first."
     EXIT
 
+  # v1 is read-only as of this release — enhance edits index.yaml (v2) only.
+  IF NOT file_exists("index.yaml"):
+    DISPLAY "This corpus uses the legacy v1 index (index.md as source of truth). "
+            "v1 is read-only as of this release — enhance no longer edits it. Run "
+            "hiivmind-corpus-migrate first (mechanical, headless), then enhance normally."
+    EXIT
+
   computed.index_raw = index_content
 ```
 

@@ -65,6 +65,13 @@ Abort (emit result with error) if any of these fail:
 
 Detect index format: `index.yaml` exists → v2, otherwise v1.
 
+**v1 is read-only as of this release.** If the corpus is v1, do not refresh it.
+Write the result file with `errors: ["v1-index: read-only — run
+hiivmind-corpus-migrate"]`, every source `status: skipped-manual`, zero
+`index_changes`, `embeddings: skipped`, then ABORT. (Contract unchanged — this
+reuses existing fields; a pipeline sees a clean "nothing done, migration
+required" result rather than a crash.)
+
 ---
 
 ## Phase 2: Check Freshness
