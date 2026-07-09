@@ -350,6 +350,7 @@ Documentation may be outdated.
 - **Navigate:** `hiivmind-corpus-navigate` - Query corpus documentation
 - **Register:** `hiivmind-corpus-register` - Add new corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update stale corpora
+- **Enrich (headless):** `hiivmind-corpus-enrich-headless` - Resolve accumulated stale entries in pipelines
 - **Discover:** `hiivmind-corpus-discover` - Find available corpora
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — View, validate, edit concept graphs
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-bridge/SKILL.md` — Cross-corpus concept bridges and aliases

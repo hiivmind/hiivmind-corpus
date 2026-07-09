@@ -119,3 +119,5 @@ Skill(
 | `hiivmind-corpus-status` | Check corpus health/freshness |
 | `hiivmind-corpus-graph` | View, validate, edit concept graphs |
 | `hiivmind-corpus-bridge` | Cross-corpus concept bridges and aliases |
+| `hiivmind-corpus-refresh-headless` | Pipeline-facing refresh (automation; users normally want `refresh`) |
+| `hiivmind-corpus-enrich-headless` | Pipeline-facing stale-entry enrichment (automation; users normally want `enhance` or `refresh`) |
