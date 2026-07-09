@@ -2,21 +2,22 @@
 
 ## Purpose
 
-Render `index.md` mechanically from `index.yaml`. No LLM involvement. Same input always produces the same output. index.md is a build artifact — never hand-edited, never LLM-interpreted at render time.
+Render `index.md` (and, for tiered corpora, every `index-{section}.md`) mechanically from `index.yaml`. No LLM involvement. Same input always produces the same output. These files are build artifacts — never hand-edited, never LLM-interpreted at render time. Tiering is a **render-time concern**: the `render:` block in config.yaml (see `config-parsing.md`) decides single vs tiered output from the one `index.yaml`.
 
 ## When to Use
 
 - End of `hiivmind-corpus build`
-- End of `hiivmind-corpus refresh`
+- End of `hiivmind-corpus refresh` / `enhance` — re-render both `index.md` and all sub-indexes whenever `index.yaml` changes; sub-indexes are never edited directly
 - End of CI refresh workflow
+- End of `hiivmind-corpus-migrate` (v1 → v2)
 - Any time `index.yaml` is modified
 
 ## Prerequisites
 
 - `index.yaml` exists in the corpus root
-- `config.yaml` exists in the same directory (provides corpus name and source count)
+- `config.yaml` exists in the same directory (provides corpus name, source count, and the `render:` block)
 - `yq` 4.0+ (mikefarah/yq)
-- `render-index.sh` present at corpus root (copied from `templates/render-index.sh` during build)
+- `render-index.sh` present at corpus root (copied from `templates/render-index.sh` during build/migrate)
 
 ## Rendering Algorithm
 
@@ -32,8 +33,18 @@ Render `index.md` mechanically from `index.yaml`. No LLM involvement. Same input
 5. Large files (`size: large`): append ` ⚡ GREP - \`{grep_hint}\`` to entry line
 6. Stale entries (`stale: true`): append ` ⏳ STALE` marker
 7. **Footer:** generation timestamp, "Rendered from index.yaml"
+8. **Tiered strategy** (`config.render.strategy: tiered`): the main `index.md`
+   carries the header, an optional Quick Reference (entry IDs from
+   `render.quick_reference`, in config order), one summary block per
+   `render.sections[]` (title, italic description, entry count, link to
+   `index-{id}.md`), and any unsectioned entries inline. Each section renders
+   to `index-{id}.md` with a backlink header and the same category-grouped
+   entry format. Sub-index files for sections removed from config are deleted
+   on render, and their entries fall back inline in the main index (no data
+   loss). Sections are ordered as listed in config; everything else stays
+   alphabetical.
 
-**Idempotency guarantee:** Same `index.yaml` → same `index.md`, every run, regardless of which agent or workflow executes it.
+**Idempotency guarantee:** Same `index.yaml` → same `index.md` (and sub-indexes), every run, regardless of which agent or workflow executes it.
 
 ## Implementation
 
