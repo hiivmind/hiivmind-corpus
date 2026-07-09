@@ -199,6 +199,22 @@ proceed normally.
 
 ---
 
+## Next Stage: Enrichment
+
+This skill intentionally leaves changed entries `stale: true` with
+placeholder metadata — it detects and records change; it does not interpret
+content. When the result file shows `index_changes.stale_entries` non-empty
+(and `embeddings: deferred`), the pipeline MUST follow with:
+
+    CALL_SKILL("hiivmind-corpus:hiivmind-corpus-enrich-headless", { corpus_path })
+
+before committing, so the branch/PR contains a complete refresh: regenerated
+summaries, concept assignments, verification results, and current embeddings.
+Standalone/manual runs may skip enrichment, but the stale flags then persist
+until enrich-headless or a rebuild runs.
+
+---
+
 ## Error Handling
 
 | Error | Behaviour |
