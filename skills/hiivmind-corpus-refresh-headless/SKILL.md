@@ -201,9 +201,15 @@ index_changes:
   stale_entries:
     - {entry id}
 embeddings: updated | skipped | no-model | not-installed | deferred
+embeddings_lag: {int or null}   # optional; cumulative drift, see patterns/embeddings.md § Embedding Lag
 errors:
   - {description}
 ```
+
+Compute `embeddings_lag` post-Phase-5 the same way as status
+(`patterns/embeddings.md` § Embedding Lag): null when no `index-embeddings.lance/`
+exists. Omitting the field is valid — the scheduler PR body reports it only when
+present and > 0.
 
 4. Echo the same YAML between `---headless-result` and `---` markers as the
    final output — this is a human-readable log convenience only; pipelines
@@ -262,6 +268,7 @@ until enrich-headless or a rebuild runs.
 ## Related Skills
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
+- Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
 - Enrichment (run after refresh): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enrich-headless/SKILL.md`
 - Interactive refresh: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-refresh/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`

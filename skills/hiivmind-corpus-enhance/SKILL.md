@@ -697,6 +697,7 @@ User: "The detailed actions sub-index"
 ## Related Skills
 
 - Migrate v1→v2 (headless): `skills/hiivmind-corpus-migrate/SKILL.md`
+- Headless status (pipelines): `skills/hiivmind-corpus-status-headless/SKILL.md`
 - Add sources: `skills/hiivmind-corpus-add-source/SKILL.md`
 - Initialize corpus: `skills/hiivmind-corpus-init/SKILL.md`
 - Build index: `skills/hiivmind-corpus-build/SKILL.md`

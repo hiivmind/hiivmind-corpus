@@ -192,7 +192,13 @@ flyio, fly.io, deployment, hosting, edge, cloud
 - **Entries:** 747
 - **Model:** BAAI/bge-small-en-v1.5
 - **Generated:** 2026-01-08T12:00:00Z
+- **Embedding lag:** 3 entries indexed since last embed
 ```
+
+Compute the **Embedding lag** line per `${CLAUDE_PLUGIN_ROOT}/lib/corpus/patterns/embeddings.md`
+§ Embedding Lag (count of entries whose `last_indexed` postdates the Lance
+`_meta.generated_at`). Show "no embeddings" when `index-embeddings.lance/` is
+absent (lag is null).
 
 ## Status Classifications
 
@@ -348,6 +354,7 @@ Documentation may be outdated.
 ## Related Skills
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
+- Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
 - **Navigate:** `hiivmind-corpus-navigate` - Query corpus documentation
 - **Register:** `hiivmind-corpus-register` - Add new corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update stale corpora

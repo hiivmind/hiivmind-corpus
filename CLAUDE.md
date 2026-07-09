@@ -73,6 +73,7 @@ The core value: Persistent human-curated indexes that track upstream changes, in
 │   ├── hiivmind-corpus-refresh-headless/ # Non-interactive refresh for pipelines
 │   ├── hiivmind-corpus-enrich-headless/  # Non-interactive stale-entry enrichment
 │   ├── hiivmind-corpus-migrate/      # One-shot v1→v2 index migration (headless)
+│   ├── hiivmind-corpus-status-headless/ # Non-interactive freshness snapshot for pipelines
 │   ├── hiivmind-corpus-discover/     # Find all installed corpora
 │   ├── hiivmind-corpus-navigate/     # Global navigation across all corpora
 │   ├── hiivmind-corpus-register/     # Register corpus with project
@@ -128,8 +129,8 @@ hiivmind-corpus-init → hiivmind-corpus-build → hiivmind-corpus-refresh
                         hiivmind-corpus-enhance
                             (as needed)
 
-Headless pipeline:  refresh-headless → enrich-headless
-                    (detect changes)   (regenerate stale entries, automated)
+Headless pipeline:  status-headless → refresh-headless → enrich-headless
+                    (cheap pre-check)  (detect changes)    (regenerate stale entries, automated)
 
 Migration (one-shot): hiivmind-corpus-migrate  (v1 index.md → v2 index.yaml + tiered render)
 ```
@@ -149,6 +150,7 @@ Migration (one-shot): hiivmind-corpus-migrate  (v1 index.md → v2 index.yaml + 
 7. **hiivmind-corpus-navigate**: Global navigator that routes queries to appropriate corpora
 8. **hiivmind-corpus-register**: Connects a corpus to the current project
 9. **hiivmind-corpus-status**: Checks corpus health and freshness
+10. **hiivmind-corpus-status-headless**: Non-interactive freshness snapshot → `status-result.yaml` (pipeline pre-check)
 
 **Gateway Command:**
 - **/hiivmind-corpus**: Interactive entry point for discovering and interacting with installed corpora
@@ -188,7 +190,8 @@ hiivmind-corpus-{project}/
 All components follow the `hiivmind-corpus-*` naming pattern:
 - Meta-plugin: `hiivmind-corpus`
 - Build skills: `hiivmind-corpus-init`, `hiivmind-corpus-add-source`, `hiivmind-corpus-build`, `hiivmind-corpus-enhance`, `hiivmind-corpus-refresh`, `hiivmind-corpus-refresh-headless`, `hiivmind-corpus-enrich-headless`, `hiivmind-corpus-migrate`
-- Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`, `hiivmind-corpus-graph`, `hiivmind-corpus-bridge`
+- Read skills: `hiivmind-corpus-discover`, `hiivmind-corpus-navigate`, `hiivmind-corpus-register`, `hiivmind-corpus-status`, `hiivmind-corpus-status-headless`, `hiivmind-corpus-graph`, `hiivmind-corpus-bridge`
+- Headless skills: `hiivmind-corpus-refresh-headless`, `hiivmind-corpus-enrich-headless`, `hiivmind-corpus-migrate`, `hiivmind-corpus-status-headless`, `hiivmind-corpus-graph` (`--headless`)
 - Gateway command: `/hiivmind-corpus`
 - Generated corpora: `hiivmind-corpus-{project}` (e.g., `hiivmind-corpus-flyio`, `hiivmind-corpus-polars`)
 
@@ -309,7 +312,7 @@ These features span multiple skills and must stay synchronized:
 | CLAUDE.md cache | awareness, discover, navigate | Cache format, HTML markers, cache-first lookup |
 | Injection targets | awareness | User-level vs repo-level templates |
 | Fork context (ADR-007) | navigate (template) | Frontmatter: context, agent, allowed-tools |
-| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status | `index-embeddings.lance/` generation/query, fastembed detection, heuristic prompt, graph-boost, graceful fallback, cross-corpus routing via per-corpus embeddings |
+| Embeddings | build, enhance, refresh, navigate, bridge, graph, discover, status, status-headless | `index-embeddings.lance/` generation/query, fastembed detection, heuristic prompt, graph-boost, graceful fallback, cross-corpus routing; `embeddings_lag` drift metric (lance_meta.py) surfaced in status/status-headless/refresh-headless |
 | Concept membership | build, graph, enhance, refresh, navigate | `concepts[]` field in index.yaml entries, bidirectional with graph.yaml concept definitions, enriches embedding text |
 | Section indexing | build, source-scanner, navigate, enhance, refresh | `sections:` config, `tier: section` entries, heading consistency detection, line_range in index.yaml |
 | Deep chunking | build, source-scanner, navigate, enhance, refresh | `chunking:` config, chunk.py invocation, `chunks-embeddings.lance/` generation/query, hybrid search, query expansion |
@@ -320,8 +323,9 @@ These features span multiple skills and must stay synchronized:
 | Structure-aware chunking | build, source-scanner, navigate | `headings` strategy in `chunk.py`, `heading_context` in embeddings |
 | Index updating | refresh, refresh-headless, enrich-headless | Single algorithm in `patterns/index-updating.md` — never duplicate into skills; v1 write paths are read-only (migrate to v2) |
 | v1→v2 migration | migrate, refresh, refresh-headless, enhance | v1 read-only gating routes to `hiivmind-corpus-migrate`; render: block + section field; migrate-result contract |
-| Headless result contract | refresh-headless, enrich-headless, scheduler tasks | `contract_version`, result files, `validate_result.py` |
+| Headless result contract | refresh-headless, enrich-headless, migrate, status-headless, graph, scheduler tasks | `contract_version`, result files (refresh/enrich/migrate/status/graph-validate), `validate_result.py` |
 | Headless enrichment | refresh-headless, enrich-headless, graph, build | Stale-entry resolution, concept assignment from existing graph only, result contract |
+| Decision capture | build, enhance, refresh, refresh-headless, enrich-headless | `config.build` block records interactive decisions; headless skills replay instead of guessing — `patterns/config-parsing.md` § The `build:` Block |
 
 ### When Adding New Features
 
@@ -369,6 +373,10 @@ refresh-headless ──► refresh-result.yaml (patterns/headless-contract.md)
 refresh-headless ──► enrich-headless (pipelines, when stale entries exist)
 enrich-headless ──► source-scanner agent, verify_entries.py, index-embeddings.lance/, enrich-result.yaml
 migrate ──► index.yaml + config.yaml render: block + render-index.sh (one-shot v1→v2), migrate-result.yaml
+status-headless ──► lance_meta.py, status-result.yaml (cheap ls-remote pre-check; scheduler reads refresh_needed)
+graph --headless ──► graph-validate-result.yaml (corpus-repo PR check)
+build ──► config.build block (decision capture); enhance/refresh/enrich-headless ◄── config.build (replay)
+status/status-headless/refresh-headless ──► lance_meta.py ──► embeddings_lag (drift metric)
 build/refresh/migrate ──► render-index.sh ──► index.md (+ index-{section}.md when tiered)
 ```
 

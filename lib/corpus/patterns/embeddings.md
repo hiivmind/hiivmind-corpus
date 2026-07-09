@@ -254,6 +254,24 @@ Compare `generated_at` in `_meta.json` vs `meta.generated_at` in index.yaml:
 
 At navigate time: use stale embeddings, include note "Embeddings may be outdated"
 
+## Embedding Lag
+
+`embeddings_lag` = number of index.yaml entries whose `last_indexed` postdates
+the Lance `_meta.generated_at` timestamp. It measures cumulative drift between
+the index and its embeddings across runs (per-run status like
+`embeddings: skipped | no-model | deferred` cannot see accumulation).
+
+Compute:
+1. `uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/lance_meta.py index-embeddings.lance/`
+   → JSON with `generated_at` (exit 2 → no `_meta` → lag is null)
+2. `EMB_AT={generated_at} yq '[.entries[] | select(.last_indexed > env(EMB_AT))] | length' index.yaml`
+
+`lance_meta.py` flattens the `_meta` key/value table to a JSON object
+(`generated_at`, `model`, `dimensions`, `entry_count`). Lag > 0 with no pending
+stale entries means embeddings should be regenerated (enhance or enrich-headless
+re-embed paths). Reported by: status (interactive), status-headless (result
+file), refresh-headless (optional result field → scheduler PR body).
+
 ## Graph-Boost
 
 When navigate Phase 4a returns embedding results and graph.yaml exists:

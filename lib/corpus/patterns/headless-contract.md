@@ -61,6 +61,7 @@ index_changes:                        # required
   removed: <int>
   stale_entries: [<entry id>, ...]    # list of str
 embeddings: updated | skipped | no-model | not-installed | deferred   # required
+embeddings_lag: <int or null>         # optional; cumulative drift; see patterns/embeddings.md § Embedding Lag
 errors: [<str>, ...]                  # list, required (may be empty)
 ```
 
