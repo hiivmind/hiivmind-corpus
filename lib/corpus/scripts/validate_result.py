@@ -5,7 +5,7 @@
 # ///
 """Validate a headless result file against the corpus result contract.
 
-Usage: validate_result.py <result.yaml> --kind refresh|enrich
+Usage: validate_result.py <result.yaml> --kind refresh|enrich|migrate
 
 See lib/corpus/patterns/headless-contract.md for the schemas.
 
@@ -22,6 +22,8 @@ SUPPORTED_VERSIONS = {1}
 SOURCE_STATUSES = {"current", "updated", "failed", "skipped-manual"}
 REFRESH_EMBEDDINGS = {"updated", "skipped", "no-model", "not-installed", "deferred"}
 ENRICH_EMBEDDINGS = {"updated", "skipped", "no-model", "not-installed"}
+MIGRATE_STRATEGIES = {"tiered", "single"}
+MIGRATE_SKIP_REASONS = {"file-missing", "clone-failed"}
 
 
 def _err(errors, msg):
@@ -89,13 +91,36 @@ def validate(data: dict, kind: str) -> list[str]:
         if emb is not None and emb not in ENRICH_EMBEDDINGS:
             _err(errors, f"embeddings invalid: {emb}")
 
+    elif kind == "migrate":
+        _require(data, "entries_migrated", int, errors)
+        skipped = _require(data, "entries_skipped", list, errors)
+        for i, s in enumerate(skipped or []):
+            if not isinstance(s, dict):
+                _err(errors, f"entries_skipped[{i}] is not a mapping")
+                continue
+            _require(s, "id", str, errors, ctx=f"entries_skipped[{i}].")
+            reason = _require(s, "reason", str, errors, ctx=f"entries_skipped[{i}].")
+            if reason is not None and reason not in MIGRATE_SKIP_REASONS:
+                _err(errors, f"entries_skipped[{i}].reason invalid: {reason}")
+        sections = _require(data, "sections", list, errors)
+        for i, sec in enumerate(sections or []):
+            if not isinstance(sec, str):
+                _err(errors, f"sections[{i}] is not a string")
+        strategy = _require(data, "strategy", str, errors)
+        if strategy is not None and strategy not in MIGRATE_STRATEGIES:
+            _err(errors, f"strategy invalid: {strategy}")
+        _require(data, "id_parity", bool, errors)
+        emb = _require(data, "embeddings", str, errors)
+        if emb is not None and emb != "skipped":
+            _err(errors, f"embeddings must be 'skipped' for migrate, got: {emb}")
+
     return errors
 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate a headless result file")
     parser.add_argument("file", help="Path to result YAML file")
-    parser.add_argument("--kind", required=True, choices=["refresh", "enrich"])
+    parser.add_argument("--kind", required=True, choices=["refresh", "enrich", "migrate"])
     args = parser.parse_args()
 
     path = Path(args.file)
