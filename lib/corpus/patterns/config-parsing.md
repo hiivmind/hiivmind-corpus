@@ -187,6 +187,34 @@ Embedded source — the corpus indexes the repo it lives in:
 
 ---
 
+## The `render:` Block (tiered rendering)
+
+Controls how `render-index.sh` turns `index.yaml` into markdown. Absent block =
+`strategy: single` (one index.md, current behavior). Tiering is a **render-time
+concern, not a storage concern** — there is exactly one `index.yaml` either way.
+
+```yaml
+render:
+  strategy: tiered            # single (default) | tiered
+  quick_reference:            # optional: entry IDs pinned at the top of index.md
+    - "flyio:flyctl/install.html.markerb"
+    - "flyio:getting-started/launch.html.markerb"
+  sections:                   # required when strategy: tiered
+    - id: getting-started     # slug; produces index-getting-started.md
+      title: "Getting Started"
+      description: "First steps - installation, signup, first deploy"
+    - id: machines
+      title: "Fly Machines"
+      description: "Machines lifecycle, REST API, flyctl commands"
+```
+
+Entries opt into a section via their `section:` field in index.yaml (see
+`index-format-v2.md`). Entries with no `section` (or one not listed here) render
+inline in the main index under their category. Deleting a section from this list
+does not lose data — its entries just fall back to the main index on next render.
+
+---
+
 ## Extraction Patterns
 
 ### Get Corpus Name
