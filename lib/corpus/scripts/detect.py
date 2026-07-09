@@ -4,32 +4,62 @@
 Usage: python3 detect.py
 
 Output (stdout, one line):
-  "ready"         - fastembed + lancedb installed, model downloaded
-  "no-model"      - fastembed + lancedb installed, model not yet downloaded
-  "not-installed" - fastembed or lancedb not importable
+  "ready"         - embedding deps available, model downloaded
+  "no-model"      - embedding deps available, model not yet downloaded
+  "not-installed" - no uv on PATH and fastembed/lancedb not importable
 
 Exit codes:
-  0 - dependencies importable (ready or no-model)
+  0 - dependencies available (ready or no-model)
   1 - dependencies not installed
   2 - python error
+
+When uv is on PATH, dependency availability is guaranteed at run time
+(embed.py/search.py carry PEP 723 metadata and run via `uv run`), so the
+import probe is skipped and only the model-cache state is reported.
 """
 
+import os
+import shutil
 import sys
+from pathlib import Path
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
 def _install_hint() -> str:
     """Return the install command, preferring uv if available."""
-    import shutil
-
     pkg = "fastembed lancedb pyyaml"
     if shutil.which("uv"):
         return f"uv pip install {pkg}"
     return f"pip install {pkg}"
 
 
+def _model_cache_status() -> str:
+    """Return 'ready' if the bge-small model is in the fastembed cache, else 'no-model'.
+
+    Honors FASTEMBED_CACHE_PATH (used by scheduler runtimes) before the
+    default ~/.cache/fastembed location. If cache layout changes across
+    versions, "no-model" is the safe fallback — worst case is an
+    unnecessary "downloading model" message.
+    """
+    try:
+        env_path = os.environ.get("FASTEMBED_CACHE_PATH")
+        cache_path = Path(env_path) if env_path else Path.home() / ".cache" / "fastembed"
+        model_dirs = list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
+        return "ready" if model_dirs else "no-model"
+    except Exception:
+        return "no-model"
+
+
 def main():
+    # With uv available, dependency availability is guaranteed at run time:
+    # embed.py/search.py carry PEP 723 metadata and run via `uv run`.
+    # Only the model-cache state matters.
+    if shutil.which("uv"):
+        print(_model_cache_status())
+        sys.exit(0)
+
+    # Legacy path (no uv): probe the ambient interpreter.
     try:
         import fastembed  # noqa: F401
     except ImportError:
@@ -44,22 +74,7 @@ def main():
         print(f"Install with: {_install_hint()}", file=sys.stderr)
         sys.exit(1)
 
-    # Check if model is already downloaded.
-    # Best-effort heuristic: check default fastembed cache directory.
-    # If cache location changes across versions, "no-model" is the safe
-    # fallback - worst case is an unnecessary "downloading model" message.
-    try:
-        from pathlib import Path
-
-        cache_path = Path.home() / ".cache" / "fastembed"
-        model_dirs = list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
-        if model_dirs:
-            print("ready")
-        else:
-            print("no-model")
-    except Exception:
-        print("no-model")
-
+    print(_model_cache_status())
     sys.exit(0)
 
 
