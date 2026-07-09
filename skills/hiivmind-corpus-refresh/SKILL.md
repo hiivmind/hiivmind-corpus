@@ -52,6 +52,15 @@ If not found, suggest running `hiivmind-corpus-init` or `hiivmind-corpus-build`.
 4. Detect index format version:
    - Check if `index.yaml` exists → `computed.index_format = "v2"`
    - If only `index.md` → `computed.index_format = "v1"`
+   - **v1 is read-only as of this release.** If `computed.index_format == "v1"`,
+     do not proceed with any v1 update path. Display:
+     "This corpus uses the legacy v1 index (index.md as source of truth). v1 is
+     read-only as of this release — refresh no longer updates it. Run
+     hiivmind-corpus-migrate first (mechanical, headless), then refresh normally."
+     Then ask: "Run the migration now? [y/N]". If **yes**, CALL_SKILL
+     `hiivmind-corpus:hiivmind-corpus-migrate` with `corpus_path`, then re-enter
+     Phase 1 from the top (the corpus is now v2). If **no**, EXIT without
+     modifying anything.
 5. Detect tiered index structure:
    - Glob for `index-*.md` files
    - If found, set `computed.index_structure.is_tiered = true` and store sub-index paths
@@ -124,6 +133,12 @@ Report: source_id, type, manifest_hash_match, status
 
 - Same as git: compare source_repo SHA against upstream
 - Report like git source
+
+**Obsidian sources** — See `lib/corpus/patterns/sources/obsidian.md`:
+
+- Vault cloned into `.source/{id}/` → same as git (SHA comparison)
+- Direct local vault path → timestamp scan like a local source
+- Report like git (clone) or local (direct path)
 
 **Self sources** — See `lib/corpus/patterns/sources/self.md` § "Freshness Tracking":
 
@@ -328,6 +343,7 @@ GUARD_REFRESH_VERIFICATION():
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`

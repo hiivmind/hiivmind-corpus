@@ -638,6 +638,7 @@ The documentation may have moved. Try:
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - **Register:** `hiivmind-corpus-register` - Add corpora to the registry
 - **Status:** `hiivmind-corpus-status` - Check corpus health
 - **Discover:** `hiivmind-corpus-discover` - Find available corpora

@@ -62,6 +62,11 @@ Notes:
 
 ## v1 format (index.md, single or tiered)
 
+> **DEPRECATED — v1 is read-only.** As of wave 2, no skill writes v1 indexes;
+> refresh/enhance detect v1 and instruct `hiivmind-corpus-migrate`. These rules
+> are retained for one release for reference and for the migrate skill's
+> understanding of the v1 entry-line format, then deleted.
+
 Apply changes directly to `index.md`. If tiered (glob `index-*.md`), map
 changes to affected sub-indexes and update each, then update the main
 `index.md` summary section. See `sources/shared.md`.

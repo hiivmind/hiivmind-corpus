@@ -80,6 +80,7 @@ meta:
 | `keywords` | string[] | yes | Auto-extracted significant terms from content body. Broader than tags — includes function names, API terms, domain-specific identifiers |
 | `concepts` | string[] | no | Concept IDs this entry belongs to (keys from graph.yaml). Populated by build Phase 5b or graph add-concept. Empty list if not yet mapped. Enriches embedding text for RAG retrieval. |
 | `category` | enum | yes | Coarse classifier. Values: `reference`, `tutorial`, `guide`, `api`, `config`, `navigation`, `journal`, `unknown` (CI placeholder — replaced on LLM re-scan) |
+| `section` | string | no | Render-time grouping key for tiered corpora. Must match a `render.sections[].id` in config.yaml. Entries without it render in the main index. Storage-agnostic: navigate/yq queries ignore it |
 | `content_type` | enum | yes | File format. Values: `markdown`, `yaml`, `json`, `text`, `rst` |
 | `size` | enum | yes | `standard` or `large`. Large = file exceeds 1000 lines |
 | `grep_hint` | string | no | For large files: suggested grep/search command with `FILE` placeholder, e.g. `grep -n "^## " FILE`. Null for standard files |

@@ -347,6 +347,7 @@ Documentation may be outdated.
 
 ## Related Skills
 
+- Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - **Navigate:** `hiivmind-corpus-navigate` - Query corpus documentation
 - **Register:** `hiivmind-corpus-register` - Add new corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update stale corpora

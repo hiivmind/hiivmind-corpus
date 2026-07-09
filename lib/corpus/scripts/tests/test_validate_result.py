@@ -43,6 +43,23 @@ errors: []
 """
 
 
+VALID_MIGRATE = """\
+contract_version: 1
+kind: migrate
+corpus: flyio
+run_at: "2026-07-09T02:00:00Z"
+entries_migrated: 142
+entries_skipped:
+  - id: "flyio:old/moved.md"
+    reason: file-missing
+sections: ["getting-started", "machines"]
+strategy: tiered
+id_parity: true
+embeddings: skipped
+errors: []
+"""
+
+
 def run_validate(tmp_path, content, kind):
     f = tmp_path / "result.yaml"
     f.write_text(content)
@@ -59,6 +76,11 @@ def test_valid_refresh_passes(tmp_path):
 
 def test_valid_enrich_passes(tmp_path):
     r = run_validate(tmp_path, VALID_ENRICH, "enrich")
+    assert r.returncode == 0, r.stderr
+
+
+def test_valid_migrate_passes(tmp_path):
+    r = run_validate(tmp_path, VALID_MIGRATE, "migrate")
     assert r.returncode == 0, r.stderr
 
 

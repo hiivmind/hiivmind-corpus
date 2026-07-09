@@ -51,6 +51,18 @@ index:
   format: "markdown"
   last_updated_at: null
 
+# render: controls how render-index.sh turns index.yaml into markdown.
+# Omit entirely for a single index.md (default). Uncomment for a tiered corpus.
+# Tiering is a render-time concern — there is always exactly one index.yaml.
+# render:
+#   strategy: tiered            # single (default) | tiered
+#   quick_reference:            # optional: entry IDs pinned at the top of index.md
+#     - "mysource:getting-started/install.md"
+#   sections:                   # required when strategy: tiered
+#     - id: getting-started     # slug; produces index-getting-started.md
+#       title: "Getting Started"
+#       description: "First steps - installation, signup, first deploy"
+
 settings:
   include_patterns:
     - "**/*.md"
