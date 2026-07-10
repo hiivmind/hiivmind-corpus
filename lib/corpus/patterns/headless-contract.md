@@ -13,6 +13,7 @@ retained for human-readable logs only — orchestrators MUST read the file.
 | hiivmind-corpus-migrate | migrate-result.yaml | `{corpus_root}/migrate-result.yaml` |
 | hiivmind-corpus-status-headless | status-result.yaml | `{corpus_root}/status-result.yaml` |
 | hiivmind-corpus-graph (--headless) | graph-validate-result.yaml | `{corpus_root}/graph-validate-result.yaml` |
+| hiivmind-corpus-build-headless | build-result.yaml | `{corpus_root}/build-result.yaml` |
 
 Result files are transient run artifacts: the skill ensures both filenames are
 listed in the corpus `.gitignore` (appending if missing) before writing.
@@ -34,6 +35,7 @@ not asked to validate.
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py migrate-result.yaml --kind migrate
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py status-result.yaml --kind status
     uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py graph-validate-result.yaml --kind graph-validate
+    uv run ${CLAUDE_PLUGIN_ROOT}/lib/corpus/scripts/validate_result.py build-result.yaml --kind build
 
 Orchestrators should validate before consuming and treat exit 1/2 as a failed
 run (report, do not commit). Exit codes: 0 valid, 1 invalid (errors on
@@ -137,6 +139,29 @@ issues:                               # required list (may be empty)
     detail: <str>                     # required — human-readable, includes offending id
 valid: <bool>                         # required — true when zero error-severity issues
 errors: [<str>, ...]                  # required — runtime failures, not findings
+```
+
+### build-result.yaml (written by hiivmind-corpus-build-headless)
+
+```yaml
+contract_version: 1
+kind: build
+corpus: <name>                        # str, required
+run_at: <ISO 8601>                    # str, required
+entries: <int>                        # required — index.meta.entry_count
+sources:                              # required list (may be empty)
+  - id: <source id>                   # str, required
+    type: <source type>              # str, required
+    files_scanned: <int>             # required
+strategy: single | tiered             # required enum
+sections: [<str>, ...]                # required — section ids ([] when single)
+graph: generated | skipped | not-configured   # required enum
+embeddings: updated | skipped | no-model | not-installed   # required enum
+verification:                         # required
+  sampled: <int>
+  failed: <int>
+  drift_entries: [<entry id>, ...]
+errors: [<str>, ...]                  # required — includes excluded-by-config notes
 ```
 
 ## Source status semantics

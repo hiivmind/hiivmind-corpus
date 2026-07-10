@@ -640,6 +640,7 @@ The documentation may have moved. Try:
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
+- Headless rebuild (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build-headless/SKILL.md`
 - **Register:** `hiivmind-corpus-register` - Add corpora to the registry
 - **Status:** `hiivmind-corpus-status` - Check corpus health
 - **Discover:** `hiivmind-corpus-discover` - Find available corpora

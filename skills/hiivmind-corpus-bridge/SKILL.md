@@ -211,6 +211,7 @@ Manually add a query-routing alias.
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
+- Headless rebuild (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build-headless/SKILL.md`
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-graph/SKILL.md` — Per-corpus concept graph (view, validate, edit)
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-navigate/SKILL.md` — Uses bridges for Tier 4 cross-corpus retrieval
 - `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-register/SKILL.md` — Registers corpora to project registry

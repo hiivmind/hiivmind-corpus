@@ -681,7 +681,9 @@ GUARD_PHASE_8():
    opt-in outcome — true if the user enabled embeddings, else false);
    `verify_on_build` / `verify_sample_size` (Phase 7c settings);
    `decided_at = now()`. Preserve any keys the user set by hand. This block lets
-   enhance/refresh/enrich-headless replay these decisions instead of re-asking.
+   enhance/refresh/enrich-headless replay these decisions instead of re-asking,
+   and lets `hiivmind-corpus-build-headless` reconstruct the whole index
+   non-interactively.
 
 ### Completion
 
@@ -739,6 +741,7 @@ Sources indexed: {source_count}
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
+- Headless rebuild (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build-headless/SKILL.md`
 - Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Enhance topics: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-enhance/SKILL.md`

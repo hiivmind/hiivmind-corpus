@@ -355,6 +355,7 @@ Documentation may be outdated.
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
+- Headless rebuild (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build-headless/SKILL.md`
 - **Navigate:** `hiivmind-corpus-navigate` - Query corpus documentation
 - **Register:** `hiivmind-corpus-register` - Add new corpora
 - **Refresh:** `hiivmind-corpus-refresh` - Update stale corpora
