@@ -5,7 +5,7 @@
 # ///
 """Validate a headless result file against the corpus result contract.
 
-Usage: validate_result.py <result.yaml> --kind refresh|enrich|migrate|status|graph-validate
+Usage: validate_result.py <result.yaml> --kind refresh|enrich|migrate|status|graph-validate|build
 
 See lib/corpus/patterns/headless-contract.md for the schemas.
 
@@ -27,6 +27,9 @@ MIGRATE_SKIP_REASONS = {"file-missing", "clone-failed"}
 INDEX_FORMATS = {"v2", "v1", "none"}
 STATUS_FRESHNESS = {"current", "behind", "unknown"}
 GRAPH_SEVERITIES = {"error", "warning"}
+BUILD_STRATEGIES = {"single", "tiered"}
+BUILD_GRAPH = {"generated", "skipped", "not-configured"}
+BUILD_EMBEDDINGS = {"updated", "skipped", "no-model", "not-installed"}
 
 
 def _require_int_or_null(data, key, errors, ctx=""):
@@ -163,6 +166,35 @@ def validate(data: dict, kind: str) -> list[str]:
             _require(iss, "detail", str, errors, ctx=f"issues[{i}].")
         _require(data, "valid", bool, errors)
 
+    elif kind == "build":
+        _require(data, "entries", int, errors)
+        sources = _require(data, "sources", list, errors)
+        for i, s in enumerate(sources or []):
+            if not isinstance(s, dict):
+                _err(errors, f"sources[{i}] is not a mapping")
+                continue
+            _require(s, "id", str, errors, ctx=f"sources[{i}].")
+            _require(s, "type", str, errors, ctx=f"sources[{i}].")
+            _require(s, "files_scanned", int, errors, ctx=f"sources[{i}].")
+        strategy = _require(data, "strategy", str, errors)
+        if strategy is not None and strategy not in BUILD_STRATEGIES:
+            _err(errors, f"strategy invalid: {strategy}")
+        sections = _require(data, "sections", list, errors)
+        for i, sec in enumerate(sections or []):
+            if not isinstance(sec, str):
+                _err(errors, f"sections[{i}] is not a string")
+        graph = _require(data, "graph", str, errors)
+        if graph is not None and graph not in BUILD_GRAPH:
+            _err(errors, f"graph invalid: {graph}")
+        emb = _require(data, "embeddings", str, errors)
+        if emb is not None and emb not in BUILD_EMBEDDINGS:
+            _err(errors, f"embeddings invalid: {emb}")
+        ver = _require(data, "verification", dict, errors)
+        if ver is not None:
+            _require(ver, "sampled", int, errors, ctx="verification.")
+            _require(ver, "failed", int, errors, ctx="verification.")
+            _require(ver, "drift_entries", list, errors, ctx="verification.")
+
     return errors
 
 
@@ -170,7 +202,7 @@ def main():
     parser = argparse.ArgumentParser(description="Validate a headless result file")
     parser.add_argument("file", help="Path to result YAML file")
     parser.add_argument("--kind", required=True,
-                        choices=["refresh", "enrich", "migrate", "status", "graph-validate"])
+                        choices=["refresh", "enrich", "migrate", "status", "graph-validate", "build"])
     args = parser.parse_args()
 
     path = Path(args.file)

@@ -220,8 +220,9 @@ does not lose data — its entries just fall back to the main index on next rend
 **Principle: interactive skills capture decisions; headless skills replay
 them.** The build skill records every Phase 3/4 answer here at save time.
 Enhance, refresh, and enrich-headless read these instead of guessing (or
-re-asking). A future `build-headless` re-build becomes possible because this
-block is a complete replay script of the interactive session.
+re-asking), and `hiivmind-corpus-build-headless` replays the whole block to
+reconstruct the index non-interactively — this block is a complete replay
+script of the interactive session.
 
 ```yaml
 build:

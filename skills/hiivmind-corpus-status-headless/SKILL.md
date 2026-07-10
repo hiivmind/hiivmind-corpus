@@ -62,4 +62,4 @@ Ensure `status-result.yaml` is in the corpus `.gitignore` (append if missing).
 ## Reference
 
 - Patterns: `status.md`, `freshness.md`, `config-parsing.md`, `embeddings.md`, `headless-contract.md`
-- Related skills: hiivmind-corpus-status (interactive), hiivmind-corpus-refresh-headless, hiivmind-corpus-enrich-headless, hiivmind-corpus-migrate, hiivmind-corpus-discover, hiivmind-corpus-navigate, hiivmind-corpus-build, hiivmind-corpus-refresh, hiivmind-corpus-enhance, hiivmind-corpus-graph, hiivmind-corpus-bridge, hiivmind-corpus-init, hiivmind-corpus-add-source, hiivmind-corpus-register
+- Related skills: hiivmind-corpus-status (interactive), hiivmind-corpus-build-headless, hiivmind-corpus-refresh-headless, hiivmind-corpus-enrich-headless, hiivmind-corpus-migrate, hiivmind-corpus-discover, hiivmind-corpus-navigate, hiivmind-corpus-build, hiivmind-corpus-refresh, hiivmind-corpus-enhance, hiivmind-corpus-graph, hiivmind-corpus-bridge, hiivmind-corpus-init, hiivmind-corpus-add-source, hiivmind-corpus-register

@@ -382,6 +382,7 @@ Skip and note in output:
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
 - Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
+- Headless rebuild (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build-headless/SKILL.md`
 - **Navigate:** `skills/hiivmind-corpus-navigate/SKILL.md` - Query corpus documentation
 - **Register:** `skills/hiivmind-corpus-register/SKILL.md` - Add corpus to registry
 - **Status:** `skills/hiivmind-corpus-status/SKILL.md` - Check corpus health

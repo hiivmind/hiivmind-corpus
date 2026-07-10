@@ -93,6 +93,28 @@ errors: []
 """
 
 
+VALID_BUILD = """\
+contract_version: 1
+kind: build
+corpus: lancedb
+run_at: "2026-07-10T00:00:00Z"
+entries: 193
+sources:
+  - id: lancedb-docs
+    type: git
+    files_scanned: 210
+strategy: tiered
+sections: ["guides", "api-reference"]
+graph: generated
+embeddings: updated
+verification:
+  sampled: 20
+  failed: 1
+  drift_entries: ["lancedb-docs:guides/drift.md"]
+errors: []
+"""
+
+
 def run_validate(tmp_path, content, kind):
     f = tmp_path / "result.yaml"
     f.write_text(content)
@@ -137,6 +159,18 @@ def test_refresh_optional_embeddings_lag_ok(tmp_path):
     content = VALID_REFRESH.replace("embeddings: deferred", "embeddings: deferred\nembeddings_lag: 5")
     r = run_validate(tmp_path, content, "refresh")
     assert r.returncode == 0, r.stderr
+
+
+def test_valid_build_result(tmp_path):
+    r = run_validate(tmp_path, VALID_BUILD, "build")
+    assert r.returncode == 0, r.stderr
+
+
+def test_build_invalid_graph_fails(tmp_path):
+    broken = VALID_BUILD.replace("graph: generated", "graph: banana")
+    r = run_validate(tmp_path, broken, "build")
+    assert r.returncode == 1
+    assert "graph" in r.stderr
 
 
 def test_invalid_result_fails(tmp_path):
