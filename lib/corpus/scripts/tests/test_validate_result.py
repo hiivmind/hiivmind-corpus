@@ -60,6 +60,39 @@ errors: []
 """
 
 
+VALID_STATUS = """\
+contract_version: 1
+kind: status
+corpus: lancedb
+run_at: "2026-07-09T03:00:00Z"
+index_format: v2
+sources:
+  - id: lancedb-docs
+    type: git
+    freshness: behind
+stale_entries: 4
+embeddings_lag: 12
+refresh_needed: true
+errors: []
+"""
+
+
+VALID_GRAPH_VALIDATE = """\
+contract_version: 1
+kind: graph-validate
+corpus: lancedb
+run_at: "2026-07-09T04:00:00Z"
+concepts: 30
+relationships: 42
+issues:
+  - severity: warning
+    rule: orphan-concept
+    detail: "concept 'io' has no entries"
+valid: true
+errors: []
+"""
+
+
 def run_validate(tmp_path, content, kind):
     f = tmp_path / "result.yaml"
     f.write_text(content)
@@ -81,6 +114,28 @@ def test_valid_enrich_passes(tmp_path):
 
 def test_valid_migrate_passes(tmp_path):
     r = run_validate(tmp_path, VALID_MIGRATE, "migrate")
+    assert r.returncode == 0, r.stderr
+
+
+def test_valid_status_result(tmp_path):
+    r = run_validate(tmp_path, VALID_STATUS, "status")
+    assert r.returncode == 0, r.stderr
+
+
+def test_status_null_embeddings_lag_ok(tmp_path):
+    content = VALID_STATUS.replace("embeddings_lag: 12", "embeddings_lag: null")
+    r = run_validate(tmp_path, content, "status")
+    assert r.returncode == 0, r.stderr
+
+
+def test_valid_graph_validate_result(tmp_path):
+    r = run_validate(tmp_path, VALID_GRAPH_VALIDATE, "graph-validate")
+    assert r.returncode == 0, r.stderr
+
+
+def test_refresh_optional_embeddings_lag_ok(tmp_path):
+    content = VALID_REFRESH.replace("embeddings: deferred", "embeddings: deferred\nembeddings_lag: 5")
+    r = run_validate(tmp_path, content, "refresh")
     assert r.returncode == 0, r.stderr
 
 

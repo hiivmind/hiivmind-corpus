@@ -158,4 +158,4 @@ Write the result file even on ABORT (with `error` populated and
 ## Reference
 
 - Patterns: `config-parsing.md`, `index-format-v2.md`, `index-rendering.md`, `headless-contract.md`, `sources/git.md`
-- Related skills: hiivmind-corpus-build, hiivmind-corpus-refresh, hiivmind-corpus-refresh-headless, hiivmind-corpus-enrich-headless, hiivmind-corpus-enhance, hiivmind-corpus-status, hiivmind-corpus-navigate, hiivmind-corpus-graph, hiivmind-corpus-init, hiivmind-corpus-add-source, hiivmind-corpus-discover, hiivmind-corpus-register, hiivmind-corpus-bridge
+- Related skills: hiivmind-corpus-build, hiivmind-corpus-refresh, hiivmind-corpus-refresh-headless, hiivmind-corpus-enrich-headless, hiivmind-corpus-enhance, hiivmind-corpus-status, hiivmind-corpus-status-headless, hiivmind-corpus-navigate, hiivmind-corpus-graph, hiivmind-corpus-init, hiivmind-corpus-add-source, hiivmind-corpus-discover, hiivmind-corpus-register, hiivmind-corpus-bridge

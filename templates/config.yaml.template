@@ -63,6 +63,20 @@ index:
 #       title: "Getting Started"
 #       description: "First steps - installation, signup, first deploy"
 
+# build: records the interactive build decisions so headless skills can replay
+# them (enhance/refresh/enrich read these instead of re-asking or guessing).
+# Written automatically by hiivmind-corpus-build; absent = legacy corpus.
+# build:
+#   use_case: reference          # reference | learning | troubleshooting | mixed
+#   organization: by-topic       # by-topic | by-source | mixed
+#   segmentation: single         # single | tiered | by-source | by-section
+#   source_priorities: []        # ordered source ids; multi-source only
+#   skip_sections: []            # section names deliberately excluded from the index
+#   embeddings: false            # user opted into embeddings during build
+#   verify_on_build: true        # run entry verification during build
+#   verify_sample_size: 20
+#   decided_at: null
+
 settings:
   include_patterns:
     - "**/*.md"

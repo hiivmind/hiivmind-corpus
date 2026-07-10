@@ -5,7 +5,7 @@
 # ///
 """Validate a headless result file against the corpus result contract.
 
-Usage: validate_result.py <result.yaml> --kind refresh|enrich|migrate
+Usage: validate_result.py <result.yaml> --kind refresh|enrich|migrate|status|graph-validate
 
 See lib/corpus/patterns/headless-contract.md for the schemas.
 
@@ -24,6 +24,19 @@ REFRESH_EMBEDDINGS = {"updated", "skipped", "no-model", "not-installed", "deferr
 ENRICH_EMBEDDINGS = {"updated", "skipped", "no-model", "not-installed"}
 MIGRATE_STRATEGIES = {"tiered", "single"}
 MIGRATE_SKIP_REASONS = {"file-missing", "clone-failed"}
+INDEX_FORMATS = {"v2", "v1", "none"}
+STATUS_FRESHNESS = {"current", "behind", "unknown"}
+GRAPH_SEVERITIES = {"error", "warning"}
+
+
+def _require_int_or_null(data, key, errors, ctx=""):
+    """Key must be present; value may be int or None."""
+    label = f"{ctx}{key}"
+    if key not in data:
+        _err(errors, f"missing required key: {label}")
+        return
+    if data[key] is not None and not isinstance(data[key], int):
+        _err(errors, f"wrong type for {label}: expected int or null, got {type(data[key]).__name__}")
 
 
 def _err(errors, msg):
@@ -77,6 +90,9 @@ def validate(data: dict, kind: str) -> list[str]:
         emb = _require(data, "embeddings", str, errors)
         if emb is not None and emb not in REFRESH_EMBEDDINGS:
             _err(errors, f"embeddings invalid: {emb}")
+        if "embeddings_lag" in data and data["embeddings_lag"] is not None \
+                and not isinstance(data["embeddings_lag"], int):
+            _err(errors, "wrong type for embeddings_lag: expected int or null")
 
     elif kind == "enrich":
         for k in ("enriched", "skipped", "concepts_assigned"):
@@ -114,13 +130,47 @@ def validate(data: dict, kind: str) -> list[str]:
         if emb is not None and emb != "skipped":
             _err(errors, f"embeddings must be 'skipped' for migrate, got: {emb}")
 
+    elif kind == "status":
+        fmt = _require(data, "index_format", str, errors)
+        if fmt is not None and fmt not in INDEX_FORMATS:
+            _err(errors, f"index_format invalid: {fmt}")
+        sources = _require(data, "sources", list, errors)
+        for i, s in enumerate(sources or []):
+            if not isinstance(s, dict):
+                _err(errors, f"sources[{i}] is not a mapping")
+                continue
+            _require(s, "id", str, errors, ctx=f"sources[{i}].")
+            _require(s, "type", str, errors, ctx=f"sources[{i}].")
+            fresh = _require(s, "freshness", str, errors, ctx=f"sources[{i}].")
+            if fresh is not None and fresh not in STATUS_FRESHNESS:
+                _err(errors, f"sources[{i}].freshness invalid: {fresh}")
+        _require(data, "stale_entries", int, errors)
+        _require_int_or_null(data, "embeddings_lag", errors)
+        _require(data, "refresh_needed", bool, errors)
+
+    elif kind == "graph-validate":
+        _require(data, "concepts", int, errors)
+        _require(data, "relationships", int, errors)
+        issues = _require(data, "issues", list, errors)
+        for i, iss in enumerate(issues or []):
+            if not isinstance(iss, dict):
+                _err(errors, f"issues[{i}] is not a mapping")
+                continue
+            sev = _require(iss, "severity", str, errors, ctx=f"issues[{i}].")
+            if sev is not None and sev not in GRAPH_SEVERITIES:
+                _err(errors, f"issues[{i}].severity invalid: {sev}")
+            _require(iss, "rule", str, errors, ctx=f"issues[{i}].")
+            _require(iss, "detail", str, errors, ctx=f"issues[{i}].")
+        _require(data, "valid", bool, errors)
+
     return errors
 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate a headless result file")
     parser.add_argument("file", help="Path to result YAML file")
-    parser.add_argument("--kind", required=True, choices=["refresh", "enrich", "migrate"])
+    parser.add_argument("--kind", required=True,
+                        choices=["refresh", "enrich", "migrate", "status", "graph-validate"])
     args = parser.parse_args()
 
     path = Path(args.file)

@@ -261,6 +261,10 @@ v2 → stale-marking rules (M/A/D); v1 → direct entry edits with real titles
 extracted from `.source/` (single or tiered). Then update config metadata and
 run the embedding update per the same pattern.
 
+Placement of added entries follows `config.build` (see
+`patterns/index-updating.md` and `patterns/config-parsing.md` § The `build:`
+Block) — `skip_sections` exclusions are logged, not indexed.
+
 Interactive additions on top of the pattern:
 
 1. **Preview before saving:** show the user the changes (entries
@@ -344,6 +348,7 @@ GUARD_REFRESH_VERIFICATION():
 ## Related Skills
 
 - Migrate v1→v2 (headless): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-migrate/SKILL.md`
+- Headless status (pipelines): `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-status-headless/SKILL.md`
 - Initialize corpus: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-init/SKILL.md`
 - Add sources: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-add-source/SKILL.md`
 - Build index: `${CLAUDE_PLUGIN_ROOT}/skills/hiivmind-corpus-build/SKILL.md`
