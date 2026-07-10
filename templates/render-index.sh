@@ -52,7 +52,8 @@ render_entries() {
 
   for CAT in $categories; do
     echo ""
-    CAT_HEADING=$(echo "$CAT" | sed 's/\b\(.\)/\u\1/g')
+    # Title-case each word. Portable (BSD/macOS sed lacks GNU \u).
+    CAT_HEADING=$(echo "$CAT" | awk '{for(i=1;i<=NF;i++)$i=toupper(substr($i,1,1)) substr($i,2)}1')
     echo "## ${CAT_HEADING}"
     echo ""
     MODE="$mode" SECTION="$section" VALID="$VALID_SECTIONS" CAT_FILTER="$CAT" yq -r '
@@ -68,11 +69,13 @@ render_entries() {
         ))
       | sort_by(.title)
       | .[]
-      | [.title, .id, .summary, .size, (.grep_hint // ""), (.stale | tostring)]
+      | [.title, .id, .summary, .size, (.grep_hint // "~"), (.stale | tostring)]
       | @tsv
     ' "$INDEX_YAML" | while IFS=$'\t' read -r title id summary size grep_hint stale; do
+      # Tab is IFS-whitespace, so an empty field would be collapsed and shift the
+      # columns; a "~" sentinel keeps grep_hint non-empty ("~" = no hint).
       line="- **${title}** \`${id}\` - ${summary}"
-      if [[ "$size" == "large" && -n "$grep_hint" ]]; then
+      if [[ "$size" == "large" && -n "$grep_hint" && "$grep_hint" != "~" ]]; then
         line+=" ⚡ GREP - \`${grep_hint}\`"
       fi
       if [[ "$stale" == "true" ]]; then
