@@ -20,6 +20,20 @@ index status, source availability, and cache state.
 
 ## Workflow
 
+### Resolved corpus context
+
+When the trusted runtime input describes `kind: corpus` and
+`workspace_role: "corpus-root"`, inspect that one corpus.
+Read `config.yaml` from the logical workspace root. Then inspect its index and
+sources. Do not search for
+`.hiivmind/corpus/registry.yaml`; the application has already resolved the
+corpus identity and workspace.
+
+### Consumer project registry
+
+When resolved corpus context is absent, discover registered corpora from
+`.hiivmind/corpus/registry.yaml` and follow the multi-corpus workflow below.
+
 ### Phase 1: Load Registry
 
 Read `.hiivmind/corpus/registry.yaml`:
