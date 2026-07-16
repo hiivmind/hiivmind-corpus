@@ -5,7 +5,6 @@ description: >
   want to link concepts across corpora, create query-routing aliases, or validate
   cross-corpus relationships. Triggers: "bridge", "cross-corpus", "link corpora",
   "registry graph", "alias", "bridge show", "bridge validate", "add alias".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
 ---
 
 # Cross-Corpus Concept Bridge

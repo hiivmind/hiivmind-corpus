@@ -6,27 +6,6 @@ description: >
   or mentions that documentation sources have changed. Triggers on "refresh my [corpus name] corpus",
   "sync corpus with upstream", "check if docs are current", "update from source repo", or
   "hiivmind-corpus refresh".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, Task
-inputs:
-  - name: corpus_name
-    type: string
-    required: false
-    description: Name of the corpus to refresh (uses current directory if not provided)
-  - name: mode
-    type: string
-    required: false
-    description: "'status' for check-only, 'update' to pull changes (prompted if not provided)"
-  - name: auto_approve
-    type: boolean
-    required: false
-    description: Skip confirmation prompts (for CI/automated runs)
-outputs:
-  - name: status_report
-    type: array
-    description: Per-source freshness status
-  - name: updated_sources
-    type: array
-    description: Sources that were updated (empty in status mode)
 ---
 
 # Corpus Refresh

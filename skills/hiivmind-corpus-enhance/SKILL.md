@@ -5,23 +5,7 @@ description: >
   "expand section in index", "need more depth on [topic]", "corpus is too shallow", "add entries for [topic]",
   or wants deeper coverage of specific topics in an existing corpus. Triggers on "enhance [topic] section",
   "more detail on [feature]", "expand the index", "add depth to corpus", or "hiivmind-corpus enhance".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
-inputs:
-  - name: topic
-    type: string
-    required: false
-    description: Topic or section to enhance (prompted if not provided)
-  - name: corpus_path
-    type: string
-    required: false
-    description: Path to corpus skill directory (defaults to current directory)
-outputs:
-  - name: updated_index
-    type: boolean
-    description: Whether index.md (or sub-index) was modified
-  - name: entries_added
-    type: number
-    description: Count of new entries added to the index
+
 ---
 
 # Corpus Index Enhancement

@@ -5,20 +5,6 @@ description: >
   and scheduled tasks. Always runs in update mode, selects all stale sources automatically,
   and emits a machine-readable YAML result block instead of prose. Use hiivmind-corpus-refresh
   for interactive use.
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash, WebFetch, Task
-inputs:
-  - name: corpus_path
-    type: string
-    required: false
-    description: Absolute path to the corpus root (uses current working directory if not provided)
-  - name: result_path
-    type: string
-    required: false
-    description: Where to write refresh-result.yaml (defaults to {corpus_root}/refresh-result.yaml)
-outputs:
-  - name: result
-    type: yaml
-    description: Structured result written to result_path and echoed as a log block — see patterns/headless-contract.md
 ---
 
 # Corpus Refresh (Headless)

@@ -7,24 +7,6 @@ description: >
   flags, re-renders, and re-embeds. Run after hiivmind-corpus-refresh-headless in automated
   pipelines, or standalone to repair a corpus with accumulated stale entries. Requires a
   v2 index (index.yaml).
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Task
-inputs:
-  - name: corpus_path
-    type: string
-    required: false
-    description: Absolute path to the corpus root (uses current working directory if not provided)
-  - name: result_path
-    type: string
-    required: false
-    description: Where to write enrich-result.yaml (defaults to {corpus_root}/enrich-result.yaml)
-  - name: entry_ids
-    type: array
-    required: false
-    description: Specific entry IDs to enrich (defaults to all entries with stale = true)
-outputs:
-  - name: result
-    type: yaml
-    description: enrich-result.yaml per patterns/headless-contract.md
 ---
 
 # Corpus Enrichment (Headless)

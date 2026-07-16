@@ -5,7 +5,6 @@ description: >
   Triggers: "graph", "show graph", "validate graph", "concept graph",
   "view concepts", "graph.yaml", "show relationships", "add concept",
   "add relationship".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
 ---
 
 # Corpus Concept Graph

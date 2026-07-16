@@ -5,7 +5,6 @@ description: >
   questions, want to look up API references, or mention keywords matching registered corpora.
   Triggers: documentation, docs, lookup, search corpus, what does, how to, API reference.
   Auto-triggers when query contains keywords from any registered corpus (flyio, polars, etc.).
-allowed-tools: Read, Glob, Grep, Bash, WebFetch, AskUserQuestion
 ---
 
 # Corpus Navigate Skill

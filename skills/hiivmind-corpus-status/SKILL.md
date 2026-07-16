@@ -4,7 +4,6 @@ description: >
   Check the health and status of registered corpora. Use when users want to see corpus
   freshness, verify configurations, check for upstream updates, or diagnose issues.
   Triggers: corpus status, check corpus, corpus health, is corpus up to date, corpus info.
-allowed-tools: Read, Glob, Bash, WebFetch, AskUserQuestion
 ---
 
 # Corpus Status Skill

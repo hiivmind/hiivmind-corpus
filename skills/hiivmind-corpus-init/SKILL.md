@@ -5,23 +5,6 @@ description: >
   "set up docs for a library", "index this project's docs", "create documentation corpus",
   or mentions wanting to create a new documentation corpus. Also triggers on "new corpus",
   "corpus for [library name]", or "hiivmind-corpus init".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash
-inputs:
-  - name: source_url
-    type: string
-    required: false
-    description: GitHub repo URL, docs site URL, or local path (prompted if not provided)
-  - name: corpus_name
-    type: string
-    required: false
-    description: Corpus identifier (derived from URL or prompted if not provided)
-outputs:
-  - name: corpus_root
-    type: string
-    description: Path to the created corpus directory
-  - name: delegated_to_add_source
-    type: boolean
-    description: Whether the skill delegated to add-source for initial content
 ---
 
 # Corpus Init

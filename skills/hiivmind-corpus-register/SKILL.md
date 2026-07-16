@@ -4,7 +4,6 @@ description: >
   Register a documentation corpus with the current project. Use when users want to add
   a corpus to their project, connect documentation sources, or set up corpus access.
   Triggers: register corpus, add corpus, connect docs, add documentation, setup corpus.
-allowed-tools: Read, Write, Edit, Bash, WebFetch, AskUserQuestion
 ---
 
 # Corpus Register Skill

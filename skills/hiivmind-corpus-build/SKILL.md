@@ -6,25 +6,6 @@ description: >
   corpus that was just initialized. Triggers on "build my corpus", "index the documentation",
   "create the index.md", "finish setting up corpus", "hiivmind-corpus build", or when a corpus
   has placeholder index.md that says "Run hiivmind-corpus-build", or "create the index.yaml".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch, Task
-inputs:
-  - name: corpus_name
-    type: string
-    required: false
-    description: Name of the corpus to build (uses current directory if not provided)
-outputs:
-  - name: index_path
-    type: string
-    description: Path to the generated index.md
-  - name: index_yaml_path
-    type: string
-    description: Path to the generated index.yaml
-  - name: segmentation_strategy
-    type: string
-    description: Strategy used (single, tiered, by-section, by-source)
-  - name: entry_count
-    type: number
-    description: Total index entries created
 ---
 
 # Corpus Build

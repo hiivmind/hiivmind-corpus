@@ -4,23 +4,6 @@ description: >
   Add documentation source to corpus. Triggers: "add source", "add git repo",
   "include blog posts", "add local documents", "extend corpus with web pages",
   "add team docs", "add PDF to corpus", "import PDF book", "split PDF into chapters".
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash, WebFetch
-inputs:
-  - name: source_url
-    type: string
-    required: false
-    description: URL or path to documentation source (prompted if not provided)
-  - name: working_directory
-    type: string
-    required: false
-    description: Corpus root directory (defaults to current directory)
-outputs:
-  - name: source_id
-    type: string
-    description: Identifier of the added source
-  - name: source_type
-    type: string
-    description: Type of source added (git, local, web, llms-txt, generated-docs, obsidian)
 ---
 
 # Add Source

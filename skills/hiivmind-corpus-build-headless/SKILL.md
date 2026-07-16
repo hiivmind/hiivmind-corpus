@@ -7,16 +7,6 @@ description: >
   rendered markdown, optional graph and embeddings, and writes build-result.yaml
   (headless contract). Triggers: "headless build", "rebuild corpus headless",
   "build result file", scheduled rebuilds. Users normally want `build`.
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash, WebFetch, Task
-inputs:
-  - name: corpus_path
-    type: string
-    required: false
-    description: Absolute path to the corpus root (uses current working directory if not provided)
-  - name: result_path
-    type: string
-    required: false
-    description: Where to write build-result.yaml (defaults to {corpus_root}/build-result.yaml)
 ---
 
 # Corpus Build (Headless)
