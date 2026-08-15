@@ -23,6 +23,7 @@ Exit codes:
   3 - other error
   4 - model mismatch (existing dataset built with different model)
 """
+
 import argparse
 import json
 import sys
@@ -31,8 +32,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from constants import (  # noqa: E402
-    MODEL_NAME, DIMENSIONS, TABLE_NAME, CHUNKS_TABLE_NAME,
-    META_TABLE, PASSAGE_PREFIX, QUERY_PREFIX, VECTOR_INDEX_THRESHOLD,
+    MODEL_NAME,
+    DIMENSIONS,
+    TABLE_NAME,
+    CHUNKS_TABLE_NAME,
+    META_TABLE,
+    PASSAGE_PREFIX,
+    QUERY_PREFIX,
+    VECTOR_INDEX_THRESHOLD,
 )
 
 
@@ -95,17 +102,19 @@ def load_chunks(input_path):
         chunks = json.load(f)
     items = []
     for chunk in chunks:
-        items.append({
-            "id": chunk["id"],
-            "parent": chunk["parent"],
-            "source": chunk["source"],
-            "path": chunk["path"],
-            "chunk_index": chunk["chunk_index"],
-            "chunk_text": chunk["chunk_text"],
-            "heading_context": chunk.get("heading_context", ""),
-            "line_range": chunk["line_range"],
-            "overlap_prev": chunk.get("overlap_prev", False),
-        })
+        items.append(
+            {
+                "id": chunk["id"],
+                "parent": chunk["parent"],
+                "source": chunk["source"],
+                "path": chunk["path"],
+                "chunk_index": chunk["chunk_index"],
+                "chunk_text": chunk["chunk_text"],
+                "heading_context": chunk.get("heading_context", ""),
+                "line_range": chunk["line_range"],
+                "overlap_prev": chunk.get("overlap_prev", False),
+            }
+        )
     return items
 
 
@@ -159,8 +168,7 @@ def main_chunks(args):
         from fastembed import TextEmbedding
     except ImportError:
         print(
-            "Error: fastembed not installed. "
-            "Run: pip install fastembed lancedb",
+            "Error: fastembed not installed. Run: pip install fastembed lancedb",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -170,8 +178,7 @@ def main_chunks(args):
         import pyarrow as pa
     except ImportError:
         print(
-            "Error: lancedb not installed. "
-            "Run: pip install fastembed lancedb",
+            "Error: lancedb not installed. Run: pip install fastembed lancedb",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -296,8 +303,7 @@ def main():
         from fastembed import TextEmbedding
     except ImportError:
         print(
-            "Error: fastembed not installed. "
-            "Run: pip install fastembed lancedb pyyaml",
+            "Error: fastembed not installed. Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -307,8 +313,7 @@ def main():
         import pyarrow as pa
     except ImportError:
         print(
-            "Error: lancedb not installed. "
-            "Run: pip install fastembed lancedb pyyaml",
+            "Error: lancedb not installed. Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
         sys.exit(1)

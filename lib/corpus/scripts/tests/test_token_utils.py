@@ -1,4 +1,5 @@
 """Tests for token_utils.py — shared token counting."""
+
 import sys
 from pathlib import Path
 

@@ -11,6 +11,7 @@ Integration tests (require fastembed + lancedb):
   - FTS index creation
   - Concepts in Lance schema
 """
+
 import json
 import subprocess
 import sys
@@ -151,7 +152,12 @@ class TestErrorHandling:
     def test_missing_input_file(self, tmp_path):
         """Exit code 2 when input file doesn't exist."""
         result = subprocess.run(
-            [sys.executable, SCRIPT, "/nonexistent/file.yaml", str(tmp_path / "out.lance")],
+            [
+                sys.executable,
+                SCRIPT,
+                "/nonexistent/file.yaml",
+                str(tmp_path / "out.lance"),
+            ],
             capture_output=True,
             text=True,
         )
@@ -230,8 +236,7 @@ class TestEmbeddingPipeline:
         )
 
         result = subprocess.run(
-            [sys.executable, SCRIPT, "--force",
-             str(sample_index_yaml), str(output)],
+            [sys.executable, SCRIPT, "--force", str(sample_index_yaml), str(output)],
             capture_output=True,
             text=True,
         )
@@ -275,7 +280,9 @@ class TestEmbeddingPipeline:
         db = lancedb.connect(str(output))
         db.drop_table("_meta")
         meta_json = output / "_meta.json"
-        meta_json.write_text(json.dumps({"model": "BAAI/bge-small-en-v1.5", "dimensions": 384}))
+        meta_json.write_text(
+            json.dumps({"model": "BAAI/bge-small-en-v1.5", "dimensions": 384})
+        )
 
         # Rebuild should migrate
         result = subprocess.run(
@@ -295,18 +302,36 @@ class TestEmbeddingPipeline:
 def sample_chunks_json(tmp_path):
     """Create a chunks JSON file matching chunk.py output format."""
     chunks = [
-        {"id": "test:doc1.md#chunk-0", "parent": "test:doc1.md", "source": "test",
-         "path": "doc1.md", "chunk_index": 0,
-         "chunk_text": "Getting started with the project requires installing dependencies first.",
-         "line_range": [1, 10], "overlap_prev": False},
-        {"id": "test:doc1.md#chunk-1", "parent": "test:doc1.md", "source": "test",
-         "path": "doc1.md", "chunk_index": 1,
-         "chunk_text": "The API provides endpoints for creating, reading, and deleting resources.",
-         "line_range": [8, 20], "overlap_prev": True},
-        {"id": "test:doc2.md#chunk-0", "parent": "test:doc2.md", "source": "test",
-         "path": "doc2.md", "chunk_index": 0,
-         "chunk_text": "Performance tuning involves optimizing database queries and caching strategies.",
-         "line_range": [1, 15], "overlap_prev": False},
+        {
+            "id": "test:doc1.md#chunk-0",
+            "parent": "test:doc1.md",
+            "source": "test",
+            "path": "doc1.md",
+            "chunk_index": 0,
+            "chunk_text": "Getting started with the project requires installing dependencies first.",
+            "line_range": [1, 10],
+            "overlap_prev": False,
+        },
+        {
+            "id": "test:doc1.md#chunk-1",
+            "parent": "test:doc1.md",
+            "source": "test",
+            "path": "doc1.md",
+            "chunk_index": 1,
+            "chunk_text": "The API provides endpoints for creating, reading, and deleting resources.",
+            "line_range": [8, 20],
+            "overlap_prev": True,
+        },
+        {
+            "id": "test:doc2.md#chunk-0",
+            "parent": "test:doc2.md",
+            "source": "test",
+            "path": "doc2.md",
+            "chunk_index": 0,
+            "chunk_text": "Performance tuning involves optimizing database queries and caching strategies.",
+            "line_range": [1, 15],
+            "overlap_prev": False,
+        },
     ]
     path = tmp_path / "chunks.json"
     path.write_text(json.dumps(chunks))
@@ -319,9 +344,16 @@ class TestChunkMode:
     def test_missing_mode_chunks_input(self, tmp_path):
         """Exit code 2 when chunks input file doesn't exist."""
         result = subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "chunks",
-             "/nonexistent/chunks.json", str(tmp_path / "out.lance")],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                SCRIPT,
+                "--mode",
+                "chunks",
+                "/nonexistent/chunks.json",
+                str(tmp_path / "out.lance"),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 2
 
@@ -332,11 +364,19 @@ class TestChunkEmbeddingPipeline:
 
     def test_chunk_mode_creates_chunks_table(self, sample_chunks_json, tmp_path):
         import lancedb
+
         output = tmp_path / "chunks-embeddings.lance"
         result = subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "chunks",
-             str(sample_chunks_json), str(output)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                SCRIPT,
+                "--mode",
+                "chunks",
+                str(sample_chunks_json),
+                str(output),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0, f"Failed: {result.stderr}"
         db = lancedb.connect(str(output))
@@ -351,21 +391,35 @@ class TestChunkEmbeddingPipeline:
     def test_chunk_mode_creates_fts_index(self, sample_chunks_json, tmp_path):
         output = tmp_path / "chunks-embeddings.lance"
         subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "chunks",
-             str(sample_chunks_json), str(output)],
+            [
+                sys.executable,
+                SCRIPT,
+                "--mode",
+                "chunks",
+                str(sample_chunks_json),
+                str(output),
+            ],
             capture_output=True,
         )
         import lancedb
+
         db = lancedb.connect(str(output))
         table = db.open_table("chunks")
         assert "chunk_text" in table.schema.names
 
     def test_chunk_mode_meta_table(self, sample_chunks_json, tmp_path):
         import lancedb
+
         output = tmp_path / "chunks-embeddings.lance"
         subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "chunks",
-             str(sample_chunks_json), str(output)],
+            [
+                sys.executable,
+                SCRIPT,
+                "--mode",
+                "chunks",
+                str(sample_chunks_json),
+                str(output),
+            ],
             capture_output=True,
         )
         db = lancedb.connect(str(output))
@@ -380,9 +434,16 @@ class TestChunkEmbeddingPipeline:
     def test_chunk_mode_json_output(self, sample_chunks_json, tmp_path):
         output = tmp_path / "chunks-embeddings.lance"
         result = subprocess.run(
-            [sys.executable, SCRIPT, "--mode", "chunks",
-             str(sample_chunks_json), str(output)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                SCRIPT,
+                "--mode",
+                "chunks",
+                str(sample_chunks_json),
+                str(output),
+            ],
+            capture_output=True,
+            text=True,
         )
         output_json = json.loads(result.stdout)
         assert output_json["total"] == 3
@@ -443,28 +504,47 @@ class TestHeadingContextEmbedding:
         path.write_text(json.dumps(chunks))
         return path
 
-    def test_heading_context_produces_different_embeddings(self, chunks_with_context, chunks_without_context, tmp_path):
+    def test_heading_context_produces_different_embeddings(
+        self, chunks_with_context, chunks_without_context, tmp_path
+    ):
         """Chunks with heading_context should embed differently than without."""
         script = str(Path(__file__).parent.parent / "embed.py")
 
         # Embed with context
         out_ctx = tmp_path / "with_ctx.lance"
         r1 = subprocess.run(
-            [sys.executable, script, "--mode", "chunks", str(chunks_with_context), str(out_ctx)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                script,
+                "--mode",
+                "chunks",
+                str(chunks_with_context),
+                str(out_ctx),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert r1.returncode == 0, f"Failed: {r1.stderr}"
 
         # Embed without context
         out_no_ctx = tmp_path / "no_ctx.lance"
         r2 = subprocess.run(
-            [sys.executable, script, "--mode", "chunks", str(chunks_without_context), str(out_no_ctx)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                script,
+                "--mode",
+                "chunks",
+                str(chunks_without_context),
+                str(out_no_ctx),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert r2.returncode == 0, f"Failed: {r2.stderr}"
 
         # Compare vectors — they should differ since heading_context was prepended
         import lancedb
+
         db_ctx = lancedb.connect(str(out_ctx))
         db_no_ctx = lancedb.connect(str(out_no_ctx))
         tbl_ctx = db_ctx.open_table("chunks")
@@ -476,17 +556,28 @@ class TestHeadingContextEmbedding:
         # Same chunk_text but different heading_context should produce different vectors
         assert list(vec_ctx) != list(vec_no_ctx)
 
-    def test_empty_heading_context_backward_compatible(self, chunks_without_context, tmp_path):
+    def test_empty_heading_context_backward_compatible(
+        self, chunks_without_context, tmp_path
+    ):
         """Chunks without heading_context field should embed normally."""
         script = str(Path(__file__).parent.parent / "embed.py")
         output = tmp_path / "compat.lance"
         result = subprocess.run(
-            [sys.executable, script, "--mode", "chunks", str(chunks_without_context), str(output)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                script,
+                "--mode",
+                "chunks",
+                str(chunks_without_context),
+                str(output),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0, f"Failed: {result.stderr}"
 
         import lancedb
+
         db = lancedb.connect(str(output))
         tbl = db.open_table("chunks")
         df = tbl.to_pandas()
@@ -497,6 +588,7 @@ class TestHeadingContextEmbedding:
         """load_chunks should include heading_context in items."""
         sys.path.insert(0, str(Path(SCRIPT).parent))
         from embed import load_chunks
+
         items = load_chunks(str(chunks_with_context))
         assert items[0]["heading_context"] == "## Getting Started > ### Installation"
         assert items[1]["heading_context"] == ""
@@ -505,6 +597,7 @@ class TestHeadingContextEmbedding:
         """load_chunks should default heading_context to empty string when missing."""
         sys.path.insert(0, str(Path(SCRIPT).parent))
         from embed import load_chunks
+
         items = load_chunks(str(chunks_without_context))
         assert items[0]["heading_context"] == ""
 

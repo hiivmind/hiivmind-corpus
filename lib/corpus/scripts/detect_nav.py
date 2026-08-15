@@ -18,6 +18,7 @@ Exit codes:
   1 - invalid arguments
   2 - python error
 """
+
 import argparse
 import json
 import re
@@ -59,10 +60,19 @@ def _walk_mkdocs_nav(nav_items: list, source_root: Path, level: int) -> list[dic
         if isinstance(item, dict):
             for title, value in item.items():
                 if isinstance(value, str):
-                    result.append({"title": title, "path": value, "level": level, "children": []})
+                    result.append(
+                        {"title": title, "path": value, "level": level, "children": []}
+                    )
                 elif isinstance(value, list):
                     children = _walk_mkdocs_nav(value, source_root, level + 1)
-                    result.append({"title": title, "path": None, "level": level, "children": children})
+                    result.append(
+                        {
+                            "title": title,
+                            "path": None,
+                            "level": level,
+                            "children": children,
+                        }
+                    )
         elif isinstance(item, str):
             result.append({"title": item, "path": item, "level": level, "children": []})
     return result
@@ -90,7 +100,9 @@ def _parse_mkdocs_nav_regex(nav_file: Path, source_root: Path) -> list[dict]:
                 level = ((indent - min_indent) // 2) + 1
                 title = match.group(2).strip()
                 path = match.group(3).strip() if match.group(3).strip() else None
-                flat.append({"title": title, "path": path, "level": level, "children": []})
+                flat.append(
+                    {"title": title, "path": path, "level": level, "children": []}
+                )
     return _nest_by_level(flat)
 
 
@@ -102,7 +114,14 @@ def parse_sidebar_md(sidebar_file: Path, source_root: Path) -> list[dict]:
         if match:
             indent = len(match.group(1))
             level = (indent // 2) + 1
-            flat.append({"title": match.group(2).strip(), "path": match.group(3).strip(), "level": level, "children": []})
+            flat.append(
+                {
+                    "title": match.group(2).strip(),
+                    "path": match.group(3).strip(),
+                    "level": level,
+                    "children": [],
+                }
+            )
     return _nest_by_level(flat)
 
 
@@ -141,8 +160,19 @@ def _count_md_files(source_root: Path) -> int:
 def detect_nav(source_root_str: str) -> dict:
     source_root = Path(source_root_str)
     empty_result = {
-        "found": False, "nav_file": None, "framework": None, "hierarchy": [],
-        "coverage": {"nav_entries": 0, "files_resolved": 0, "files_missing": 0, "total_md_files": _count_md_files(source_root) if source_root.is_dir() else 0, "coverage_pct": 0.0},
+        "found": False,
+        "nav_file": None,
+        "framework": None,
+        "hierarchy": [],
+        "coverage": {
+            "nav_entries": 0,
+            "files_resolved": 0,
+            "files_missing": 0,
+            "total_md_files": _count_md_files(source_root)
+            if source_root.is_dir()
+            else 0,
+            "coverage_pct": 0.0,
+        },
     }
     if not source_root.is_dir():
         return empty_result
@@ -169,15 +199,26 @@ def detect_nav(source_root_str: str) -> dict:
         coverage_pct = round((resolved / total_md * 100) if total_md > 0 else 0.0, 1)
 
         return {
-            "found": True, "nav_file": filename, "framework": framework, "hierarchy": hierarchy,
-            "coverage": {"nav_entries": len(all_paths), "files_resolved": resolved, "files_missing": missing, "total_md_files": total_md, "coverage_pct": coverage_pct},
+            "found": True,
+            "nav_file": filename,
+            "framework": framework,
+            "hierarchy": hierarchy,
+            "coverage": {
+                "nav_entries": len(all_paths),
+                "files_resolved": resolved,
+                "files_missing": missing,
+                "total_md_files": total_md,
+                "coverage_pct": coverage_pct,
+            },
         }
     return empty_result
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Detect documentation nav structure")
-    parser.add_argument("--source-root", required=True, help="Path to source root directory")
+    parser.add_argument(
+        "--source-root", required=True, help="Path to source root directory"
+    )
     return parser.parse_args()
 
 

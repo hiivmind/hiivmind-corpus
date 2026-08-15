@@ -14,6 +14,7 @@ Exit codes:
   1 - invalid (errors on stderr, one per line)
   2 - file missing or unparseable
 """
+
 import argparse
 import sys
 from pathlib import Path
@@ -39,7 +40,10 @@ def _require_int_or_null(data, key, errors, ctx=""):
         _err(errors, f"missing required key: {label}")
         return
     if data[key] is not None and not isinstance(data[key], int):
-        _err(errors, f"wrong type for {label}: expected int or null, got {type(data[key]).__name__}")
+        _err(
+            errors,
+            f"wrong type for {label}: expected int or null, got {type(data[key]).__name__}",
+        )
 
 
 def _err(errors, msg):
@@ -52,7 +56,10 @@ def _require(data, key, types, errors, ctx=""):
         _err(errors, f"missing required key: {label}")
         return None
     if not isinstance(data[key], types):
-        _err(errors, f"wrong type for {label}: expected {types}, got {type(data[key]).__name__}")
+        _err(
+            errors,
+            f"wrong type for {label}: expected {types}, got {type(data[key]).__name__}",
+        )
         return None
     return data[key]
 
@@ -93,8 +100,11 @@ def validate(data: dict, kind: str) -> list[str]:
         emb = _require(data, "embeddings", str, errors)
         if emb is not None and emb not in REFRESH_EMBEDDINGS:
             _err(errors, f"embeddings invalid: {emb}")
-        if "embeddings_lag" in data and data["embeddings_lag"] is not None \
-                and not isinstance(data["embeddings_lag"], int):
+        if (
+            "embeddings_lag" in data
+            and data["embeddings_lag"] is not None
+            and not isinstance(data["embeddings_lag"], int)
+        ):
             _err(errors, "wrong type for embeddings_lag: expected int or null")
 
     elif kind == "enrich":
@@ -201,8 +211,11 @@ def validate(data: dict, kind: str) -> list[str]:
 def main():
     parser = argparse.ArgumentParser(description="Validate a headless result file")
     parser.add_argument("file", help="Path to result YAML file")
-    parser.add_argument("--kind", required=True,
-                        choices=["refresh", "enrich", "migrate", "status", "graph-validate", "build"])
+    parser.add_argument(
+        "--kind",
+        required=True,
+        choices=["refresh", "enrich", "migrate", "status", "graph-validate", "build"],
+    )
     args = parser.parse_args()
 
     path = Path(args.file)
@@ -211,6 +224,7 @@ def main():
         sys.exit(2)
 
     import yaml
+
     try:
         data = yaml.safe_load(path.read_text())
     except yaml.YAMLError as e:

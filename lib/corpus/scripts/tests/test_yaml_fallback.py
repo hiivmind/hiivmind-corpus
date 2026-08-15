@@ -4,6 +4,7 @@ Tests the regex-based parsers directly to ensure they work when PyYAML
 is unavailable. These parse the same formats as the YAML parsers but
 using regex.
 """
+
 import sys
 from pathlib import Path
 
@@ -37,11 +38,7 @@ class TestMkdocsNavRegexFallback:
     def test_stops_at_next_top_level_key(self, tmp_path):
         mkdocs = tmp_path / "mkdocs.yml"
         mkdocs.write_text(
-            "nav:\n"
-            "  - Home: index.md\n"
-            "  - About: about.md\n"
-            "theme:\n"
-            "  name: material\n"
+            "nav:\n  - Home: index.md\n  - About: about.md\ntheme:\n  name: material\n"
         )
         result = _parse_mkdocs_nav_regex(mkdocs, tmp_path)
         assert len(result) == 2  # should not parse theme section
@@ -87,9 +84,7 @@ class TestIndexRegexFallback:
     def test_strips_quotes(self, tmp_path):
         index = tmp_path / "index.yaml"
         index.write_text(
-            "entries:\n"
-            "  - id: \"src:file.md\"\n"
-            "    title: 'Quoted Title'\n"
+            "entries:\n  - id: \"src:file.md\"\n    title: 'Quoted Title'\n"
         )
         result = _load_index_regex(str(index))
         assert result[0]["id"] == "src:file.md"
