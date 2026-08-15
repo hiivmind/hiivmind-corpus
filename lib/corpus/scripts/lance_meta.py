@@ -13,6 +13,7 @@ Values are stored as strings by embed.py and passed through as-is.
 Usage: lance_meta.py <lance_dir>
 Exit codes: 0 ok, 1 usage/open error, 2 no _meta table.
 """
+
 import json
 import sys
 from pathlib import Path

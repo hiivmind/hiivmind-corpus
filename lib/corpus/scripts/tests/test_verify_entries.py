@@ -1,4 +1,5 @@
 """Tests for verify_entries.py — entry content verification data prep."""
+
 import json
 import subprocess
 import sys
@@ -34,7 +35,9 @@ def sample_index(tmp_path):
     source_root = tmp_path / "source"
     docs = source_root / "docs"
     docs.mkdir(parents=True)
-    (docs / "intro.md").write_text("# Introduction\n\nThis is the overview of the project.\n" * 10)
+    (docs / "intro.md").write_text(
+        "# Introduction\n\nThis is the overview of the project.\n" * 10
+    )
     (docs / "guide.md").write_text("# Guide\n\nStep by step instructions.\n" * 5)
     return index_yaml, source_root
 
@@ -65,14 +68,18 @@ class TestExtractPreviews:
 
     def test_sample_limits_count(self, sample_index):
         index_yaml, source_root = sample_index
-        result = extract_previews(str(index_yaml), str(source_root), token_limit=500, sample=1)
+        result = extract_previews(
+            str(index_yaml), str(source_root), token_limit=500, sample=1
+        )
         assert len(result) == 1
 
     def test_filter_by_entry_ids(self, sample_index):
         index_yaml, source_root = sample_index
         result = extract_previews(
-            str(index_yaml), str(source_root), token_limit=500,
-            entry_ids=["src:docs/guide.md"]
+            str(index_yaml),
+            str(source_root),
+            token_limit=500,
+            entry_ids=["src:docs/guide.md"],
         )
         assert len(result) == 1
         assert result[0]["entry_id"] == "src:docs/guide.md"
@@ -84,9 +91,16 @@ class TestVerifyEntriesCLI:
     def test_cli_json_output(self, sample_index):
         index_yaml, source_root = sample_index
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "verify_entries.py"),
-             "--index", str(index_yaml), "--source-root", str(source_root)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "verify_entries.py"),
+                "--index",
+                str(index_yaml),
+                "--source-root",
+                str(source_root),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -94,9 +108,16 @@ class TestVerifyEntriesCLI:
 
     def test_cli_missing_index(self):
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "verify_entries.py"),
-             "--index", "/nonexistent/index.yaml", "--source-root", "/tmp"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "verify_entries.py"),
+                "--index",
+                "/nonexistent/index.yaml",
+                "--source-root",
+                "/tmp",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode != 0
 

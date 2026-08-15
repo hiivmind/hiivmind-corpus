@@ -1,4 +1,5 @@
 """Essential tests for validate_result.py — headless result contract validation."""
+
 import subprocess
 import sys
 
@@ -120,7 +121,8 @@ def run_validate(tmp_path, content, kind):
     f.write_text(content)
     return subprocess.run(
         [sys.executable, SCRIPT, str(f), "--kind", kind],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -156,7 +158,9 @@ def test_valid_graph_validate_result(tmp_path):
 
 
 def test_refresh_optional_embeddings_lag_ok(tmp_path):
-    content = VALID_REFRESH.replace("embeddings: deferred", "embeddings: deferred\nembeddings_lag: 5")
+    content = VALID_REFRESH.replace(
+        "embeddings: deferred", "embeddings: deferred\nembeddings_lag: 5"
+    )
     r = run_validate(tmp_path, content, "refresh")
     assert r.returncode == 0, r.stderr
 

@@ -1,4 +1,5 @@
 """Tests for detect.py — fastembed + lancedb availability detection."""
+
 import subprocess
 import sys
 
@@ -58,11 +59,14 @@ class TestCachePathAndUv:
 
     def _run(self, env_overrides, tmp_path):
         import os
+
         env = os.environ.copy()
         env.update(env_overrides)
         return subprocess.run(
             [sys.executable, "lib/corpus/scripts/detect.py"],
-            capture_output=True, text=True, env=env,
+            capture_output=True,
+            text=True,
+            env=env,
         )
 
     def test_custom_cache_path_with_model_reports_ready(self, tmp_path):
@@ -84,6 +88,7 @@ class TestCachePathAndUv:
         """With uv on PATH, availability is guaranteed by `uv run`, so the
         import probe must be skipped even in an env without fastembed."""
         import shutil
+
         if shutil.which("uv") is None:
             pytest.skip("uv not installed on this host")
         cache = tmp_path / "empty-cache"

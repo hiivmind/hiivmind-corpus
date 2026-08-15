@@ -20,6 +20,7 @@ Exit codes:
   2 - file not found
   3 - other error
 """
+
 import argparse
 import json
 import math
@@ -107,7 +108,9 @@ def score_line(line: str, strategy: str) -> int:
     return 0
 
 
-def _chunk_paragraphs(lines, target_tokens, overlap_tokens, heading_context, start_line=1):
+def _chunk_paragraphs(
+    lines, target_tokens, overlap_tokens, heading_context, start_line=1
+):
     """Split lines into chunks at paragraph boundaries with overlap."""
     chunks = []
     current_lines = []
@@ -115,21 +118,29 @@ def _chunk_paragraphs(lines, target_tokens, overlap_tokens, heading_context, sta
     chunk_start = start_line
 
     for i, line in enumerate(lines):
-        line_tokens = max(1, int(len(line.split()) * TOKENS_PER_WORD)) if line.strip() else 1
+        line_tokens = (
+            max(1, int(len(line.split()) * TOKENS_PER_WORD)) if line.strip() else 1
+        )
         if current_tokens + line_tokens > target_tokens and current_lines:
             chunk_text_str = "\n".join(current_lines)
-            chunks.append({
-                "text": chunk_text_str,
-                "line_range": [chunk_start, start_line + i - 1],
-                "chunk_index": len(chunks),
-                "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
-                "heading_context": heading_context,
-            })
+            chunks.append(
+                {
+                    "text": chunk_text_str,
+                    "line_range": [chunk_start, start_line + i - 1],
+                    "chunk_index": len(chunks),
+                    "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
+                    "heading_context": heading_context,
+                }
+            )
             if overlap_tokens > 0:
                 overlap_lines = []
                 overlap_count = 0
                 for prev_line in reversed(current_lines):
-                    prev_tokens = max(1, int(len(prev_line.split()) * TOKENS_PER_WORD)) if prev_line.strip() else 1
+                    prev_tokens = (
+                        max(1, int(len(prev_line.split()) * TOKENS_PER_WORD))
+                        if prev_line.strip()
+                        else 1
+                    )
                     overlap_count += prev_tokens
                     overlap_lines.insert(0, prev_line)
                     if overlap_count >= overlap_tokens:
@@ -145,13 +156,15 @@ def _chunk_paragraphs(lines, target_tokens, overlap_tokens, heading_context, sta
         current_tokens += line_tokens
 
     if current_lines:
-        chunks.append({
-            "text": "\n".join(current_lines),
-            "line_range": [chunk_start, start_line + len(lines) - 1],
-            "chunk_index": len(chunks),
-            "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
-            "heading_context": heading_context,
-        })
+        chunks.append(
+            {
+                "text": "\n".join(current_lines),
+                "line_range": [chunk_start, start_line + len(lines) - 1],
+                "chunk_index": len(chunks),
+                "overlap_prev": len(chunks) > 0 and overlap_tokens > 0,
+                "heading_context": heading_context,
+            }
+        )
     return chunks
 
 
@@ -175,17 +188,22 @@ def _chunk_by_headings(text, target_tokens, overlap_tokens):
         heading_context = f"{'#' * section['level']} {section['title']}"
 
         if section_tokens <= target_tokens:
-            chunks.append({
-                "text": "\n".join(section_lines),
-                "line_range": [section["line_start"], section["line_end"]],
-                "chunk_index": len(chunks),
-                "overlap_prev": False,
-                "heading_context": heading_context,
-            })
+            chunks.append(
+                {
+                    "text": "\n".join(section_lines),
+                    "line_range": [section["line_start"], section["line_end"]],
+                    "chunk_index": len(chunks),
+                    "overlap_prev": False,
+                    "heading_context": heading_context,
+                }
+            )
         else:
             sub_chunks = _chunk_paragraphs(
-                section_lines, target_tokens, overlap_tokens,
-                heading_context, start_line=section["line_start"],
+                section_lines,
+                target_tokens,
+                overlap_tokens,
+                heading_context,
+                start_line=section["line_start"],
             )
             for sc in sub_chunks:
                 sc["chunk_index"] = len(chunks)
@@ -255,7 +273,9 @@ def chunk_text(
                     "text": chunk_text_str,
                     "line_range": [chunk_start + 1, total_lines],
                     "chunk_index": len(chunks),
-                    "overlap_prev": chunk_start > 0 and overlap_tokens > 0 and len(chunks) > 0,
+                    "overlap_prev": chunk_start > 0
+                    and overlap_tokens > 0
+                    and len(chunks) > 0,
                 }
             )
             break
@@ -292,7 +312,9 @@ def chunk_text(
                     "text": chunk_text_str,
                     "line_range": [chunk_start + 1, split_at],
                     "chunk_index": len(chunks),
-                    "overlap_prev": chunk_start > 0 and overlap_tokens > 0 and len(chunks) > 0,
+                    "overlap_prev": chunk_start > 0
+                    and overlap_tokens > 0
+                    and len(chunks) > 0,
                 }
             )
 
@@ -300,7 +322,9 @@ def chunk_text(
             overlap_lines = 0
             overlap_token_count = 0
             for i in range(split_at - 1, chunk_start, -1):
-                overlap_token_count += estimate_tokens(lines[i]) if lines[i].strip() else 1
+                overlap_token_count += (
+                    estimate_tokens(lines[i]) if lines[i].strip() else 1
+                )
                 overlap_lines += 1
                 if overlap_token_count >= overlap_tokens:
                     break

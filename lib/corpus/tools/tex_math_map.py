@@ -16,13 +16,13 @@ The mappings are built from:
 # Only the non-ASCII-mapped slots need fixing.
 # ---------------------------------------------------------------------------
 OML_MAP = {
-    "\u02DB": "α",   # ˛ (ogonek) -> alpha
-    "\u02C7": "β",   # ˇ (caron) -> beta (in italic context)
-    "\u0131": "ι",   # ı (dotless i) -> iota
-    "\u2020": "δ",   # † (dagger) -> delta
-    "\u0152": "ω",   # Œ (OE ligature) -> omega
-    "\u02C6": "θ",   # ˆ (circumflex) -> theta
-    "\uFFFD": "π",   # replacement char -> pi (most common in these docs)
+    "\u02db": "α",  # ˛ (ogonek) -> alpha
+    "\u02c7": "β",  # ˇ (caron) -> beta (in italic context)
+    "\u0131": "ι",  # ı (dotless i) -> iota
+    "\u2020": "δ",  # † (dagger) -> delta
+    "\u0152": "ω",  # Œ (OE ligature) -> omega
+    "\u02c6": "θ",  # ˆ (circumflex) -> theta
+    "\ufffd": "π",  # replacement char -> pi (most common in these docs)
     # Standard ASCII chars in MT2MIT are math italic variables — no change needed:
     # a-z, A-Z, 0-9, . , ; : < > = etc. extract correctly
 }
@@ -32,11 +32,11 @@ OML_MAP = {
 # Same OML encoding but bold — used for vector/matrix notation (β, etc.)
 # ---------------------------------------------------------------------------
 OML_BOLD_MAP = {
-    "\u02C7": "β",   # ˇ -> bold beta (vector of coefficients)
-    "\u02DB": "α",   # ˛ -> bold alpha
-    "\u2020": "δ",   # † -> bold delta
-    "\u0131": "ι",   # ı -> bold iota
-    "\uFFFD": "π",   # replacement char -> bold pi
+    "\u02c7": "β",  # ˇ -> bold beta (vector of coefficients)
+    "\u02db": "α",  # ˛ -> bold alpha
+    "\u2020": "δ",  # † -> bold delta
+    "\u0131": "ι",  # ı -> bold iota
+    "\ufffd": "π",  # replacement char -> bold pi
 }
 
 # ---------------------------------------------------------------------------
@@ -44,21 +44,21 @@ OML_BOLD_MAP = {
 # Mathematical operators and relations
 # ---------------------------------------------------------------------------
 OMS_MAP = {
-    "C": "+",         # slot 67 -> plus
-    "D": "=",         # slot 68 -> equals
-    "j": "|",         # slot 106 -> vertical bar (conditional)
-    "N": "≥",         # slot 78 -> greater-or-equal
-    "O": "≤",         # slot 79 -> less-or-equal
-    "W": "∨",         # slot 87 -> logical or
-    "I": "∩",         # slot 73 -> intersection
-    "!": "∀",         # slot 33 -> for all
-    "3": "∪",         # slot 51 -> union
-    "f": "{",         # slot 102 -> left brace
-    "g": "}",         # slot 103 -> right brace
-    "p": "∈",         # slot 112 -> element of
-    "\u02D9": "·",    # ˙ -> centered dot (multiplication)
-    "\u02DD": "≠",    # ˝ -> not equal
-    "\uFFFD": "−",    # replacement char -> minus sign
+    "C": "+",  # slot 67 -> plus
+    "D": "=",  # slot 68 -> equals
+    "j": "|",  # slot 106 -> vertical bar (conditional)
+    "N": "≥",  # slot 78 -> greater-or-equal
+    "O": "≤",  # slot 79 -> less-or-equal
+    "W": "∨",  # slot 87 -> logical or
+    "I": "∩",  # slot 73 -> intersection
+    "!": "∀",  # slot 33 -> for all
+    "3": "∪",  # slot 51 -> union
+    "f": "{",  # slot 102 -> left brace
+    "g": "}",  # slot 103 -> right brace
+    "p": "∈",  # slot 112 -> element of
+    "\u02d9": "·",  # ˙ -> centered dot (multiplication)
+    "\u02dd": "≠",  # ˝ -> not equal
+    "\ufffd": "−",  # replacement char -> minus sign
 }
 
 # ---------------------------------------------------------------------------
@@ -67,9 +67,9 @@ OMS_MAP = {
 # ---------------------------------------------------------------------------
 OMS_SMALL_MAP = {
     "D": "=",
-    "0": "′",         # prime/transpose mark (common in β'x)
+    "0": "′",  # prime/transpose mark (common in β'x)
     "p": "∈",
-    "\uFFFD": "−",
+    "\ufffd": "−",
 }
 
 # ---------------------------------------------------------------------------
@@ -78,13 +78,13 @@ OMS_SMALL_MAP = {
 # Most extract as garbled — map common ones
 # ---------------------------------------------------------------------------
 EXA_MAP = {
-    "\uFFFD": "",     # large delimiter fragments — drop
-    "\u02C6": "",     # hat/circumflex fragment — drop
-    "P": "(",         # large left paren
-    "p": ")",         # large right paren
-    "b": "]",         # large right bracket
-    "r": "√",         # radical sign
-    "X": "∑",         # summation
+    "\ufffd": "",  # large delimiter fragments — drop
+    "\u02c6": "",  # hat/circumflex fragment — drop
+    "P": "(",  # large left paren
+    "p": ")",  # large right paren
+    "b": "]",  # large right bracket
+    "r": "√",  # radical sign
+    "X": "∑",  # summation
     # Digits in EXA are typically large versions — keep as-is
 }
 
@@ -96,7 +96,7 @@ EXA_MAP = {
 OML_SMALL_MAP = {
     # Subscript letters and digits mostly extract fine
     # Only non-ASCII needs mapping
-    "\uFFFD": "π",
+    "\ufffd": "π",
 }
 
 # ---------------------------------------------------------------------------
@@ -109,15 +109,15 @@ OML_SMALL_MAP = {
 # Font family -> mapping table
 # ---------------------------------------------------------------------------
 FONT_MAPS = {
-    "MT2MIT":  OML_MAP,
-    "MT2MIF":  OML_MAP,       # italic at different size
+    "MT2MIT": OML_MAP,
+    "MT2MIF": OML_MAP,  # italic at different size
     "MT2BMIT": OML_BOLD_MAP,
     "MT2BMIS": OML_BOLD_MAP,  # bold italic small
-    "MT2SYT":  OMS_MAP,
-    "MT2SYF":  OMS_MAP,       # symbol at different size
-    "MT2SYS":  OMS_SMALL_MAP,
-    "MT2EXA":  EXA_MAP,
-    "MT2MIS":  OML_SMALL_MAP,
+    "MT2SYT": OMS_MAP,
+    "MT2SYF": OMS_MAP,  # symbol at different size
+    "MT2SYS": OMS_SMALL_MAP,
+    "MT2EXA": EXA_MAP,
+    "MT2MIS": OML_SMALL_MAP,
 }
 
 

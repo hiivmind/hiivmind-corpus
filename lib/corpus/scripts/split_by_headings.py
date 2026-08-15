@@ -16,6 +16,7 @@ Exit codes:
   2 - file not found
   3 - python error
 """
+
 import argparse
 import json
 import re
@@ -58,7 +59,13 @@ def split_by_headings(
         if match:
             level = len(match.group(1))
             if min_level <= level <= max_level:
-                raw_sections.append({"title": match.group(2).strip(), "level": level, "line_start": i + 1})
+                raw_sections.append(
+                    {
+                        "title": match.group(2).strip(),
+                        "level": level,
+                        "line_start": i + 1,
+                    }
+                )
 
     if not raw_sections:
         return []
@@ -100,10 +107,21 @@ def split_by_headings(
 def parse_args():
     parser = argparse.ArgumentParser(description="Split markdown file by headings")
     parser.add_argument("--file", required=True, help="Path to markdown file")
-    parser.add_argument("--min-level", type=int, default=2, help="Min heading level (default: 2)")
-    parser.add_argument("--max-level", type=int, default=4, help="Max heading level (default: 4)")
-    parser.add_argument("--min-tokens", type=int, default=200, help="Min tokens per section (default: 200)")
-    parser.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
+    parser.add_argument(
+        "--min-level", type=int, default=2, help="Min heading level (default: 2)"
+    )
+    parser.add_argument(
+        "--max-level", type=int, default=4, help="Max heading level (default: 4)"
+    )
+    parser.add_argument(
+        "--min-tokens",
+        type=int,
+        default=200,
+        help="Min tokens per section (default: 200)",
+    )
+    parser.add_argument(
+        "--json", action="store_true", dest="json_output", help="Output as JSON"
+    )
     return parser.parse_args()
 
 
@@ -119,7 +137,9 @@ def main():
         print(json.dumps(sections, indent=2))
     else:
         for s in sections:
-            print(f"{s['anchor']}\tL{s['line_start']}-{s['line_end']}\t{s['token_count']} tokens\t{s['title']}")
+            print(
+                f"{s['anchor']}\tL{s['line_start']}-{s['line_end']}\t{s['token_count']} tokens\t{s['title']}"
+            )
 
 
 if __name__ == "__main__":

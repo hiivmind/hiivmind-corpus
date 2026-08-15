@@ -18,6 +18,7 @@ Exit codes:
   1 - invalid arguments or missing index
   2 - python error
 """
+
 import argparse
 import copy
 import json
@@ -53,7 +54,9 @@ def thin_sections(
     sections_before = len(sections)
     merged_log = []
 
-    sections_by_depth = sorted(sections, key=lambda e: e.get("heading_level", 0), reverse=True)
+    sections_by_depth = sorted(
+        sections, key=lambda e: e.get("heading_level", 0), reverse=True
+    )
     ids_to_remove = set()
 
     for section in sections_by_depth:
@@ -63,7 +66,9 @@ def thin_sections(
         if _has_children(sid, entries):
             continue
 
-        text = (section.get("summary", "") + " " + " ".join(section.get("keywords", []))).strip()
+        text = (
+            section.get("summary", "") + " " + " ".join(section.get("keywords", []))
+        ).strip()
         tokens = estimate_tokens(text)
         if tokens >= min_tokens:
             continue
@@ -72,7 +77,8 @@ def thin_sections(
         source_pfx = _source_prefix(sid)
 
         siblings = [
-            e for e in entries
+            e
+            for e in entries
             if e.get("parent") == parent_id
             and e.get("tier") == "section"
             and _source_prefix(e["id"]) == source_pfx
@@ -85,7 +91,10 @@ def thin_sections(
         for sib in siblings:
             sib_start = (sib.get("line_range") or [0])[0]
             if sib_start < section_start:
-                if prev_sibling is None or sib_start > (prev_sibling.get("line_range") or [0])[0]:
+                if (
+                    prev_sibling is None
+                    or sib_start > (prev_sibling.get("line_range") or [0])[0]
+                ):
                     prev_sibling = sib
 
         if prev_sibling:
@@ -107,17 +116,23 @@ def thin_sections(
         target["keywords"] = list(dict.fromkeys(target_kw + section_kw))
 
         if target.get("line_range") and section.get("line_range"):
-            target["line_range"][1] = max(target["line_range"][1], section["line_range"][1])
+            target["line_range"][1] = max(
+                target["line_range"][1], section["line_range"][1]
+            )
 
         if section.get("summary"):
-            target["summary"] = (target.get("summary", "") + " " + section["summary"]).strip()
+            target["summary"] = (
+                target.get("summary", "") + " " + section["summary"]
+            ).strip()
 
         ids_to_remove.add(sid)
-        merged_log.append({
-            "removed_id": sid,
-            "merged_into": target_id,
-            "reason": f"{tokens} tokens (below {min_tokens} threshold)",
-        })
+        merged_log.append(
+            {
+                "removed_id": sid,
+                "merged_into": target_id,
+                "reason": f"{tokens} tokens (below {min_tokens} threshold)",
+            }
+        )
 
     work["entries"] = [e for e in entries if e["id"] not in ids_to_remove]
     work["meta"]["entry_count"] = len(work["entries"])
@@ -136,8 +151,15 @@ def thin_sections(
 def parse_args():
     parser = argparse.ArgumentParser(description="Thin section entries in index.yaml")
     parser.add_argument("--index", required=True, help="Path to index.yaml")
-    parser.add_argument("--min-tokens", type=int, default=300, help="Min tokens per section (default: 300)")
-    parser.add_argument("--dry-run", action="store_true", help="Show plan without modifying")
+    parser.add_argument(
+        "--min-tokens",
+        type=int,
+        default=300,
+        help="Min tokens per section (default: 300)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show plan without modifying"
+    )
     return parser.parse_args()
 
 
@@ -162,10 +184,16 @@ def main():
     else:
         result = thin_sections(index, args.min_tokens, dry_run=False)
         with open(index_path, "w") as f:
-            yaml.dump(result, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            yaml.dump(
+                result, f, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
         summary = {
-            "sections_before": len([e for e in index.get("entries", []) if e.get("tier") == "section"]),
-            "sections_after": len([e for e in result["entries"] if e.get("tier") == "section"]),
+            "sections_before": len(
+                [e for e in index.get("entries", []) if e.get("tier") == "section"]
+            ),
+            "sections_after": len(
+                [e for e in result["entries"] if e.get("tier") == "section"]
+            ),
             "merged": [],
         }
         print(json.dumps(summary, indent=2))

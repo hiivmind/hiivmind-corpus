@@ -7,6 +7,7 @@ Unit tests (no external deps):
   - Overlap handling
   - Edge cases (empty file, single line, file smaller than target)
 """
+
 import json
 import sys
 from pathlib import Path
@@ -22,20 +23,24 @@ class TestMarkdownStrategy:
     def test_splits_on_headings(self):
         from chunk import chunk_text
 
-        text = "\n".join([
-            "# Introduction",
-            "First paragraph of intro.",
-            "Second paragraph of intro.",
-            "",
-            "## Getting Started",
-            "Content for getting started section.",
-            "More content here with details.",
-            "",
-            "## Advanced Usage",
-            "Advanced content goes here.",
-            "Even more advanced content.",
-        ])
-        chunks = chunk_text(text, strategy="markdown", target_tokens=20, overlap_tokens=0)
+        text = "\n".join(
+            [
+                "# Introduction",
+                "First paragraph of intro.",
+                "Second paragraph of intro.",
+                "",
+                "## Getting Started",
+                "Content for getting started section.",
+                "More content here with details.",
+                "",
+                "## Advanced Usage",
+                "Advanced content goes here.",
+                "Even more advanced content.",
+            ]
+        )
+        chunks = chunk_text(
+            text, strategy="markdown", target_tokens=20, overlap_tokens=0
+        )
         assert len(chunks) >= 2
         assert "text" in chunks[0]
         assert "line_range" in chunks[0]
@@ -48,7 +53,9 @@ class TestMarkdownStrategy:
 
         lines = [f"Line {i} with some content to fill space." for i in range(100)]
         text = "\n".join(lines)
-        chunks = chunk_text(text, strategy="markdown", target_tokens=50, overlap_tokens=0)
+        chunks = chunk_text(
+            text, strategy="markdown", target_tokens=50, overlap_tokens=0
+        )
         for c in chunks:
             word_count = len(c["text"].split())
             assert word_count < 150, f"Chunk too large: {word_count} words"
@@ -62,7 +69,9 @@ class TestMarkdownStrategy:
             lines.extend([f"Content line {i}-{j}." for j in range(10)])
             lines.append("")
         text = "\n".join(lines)
-        chunks = chunk_text(text, strategy="markdown", target_tokens=30, overlap_tokens=10)
+        chunks = chunk_text(
+            text, strategy="markdown", target_tokens=30, overlap_tokens=10
+        )
         if len(chunks) >= 2:
             assert chunks[1].get("overlap_prev", False) is True
 
@@ -70,14 +79,18 @@ class TestMarkdownStrategy:
         from chunk import chunk_text
 
         text = "Just a small file.\nWith two lines."
-        chunks = chunk_text(text, strategy="markdown", target_tokens=900, overlap_tokens=100)
+        chunks = chunk_text(
+            text, strategy="markdown", target_tokens=900, overlap_tokens=100
+        )
         assert len(chunks) == 1
         assert chunks[0]["line_range"] == [1, 2]
 
     def test_empty_file_returns_empty(self):
         from chunk import chunk_text
 
-        chunks = chunk_text("", strategy="markdown", target_tokens=900, overlap_tokens=100)
+        chunks = chunk_text(
+            "", strategy="markdown", target_tokens=900, overlap_tokens=100
+        )
         assert chunks == []
 
 
@@ -87,35 +100,43 @@ class TestTranscriptStrategy:
     def test_splits_on_speaker_turns(self):
         from chunk import chunk_text
 
-        text = "\n".join([
-            "Alice: Hello everyone, let's get started with the meeting.",
-            "Alice: First item on the agenda is the Q3 review.",
-            "",
-            "Bob: Thanks Alice. The numbers look good this quarter.",
-            "Bob: Revenue is up 15% compared to last quarter.",
-            "",
-            "Charlie: I have some concerns about the infrastructure costs.",
-            "Charlie: We need to discuss the cloud spending.",
-        ])
-        chunks = chunk_text(text, strategy="transcript", target_tokens=20, overlap_tokens=0)
+        text = "\n".join(
+            [
+                "Alice: Hello everyone, let's get started with the meeting.",
+                "Alice: First item on the agenda is the Q3 review.",
+                "",
+                "Bob: Thanks Alice. The numbers look good this quarter.",
+                "Bob: Revenue is up 15% compared to last quarter.",
+                "",
+                "Charlie: I have some concerns about the infrastructure costs.",
+                "Charlie: We need to discuss the cloud spending.",
+            ]
+        )
+        chunks = chunk_text(
+            text, strategy="transcript", target_tokens=20, overlap_tokens=0
+        )
         assert len(chunks) >= 2
 
     def test_splits_on_timestamps(self):
         from chunk import chunk_text
 
-        text = "\n".join([
-            "[00:00:00] Meeting started",
-            "Discussion about project timeline.",
-            "More discussion here.",
-            "",
-            "[00:15:00] Moving to next topic",
-            "Budget review discussion.",
-            "More budget details.",
-            "",
-            "[00:30:00] Action items",
-            "List of things to do.",
-        ])
-        chunks = chunk_text(text, strategy="transcript", target_tokens=20, overlap_tokens=0)
+        text = "\n".join(
+            [
+                "[00:00:00] Meeting started",
+                "Discussion about project timeline.",
+                "More discussion here.",
+                "",
+                "[00:15:00] Moving to next topic",
+                "Budget review discussion.",
+                "More budget details.",
+                "",
+                "[00:30:00] Action items",
+                "List of things to do.",
+            ]
+        )
+        chunks = chunk_text(
+            text, strategy="transcript", target_tokens=20, overlap_tokens=0
+        )
         assert len(chunks) >= 2
 
 
@@ -129,7 +150,9 @@ class TestParagraphStrategy:
         for i in range(10):
             paragraphs.append(f"Paragraph {i} with enough content to matter. " * 5)
         text = "\n\n".join(paragraphs)
-        chunks = chunk_text(text, strategy="paragraph", target_tokens=50, overlap_tokens=0)
+        chunks = chunk_text(
+            text, strategy="paragraph", target_tokens=50, overlap_tokens=0
+        )
         assert len(chunks) >= 2
 
 
@@ -139,19 +162,21 @@ class TestCodeStrategy:
     def test_splits_on_function_definitions(self):
         from chunk import chunk_text
 
-        text = "\n".join([
-            "def hello():",
-            "    print('hello')",
-            "    print('world')",
-            "",
-            "def goodbye():",
-            "    print('goodbye')",
-            "    print('world')",
-            "",
-            "class MyClass:",
-            "    def method(self):",
-            "        pass",
-        ])
+        text = "\n".join(
+            [
+                "def hello():",
+                "    print('hello')",
+                "    print('world')",
+                "",
+                "def goodbye():",
+                "    print('goodbye')",
+                "    print('world')",
+                "",
+                "class MyClass:",
+                "    def method(self):",
+                "        pass",
+            ]
+        )
         chunks = chunk_text(text, strategy="code", target_tokens=10, overlap_tokens=0)
         assert len(chunks) >= 2
 
@@ -164,7 +189,9 @@ class TestLineRanges:
 
         lines = [f"Line {i}" for i in range(50)]
         text = "\n".join(lines)
-        chunks = chunk_text(text, strategy="paragraph", target_tokens=20, overlap_tokens=0)
+        chunks = chunk_text(
+            text, strategy="paragraph", target_tokens=20, overlap_tokens=0
+        )
 
         for i in range(len(chunks) - 1):
             current_end = chunks[i]["line_range"][1]
@@ -176,7 +203,9 @@ class TestLineRanges:
 
         lines = [f"Line {i}" for i in range(50)]
         text = "\n".join(lines)
-        chunks = chunk_text(text, strategy="paragraph", target_tokens=20, overlap_tokens=0)
+        chunks = chunk_text(
+            text, strategy="paragraph", target_tokens=20, overlap_tokens=0
+        )
 
         assert chunks[0]["line_range"][0] == 1
         assert chunks[-1]["line_range"][1] == 50
@@ -192,10 +221,18 @@ class TestCLI:
         doc.write_text("# Title\n\nSome content.\n\n## Section\n\nMore content.\n")
 
         result = subprocess.run(
-            [sys.executable, "lib/corpus/scripts/chunk.py",
-             str(doc), "--strategy", "markdown",
-             "--target-tokens", "10", "--json"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                "lib/corpus/scripts/chunk.py",
+                str(doc),
+                "--strategy",
+                "markdown",
+                "--target-tokens",
+                "10",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -208,8 +245,14 @@ class TestCLI:
         import subprocess
 
         result = subprocess.run(
-            [sys.executable, "lib/corpus/scripts/chunk.py",
-             "/nonexistent/file.md", "--strategy", "markdown"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                "lib/corpus/scripts/chunk.py",
+                "/nonexistent/file.md",
+                "--strategy",
+                "markdown",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 2
