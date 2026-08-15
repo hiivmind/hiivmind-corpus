@@ -12,6 +12,7 @@ Set HIIVMIND_CORPUS_NO_MODEL=1 to force the word-count approximation and
 skip loading fastembed entirely (avoids a ~90MB model download when only a
 rough token estimate is needed, e.g. in CI).
 """
+
 import os
 
 TOKENS_PER_WORD = 1.3

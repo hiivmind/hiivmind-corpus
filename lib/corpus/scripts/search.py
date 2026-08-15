@@ -15,6 +15,7 @@ Exit codes:
   3 - other error
   4 - model mismatch
 """
+
 import argparse
 import json
 import sys
@@ -112,8 +113,7 @@ def main():
         from fastembed import TextEmbedding
     except ImportError:
         print(
-            "Error: fastembed not installed. "
-            "Run: pip install fastembed lancedb pyyaml",
+            "Error: fastembed not installed. Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -122,8 +122,7 @@ def main():
         import lancedb
     except ImportError:
         print(
-            "Error: lancedb not installed. "
-            "Run: pip install fastembed lancedb pyyaml",
+            "Error: lancedb not installed. Run: pip install fastembed lancedb pyyaml",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -154,13 +153,19 @@ def main():
     if args.hybrid:
         try:
             from lancedb.rerank import RRFReranker
+
             search = (
-                table.search(args.query, query_type="hybrid", fts_columns=args.text_column)
+                table.search(
+                    args.query, query_type="hybrid", fts_columns=args.text_column
+                )
                 .rerank(reranker=RRFReranker())
                 .limit(args.top_k)
             )
         except ImportError:
-            print("Warning: RRFReranker not available, falling back to vector search", file=sys.stderr)
+            print(
+                "Warning: RRFReranker not available, falling back to vector search",
+                file=sys.stderr,
+            )
             search = (
                 table.search(query_embedding.tolist(), vector_column_name="vector")
                 .metric("cosine")
@@ -179,6 +184,7 @@ def main():
     if args.rerank:
         try:
             from lancedb.rerank import CrossEncoderReranker
+
             search = search.rerank(reranker=CrossEncoderReranker())
         except ImportError:
             print("Warning: reranking not available", file=sys.stderr)

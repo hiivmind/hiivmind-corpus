@@ -26,9 +26,11 @@ except ImportError:
 # Data types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TextBlock:
     """A block of text extracted from a PDF page with font metadata."""
+
     text: str
     font: str
     size: float
@@ -55,6 +57,7 @@ class TextBlock:
 @dataclass
 class TocEntry:
     """A table-of-contents entry from PDF bookmarks."""
+
     level: int
     title: str
     page: int  # 0-indexed
@@ -63,6 +66,7 @@ class TocEntry:
 @dataclass
 class ChapterBoundary:
     """A detected chapter with page boundaries."""
+
     index: int
     title: str
     start_page: int  # 0-indexed
@@ -81,6 +85,7 @@ class ChapterBoundary:
 @dataclass
 class CrossRef:
     """A cross-reference found in document text."""
+
     original_text: str
     ref_type: str  # "chapter_reference", "section_reference", "see_reference"
     display_text: str
@@ -90,6 +95,7 @@ class CrossRef:
 @dataclass
 class FontInfo:
     """Summary of a font used in the document."""
+
     name: str
     size: float
     flags: int
@@ -100,6 +106,7 @@ class FontInfo:
 # Document analysis
 # ---------------------------------------------------------------------------
 
+
 def open_pdf(path: str | Path) -> pymupdf.Document:
     """Open a PDF document."""
     return pymupdf.open(str(path))
@@ -108,7 +115,9 @@ def open_pdf(path: str | Path) -> pymupdf.Document:
 def get_toc(doc: pymupdf.Document) -> list[TocEntry]:
     """Extract table of contents from PDF bookmarks."""
     raw_toc = doc.get_toc()
-    return [TocEntry(level=lvl, title=title, page=page - 1) for lvl, title, page in raw_toc]
+    return [
+        TocEntry(level=lvl, title=title, page=page - 1) for lvl, title, page in raw_toc
+    ]
 
 
 def get_page_count(doc: pymupdf.Document) -> int:
@@ -119,6 +128,7 @@ def get_page_count(doc: pymupdf.Document) -> int:
 # ---------------------------------------------------------------------------
 # Text extraction
 # ---------------------------------------------------------------------------
+
 
 def extract_text_blocks(page: pymupdf.Page) -> list[TextBlock]:
     """Extract text blocks from a page with font metadata.
@@ -137,14 +147,16 @@ def extract_text_blocks(page: pymupdf.Page) -> list[TextBlock]:
                 text = span.get("text", "").strip()
                 if not text:
                     continue
-                blocks.append(TextBlock(
-                    text=text,
-                    font=span.get("font", ""),
-                    size=round(span.get("size", 0), 1),
-                    flags=span.get("flags", 0),
-                    bbox=tuple(span.get("bbox", (0, 0, 0, 0))),
-                    page_num=page.number,
-                ))
+                blocks.append(
+                    TextBlock(
+                        text=text,
+                        font=span.get("font", ""),
+                        size=round(span.get("size", 0), 1),
+                        flags=span.get("flags", 0),
+                        bbox=tuple(span.get("bbox", (0, 0, 0, 0))),
+                        page_num=page.number,
+                    )
+                )
     return blocks
 
 
@@ -188,18 +200,23 @@ def strip_headers_footers(
 # Font analysis
 # ---------------------------------------------------------------------------
 
+
 def _aggregate_font_info(blocks: list[TextBlock]) -> dict[str, FontInfo]:
     """Aggregate font usage statistics from text blocks."""
     fonts: dict[str, FontInfo] = {}
     for block in blocks:
         key = f"{block.font}:{block.size}"
         if key not in fonts:
-            fonts[key] = FontInfo(name=block.font, size=block.size, flags=block.flags, count=0)
+            fonts[key] = FontInfo(
+                name=block.font, size=block.size, flags=block.flags, count=0
+            )
         fonts[key].count += 1
     return fonts
 
 
-def analyze_fonts(doc: pymupdf.Document, sample_page_nums: list[int] | None = None) -> dict[str, FontInfo]:
+def analyze_fonts(
+    doc: pymupdf.Document, sample_page_nums: list[int] | None = None
+) -> dict[str, FontInfo]:
     """Analyze font usage across sample pages.
 
     Args:
@@ -224,7 +241,10 @@ def analyze_fonts(doc: pymupdf.Document, sample_page_nums: list[int] | None = No
 # Chapter detection
 # ---------------------------------------------------------------------------
 
-def detect_chapters_from_toc(doc: pymupdf.Document, level: int = 1) -> list[ChapterBoundary]:
+
+def detect_chapters_from_toc(
+    doc: pymupdf.Document, level: int = 1
+) -> list[ChapterBoundary]:
     """Detect chapters from PDF TOC bookmarks.
 
     Args:
@@ -262,12 +282,14 @@ def detect_chapters_from_toc_entries(
     chapters = []
     for i, (title, start) in enumerate(filtered):
         end = filtered[i + 1][1] if i + 1 < len(filtered) else total_pages
-        chapters.append(ChapterBoundary(
-            index=i + 1,
-            title=title,
-            start_page=start,
-            end_page=end,
-        ))
+        chapters.append(
+            ChapterBoundary(
+                index=i + 1,
+                title=title,
+                start_page=start,
+                end_page=end,
+            )
+        )
     return chapters
 
 
@@ -296,9 +318,11 @@ def detect_chapters_from_fonts(
     for page_num in range(len(doc)):
         blocks = extract_text_blocks(doc[page_num])
         for block in blocks:
-            if (block.bbox[1] <= top_zone
-                    and block.size >= h1_size_min
-                    and h1_font.lower() in block.font.lower()):
+            if (
+                block.bbox[1] <= top_zone
+                and block.size >= h1_size_min
+                and h1_font.lower() in block.font.lower()
+            ):
                 chapter_starts.append((block.text.strip(), page_num))
                 break  # only first match per page
 
@@ -309,18 +333,21 @@ def detect_chapters_from_fonts(
     chapters = []
     for i, (title, start) in enumerate(chapter_starts):
         end = chapter_starts[i + 1][1] if i + 1 < len(chapter_starts) else total
-        chapters.append(ChapterBoundary(
-            index=i + 1,
-            title=title,
-            start_page=start,
-            end_page=end,
-        ))
+        chapters.append(
+            ChapterBoundary(
+                index=i + 1,
+                title=title,
+                start_page=start,
+                end_page=end,
+            )
+        )
     return chapters
 
 
 # ---------------------------------------------------------------------------
 # Markdown emission
 # ---------------------------------------------------------------------------
+
 
 def emit_heading(text: str, level: int) -> str:
     """Emit a markdown heading."""
@@ -383,6 +410,7 @@ def _yaml_quote(value: Any) -> str:
 # Cross-reference handling
 # ---------------------------------------------------------------------------
 
+
 def find_cross_references(text: str, patterns: list[tuple[str, str]]) -> list[CrossRef]:
     """Find cross-references in text using regex patterns.
 
@@ -399,19 +427,23 @@ def find_cross_references(text: str, patterns: list[tuple[str, str]]) -> list[Cr
         for match in re.finditer(pattern, text):
             groups = match.groups()
             if ref_type == "chapter_reference" and len(groups) >= 3:
-                refs.append(CrossRef(
-                    original_text=match.group(0),
-                    ref_type=ref_type,
-                    display_text=groups[1].rstrip(",").strip(),
-                    page_number=int(groups[2]),
-                ))
+                refs.append(
+                    CrossRef(
+                        original_text=match.group(0),
+                        ref_type=ref_type,
+                        display_text=groups[1].rstrip(",").strip(),
+                        page_number=int(groups[2]),
+                    )
+                )
             elif len(groups) >= 2:
-                refs.append(CrossRef(
-                    original_text=match.group(0),
-                    ref_type=ref_type,
-                    display_text=groups[0],
-                    page_number=int(groups[1]),
-                ))
+                refs.append(
+                    CrossRef(
+                        original_text=match.group(0),
+                        ref_type=ref_type,
+                        display_text=groups[0],
+                        page_number=int(groups[1]),
+                    )
+                )
     return refs
 
 
@@ -444,6 +476,7 @@ def make_wikilink(target_file: str, display_text: str) -> str:
 # File output
 # ---------------------------------------------------------------------------
 
+
 def write_chapter_markdown(path: Path, frontmatter: dict[str, Any], body: str) -> None:
     """Write a markdown file with YAML frontmatter."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -462,6 +495,7 @@ def sanitize_filename(title: str, max_length: int = 50) -> str:
 # Text post-processing
 # ---------------------------------------------------------------------------
 
+
 def dehyphenate(text: str) -> str:
     """Fix words split across lines with hyphens.
 
@@ -475,6 +509,7 @@ def dehyphenate(text: str) -> str:
 # ---------------------------------------------------------------------------
 # Table post-processing (for pymupdf4llm table data)
 # ---------------------------------------------------------------------------
+
 
 def split_subtables(extract: list[list]) -> list[list[list]]:
     """Split extracted table rows on all-empty rows into sub-tables.
@@ -616,7 +651,9 @@ def strip_empty_columns(
     num_cols = len(headers)
     keep = []
     for col_idx in range(num_cols):
-        col_vals = [headers[col_idx]] + [row[col_idx] for row in rows if col_idx < len(row)]
+        col_vals = [headers[col_idx]] + [
+            row[col_idx] for row in rows if col_idx < len(row)
+        ]
         if any(v.strip() for v in col_vals):
             keep.append(col_idx)
     if not keep:
@@ -682,9 +719,8 @@ def emit_layout_table(table_data: dict) -> str:
 
         # Quality check — fall back to code block if too sparse or too wide
         total_cells = len(headers) + sum(len(r) for r in rows)
-        empty_cells = (
-            sum(1 for h in headers if not h.strip())
-            + sum(1 for r in rows for c in r if not c.strip())
+        empty_cells = sum(1 for h in headers if not h.strip()) + sum(
+            1 for r in rows for c in r if not c.strip()
         )
         too_sparse = total_cells > 0 and empty_cells / total_cells > 0.5
         too_wide = len(headers) > 8

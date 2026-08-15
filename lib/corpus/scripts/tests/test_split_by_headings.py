@@ -1,4 +1,5 @@
 """Tests for split_by_headings.py — heading-based file splitting."""
+
 import json
 import subprocess
 import sys
@@ -32,7 +33,9 @@ class TestSplitByHeadings:
         assert result[1]["line_end"] == 6
 
     def test_anchor_generation(self):
-        text = "## Getting Started Guide\nContent.\n\n## API (v2) Reference!\nContent.\n"
+        text = (
+            "## Getting Started Guide\nContent.\n\n## API (v2) Reference!\nContent.\n"
+        )
         result = split_by_headings(text, min_level=2, max_level=4, min_tokens=0)
         assert result[0]["anchor"] == "getting-started-guide"
         assert result[1]["anchor"] == "api-v2-reference"
@@ -55,7 +58,13 @@ class TestSplitByHeadings:
         assert all(2 <= l <= 3 for l in levels)
 
     def test_merges_small_sections(self):
-        text = "## Big Section\n" + "Word " * 200 + "\n\n## Tiny\nOne line.\n\n## Another Big\n" + "Word " * 200 + "\n"
+        text = (
+            "## Big Section\n"
+            + "Word " * 200
+            + "\n\n## Tiny\nOne line.\n\n## Another Big\n"
+            + "Word " * 200
+            + "\n"
+        )
         result = split_by_headings(text, min_level=2, max_level=4, min_tokens=100)
         titles = [r["title"] for r in result]
         assert "Tiny" not in titles
@@ -77,9 +86,17 @@ class TestSplitByHeadingsCLI:
         md = tmp_path / "test.md"
         md.write_text("## Section\nContent.\n")
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "split_by_headings.py"),
-             "--file", str(md), "--json", "--min-tokens", "0"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "split_by_headings.py"),
+                "--file",
+                str(md),
+                "--json",
+                "--min-tokens",
+                "0",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -87,9 +104,15 @@ class TestSplitByHeadingsCLI:
 
     def test_cli_missing_file(self):
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "split_by_headings.py"),
-             "--file", "/nonexistent.md", "--json"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "split_by_headings.py"),
+                "--file",
+                "/nonexistent.md",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 2
 
@@ -97,9 +120,16 @@ class TestSplitByHeadingsCLI:
         md = tmp_path / "test.md"
         md.write_text("## First\nContent.\n\n## Second\nMore.\n")
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "split_by_headings.py"),
-             "--file", str(md), "--min-tokens", "0"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "split_by_headings.py"),
+                "--file",
+                str(md),
+                "--min-tokens",
+                "0",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "first" in result.stdout  # anchor

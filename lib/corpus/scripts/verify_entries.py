@@ -18,6 +18,7 @@ Exit codes:
   1 - invalid arguments or missing index
   2 - python error
 """
+
 import argparse
 import json
 import random
@@ -61,6 +62,7 @@ def _load_docs_roots(config_path: str | None) -> dict[str, str]:
         return {}
     try:
         import yaml
+
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
     except Exception:
@@ -75,7 +77,9 @@ def _load_docs_roots(config_path: str | None) -> dict[str, str]:
     return roots
 
 
-def _resolve_entry_file(source_root: Path, entry: dict, docs_roots: dict[str, str]) -> Path | None:
+def _resolve_entry_file(
+    source_root: Path, entry: dict, docs_roots: dict[str, str]
+) -> Path | None:
     """Resolve the on-disk file for an index entry.
 
     v2 schema: entry has source (id) + path (relative). Candidates in order:
@@ -145,28 +149,59 @@ def extract_previews(
             preview = None
             token_count = 0
 
-        result.append({
-            "entry_id": entry_id, "title": title, "summary": summary,
-            "source_path": source_path, "content_preview": preview, "token_count": token_count,
-        })
+        result.append(
+            {
+                "entry_id": entry_id,
+                "title": title,
+                "summary": summary,
+                "source_path": source_path,
+                "content_preview": preview,
+                "token_count": token_count,
+            }
+        )
     return result
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Extract content previews for entry verification")
+    parser = argparse.ArgumentParser(
+        description="Extract content previews for entry verification"
+    )
     parser.add_argument("--index", required=True, help="Path to index.yaml")
-    parser.add_argument("--source-root", required=True, help="Path to source root directory")
-    parser.add_argument("--config", default=None, help="Path to config.yaml (for per-source docs_root)")
-    parser.add_argument("--token-limit", type=int, default=500, help="Max tokens per preview (default: 500)")
-    parser.add_argument("--sample", type=int, default=None, help="Random sample N entries (default: all)")
-    parser.add_argument("--entries", default=None, help="Comma-separated entry IDs to verify")
+    parser.add_argument(
+        "--source-root", required=True, help="Path to source root directory"
+    )
+    parser.add_argument(
+        "--config", default=None, help="Path to config.yaml (for per-source docs_root)"
+    )
+    parser.add_argument(
+        "--token-limit",
+        type=int,
+        default=500,
+        help="Max tokens per preview (default: 500)",
+    )
+    parser.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        help="Random sample N entries (default: all)",
+    )
+    parser.add_argument(
+        "--entries", default=None, help="Comma-separated entry IDs to verify"
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     entry_ids = args.entries.split(",") if args.entries else None
-    result = extract_previews(args.index, args.source_root, token_limit=args.token_limit, sample=args.sample, entry_ids=entry_ids, config_path=args.config)
+    result = extract_previews(
+        args.index,
+        args.source_root,
+        token_limit=args.token_limit,
+        sample=args.sample,
+        entry_ids=entry_ids,
+        config_path=args.config,
+    )
     print(json.dumps(result, indent=2))
 
 

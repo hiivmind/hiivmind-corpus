@@ -1,4 +1,5 @@
 """Tests for detect_large_files.py — large file detection."""
+
 import json
 import subprocess
 import sys
@@ -16,7 +17,9 @@ def docs_dir(tmp_path):
     (tmp_path / "small.md").write_text("# Small\n\nJust a small file.\n")
     large_content = "# Large File\n\n"
     for i in range(20):
-        large_content += f"## Section {i}\n\n" + f"Content for section {i}. " * 10 + "\n\n"
+        large_content += (
+            f"## Section {i}\n\n" + f"Content for section {i}. " * 10 + "\n\n"
+        )
     (tmp_path / "large_with_headings.md").write_text(large_content)
     plain_content = "Just a very long file.\n" * 100
     (tmp_path / "large_plain.md").write_text(plain_content)
@@ -60,9 +63,16 @@ class TestDetectLargeFiles:
 class TestDetectLargeFilesCLI:
     def test_cli_json_output(self, docs_dir):
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "detect_large_files.py"),
-             "--source-root", str(docs_dir), "--max-tokens", "50"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "detect_large_files.py"),
+                "--source-root",
+                str(docs_dir),
+                "--max-tokens",
+                "50",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -70,9 +80,14 @@ class TestDetectLargeFilesCLI:
 
     def test_cli_nonexistent_dir(self):
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "detect_large_files.py"),
-             "--source-root", "/nonexistent"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "detect_large_files.py"),
+                "--source-root",
+                "/nonexistent",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)

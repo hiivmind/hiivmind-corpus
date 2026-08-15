@@ -49,7 +49,9 @@ def _model_cache_status() -> str:
     """
     try:
         env_path = os.environ.get("FASTEMBED_CACHE_PATH")
-        cache_path = Path(env_path) if env_path else Path.home() / ".cache" / "fastembed"
+        cache_path = (
+            Path(env_path) if env_path else Path.home() / ".cache" / "fastembed"
+        )
         model_dirs = list(cache_path.glob("*bge-small*")) if cache_path.exists() else []
         return "ready" if model_dirs else "no-model"
     except Exception:

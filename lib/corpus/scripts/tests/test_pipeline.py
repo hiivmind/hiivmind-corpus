@@ -3,6 +3,7 @@
 Tests that scripts compose correctly when used in sequence,
 as the source-scanner agent would use them.
 """
+
 import json
 import subprocess
 import sys
@@ -36,9 +37,16 @@ class TestLargeFileSplittingPipeline:
         """detect_large_files finds the file, split_by_headings splits it."""
         # Step 1: detect large files
         r1 = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "detect_large_files.py"),
-             "--source-root", str(source_with_large_file), "--max-tokens", "100"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "detect_large_files.py"),
+                "--source-root",
+                str(source_with_large_file),
+                "--max-tokens",
+                "100",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert r1.returncode == 0
         large_files = json.loads(r1.stdout)
@@ -52,9 +60,17 @@ class TestLargeFileSplittingPipeline:
         # Step 2: split the large file by headings
         api_path = source_with_large_file / api_entry[0]["path"]
         r2 = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "split_by_headings.py"),
-             "--file", str(api_path), "--min-tokens", "0", "--json"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "split_by_headings.py"),
+                "--file",
+                str(api_path),
+                "--min-tokens",
+                "0",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert r2.returncode == 0
         sections = json.loads(r2.stdout)
@@ -71,9 +87,16 @@ class TestLargeFileSplittingPipeline:
     def test_small_files_not_split(self, source_with_large_file):
         """Small files should not appear in detect_large_files output."""
         r = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "detect_large_files.py"),
-             "--source-root", str(source_with_large_file), "--max-tokens", "100"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "detect_large_files.py"),
+                "--source-root",
+                str(source_with_large_file),
+                "--max-tokens",
+                "100",
+            ],
+            capture_output=True,
+            text=True,
         )
         large_files = json.loads(r.stdout)
         paths = [f["path"] for f in large_files]
@@ -83,9 +106,19 @@ class TestLargeFileSplittingPipeline:
         """Sections from split_by_headings should not have gaps."""
         api_path = source_with_large_file / "api.md"
         r = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "split_by_headings.py"),
-             "--file", str(api_path), "--min-level", "2", "--min-tokens", "0", "--json"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "split_by_headings.py"),
+                "--file",
+                str(api_path),
+                "--min-level",
+                "2",
+                "--min-tokens",
+                "0",
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
         )
         sections = json.loads(r.stdout)
         if len(sections) >= 2:
@@ -100,20 +133,21 @@ class TestNavDetectToScanPipeline:
     def test_nav_hierarchy_paths_are_resolvable(self, tmp_path):
         """Paths in nav hierarchy should point to real files."""
         mkdocs = tmp_path / "mkdocs.yml"
-        mkdocs.write_text(
-            "nav:\n"
-            "  - Home: index.md\n"
-            "  - Guide: guide/start.md\n"
-        )
+        mkdocs.write_text("nav:\n  - Home: index.md\n  - Guide: guide/start.md\n")
         (tmp_path / "index.md").write_text("# Home")
         guide = tmp_path / "guide"
         guide.mkdir()
         (guide / "start.md").write_text("# Guide")
 
         r = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "detect_nav.py"),
-             "--source-root", str(tmp_path)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(SCRIPTS_DIR / "detect_nav.py"),
+                "--source-root",
+                str(tmp_path),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert r.returncode == 0
         result = json.loads(r.stdout)

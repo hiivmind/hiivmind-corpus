@@ -8,6 +8,7 @@ Unit tests (no external deps):
   - Missing files handling
   - No nav file found
 """
+
 import json
 import os
 import subprocess
@@ -64,11 +65,7 @@ class TestParseMkdocsNav:
 
     def test_missing_files_still_parsed(self, tmp_path):
         mkdocs = tmp_path / "mkdocs.yml"
-        mkdocs.write_text(
-            "nav:\n"
-            "  - Exists: exists.md\n"
-            "  - Missing: missing.md\n"
-        )
+        mkdocs.write_text("nav:\n  - Exists: exists.md\n  - Missing: missing.md\n")
         (tmp_path / "exists.md").write_text("# Exists")
 
         result = parse_mkdocs_nav(mkdocs, tmp_path)
@@ -80,11 +77,7 @@ class TestParseSidebarMd:
 
     def test_flat_sidebar(self, tmp_path):
         sidebar = tmp_path / "_sidebar.md"
-        sidebar.write_text(
-            "- [Home](index.md)\n"
-            "- [Guide](guide.md)\n"
-            "- [API](api.md)\n"
-        )
+        sidebar.write_text("- [Home](index.md)\n- [Guide](guide.md)\n- [API](api.md)\n")
         for name in ["index.md", "guide.md", "api.md"]:
             (tmp_path / name).write_text(f"# {name}")
 
@@ -122,10 +115,7 @@ class TestDetectNav:
     def test_mkdocs_detected(self, tmp_path):
         mkdocs = tmp_path / "mkdocs.yml"
         mkdocs.write_text(
-            "site_name: Test\n"
-            "nav:\n"
-            "  - Home: index.md\n"
-            "  - About: about.md\n"
+            "site_name: Test\nnav:\n  - Home: index.md\n  - About: about.md\n"
         )
         (tmp_path / "index.md").write_text("# Home")
         (tmp_path / "about.md").write_text("# About")
@@ -138,11 +128,7 @@ class TestDetectNav:
 
     def test_coverage_calculation(self, tmp_path):
         mkdocs = tmp_path / "mkdocs.yml"
-        mkdocs.write_text(
-            "nav:\n"
-            "  - Home: index.md\n"
-            "  - Missing: missing.md\n"
-        )
+        mkdocs.write_text("nav:\n  - Home: index.md\n  - Missing: missing.md\n")
         (tmp_path / "index.md").write_text("# Home")
         (tmp_path / "extra.md").write_text("# Extra")
 
@@ -180,9 +166,14 @@ class TestDetectNavCLI:
         mkdocs.write_text("nav:\n  - Home: index.md\n")
         (tmp_path / "index.md").write_text("# Home")
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py"),
-             "--source-root", str(tmp_path)],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "detect_nav.py"),
+                "--source-root",
+                str(tmp_path),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -190,9 +181,14 @@ class TestDetectNavCLI:
 
     def test_cli_nonexistent_dir(self):
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py"),
-             "--source-root", "/nonexistent/path"],
-            capture_output=True, text=True,
+            [
+                sys.executable,
+                str(Path(__file__).parent.parent / "detect_nav.py"),
+                "--source-root",
+                "/nonexistent/path",
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0  # not found is not an error
         data = json.loads(result.stdout)
@@ -201,6 +197,7 @@ class TestDetectNavCLI:
     def test_cli_missing_arg(self):
         result = subprocess.run(
             [sys.executable, str(Path(__file__).parent.parent / "detect_nav.py")],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode != 0

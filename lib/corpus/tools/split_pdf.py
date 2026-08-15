@@ -18,6 +18,7 @@ Requirements:
 """
 
 import warnings
+
 warnings.warn(
     "split_pdf.py is deprecated. Use the three-stage PDF extraction pipeline instead. "
     "See lib/corpus/patterns/sources/pdf.md for the new workflow.",
@@ -146,7 +147,9 @@ def display_chapters(chapters: list[Chapter], input_path: str) -> None:
 
     for ch in chapters:
         title = ch.title[:42] + "..." if len(ch.title) > 45 else ch.title
-        print(f"  {ch.index:>3}  {title:<45} {ch.page_range:>10} {ch.page_count:>8} pages")
+        print(
+            f"  {ch.index:>3}  {title:<45} {ch.page_range:>10} {ch.page_count:>8} pages"
+        )
     print()
 
 
@@ -170,9 +173,7 @@ def sanitize_filename(title: str, max_length: int = 50) -> str:
     return safe[:max_length].strip("_")
 
 
-def split_pdf(
-    input_path: str, chapters: list[Chapter], output_dir: Path
-) -> list[Path]:
+def split_pdf(input_path: str, chapters: list[Chapter], output_dir: Path) -> list[Path]:
     """
     Execute the split, creating chapter PDFs and manifest.
 
