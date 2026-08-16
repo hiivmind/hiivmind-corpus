@@ -7,7 +7,9 @@ requires-python = ">=3.10"
 # dependency-coherence relationship for the F11 dependency-bump handoff
 # feature's live-proof (see hiivmind-pulse-gh docs/superpowers/plans/
 # 2026-08-15-dependency-bump-handoff.md, Task 9 Step 5).
-dependencies = ["pydantic>=2.9,<2.11"]
+dependencies = [
+    "pydantic==2.13.4",
+]
 
 [dependency-groups]
 dev = [
