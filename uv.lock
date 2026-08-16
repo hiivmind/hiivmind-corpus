@@ -288,9 +288,6 @@ wheels = [
 name = "hiivmind-corpus-dev"
 version = "0.0.0"
 source = { virtual = "." }
-dependencies = [
-    { name = "pydantic" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -305,7 +302,6 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = "==2.13.4" }]
 
 [package.metadata.requires-dev]
 dev = [

@@ -3,13 +3,7 @@ name = "hiivmind-corpus-dev"
 version = "0.0.0"
 description = "Dev/test environment for hiivmind-corpus plugin scripts (the scripts themselves are PEP 723 self-contained)"
 requires-python = ">=3.10"
-# pydantic: shared with hiivmind/agent-kernel to establish a real fleet
-# dependency-coherence relationship for the F11 dependency-bump handoff
-# feature's live-proof (see hiivmind-pulse-gh docs/superpowers/plans/
-# 2026-08-15-dependency-bump-handoff.md, Task 9 Step 5).
-dependencies = [
-    "pydantic==2.13.4",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
