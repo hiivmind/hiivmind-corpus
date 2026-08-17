@@ -9,9 +9,12 @@ description: >
 
 # Corpus Status (Headless)
 
-Read-only freshness snapshot of ONE corpus, written as a machine-readable
-result file. Designed as a cheap pre-check before a full refresh (ls-remote,
-not clone) and for nightly status sweeps across corpora.
+Freshness snapshot of ONE corpus, written as a machine-readable result file.
+Never modifies corpus source-of-truth files. It writes the configured result artifact.
+It may append its path to `.gitignore`, runs bounded validation and process
+commands, and may contact configured upstream git remotes via `git ls-remote`.
+Designed as a cheap pre-check before a full refresh (no clone) and for nightly
+status sweeps across corpora.
 
 **Inputs:**
 - `corpus_path` (required)
@@ -34,7 +37,8 @@ not clone) and for nightly status sweeps across corpora.
    to get `embedded_at`, then count entries whose `last_indexed` postdates it
    (see `patterns/embeddings.md` § Embedding Lag). No lance dir → `null`.
 5. **Write result** (contract below), echo a one-line summary. Never modify
-   the corpus. Write the result file even on ABORT, with `errors` populated.
+   corpus source-of-truth files. Write the result file even on ABORT, with
+   `errors` populated.
 
 ## Output Contract
 
